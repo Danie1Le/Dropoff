@@ -1,6 +1,6 @@
 # Dropoff
 
-Delivery-marketplace backend (Java 21, Spring Boot 3, Postgres, Redis, Kafka). See `PROJECT_OVERVIEW.md`.
+Delivery-marketplace backend. Scope, stack, and milestones: `PROJECT_OVERVIEW.md`. Domain language: `GLOSSARY.md`. Decisions: `docs/adr/`.
 
 ## Agent skills
 
