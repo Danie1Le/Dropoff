@@ -122,7 +122,7 @@ customers(id, name, address, lat, lng)
 couriers(id, name, status, last_lat, last_lng, updated_at)
 orders(id, customer_id, merchant_id, courier_id, status, total_cents,
        idempotency_key UNIQUE, created_at, updated_at)
-order_items(id, order_id, menu_item_id, quantity, price_cents)
+order_lines(id, order_id, menu_item_id, quantity, price_cents)
 order_events(id, order_id, from_status, to_status, created_at)
 ```
 
