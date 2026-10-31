@@ -96,7 +96,7 @@ Entry-level backend and software engineering roles at delivery and marketplace c
 | Layer | Technology |
 |---|---|
 | Language | **Java 21** (optional: Kotlin for one service) |
-| Framework | **Spring Boot 3** (Web, Data JPA, Validation, Actuator, WebSocket) |
+| Framework | **Spring Boot 4** (Web MVC, Data JPA, Validation, Actuator, WebSocket) |
 | Build | Gradle |
 | Database | **PostgreSQL**, with Flyway for migrations |
 | Cache / Geo | **Redis** (`GEOADD` / `GEOSEARCH`) |
