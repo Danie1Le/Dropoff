@@ -9,11 +9,11 @@ A person who places orders and receives deliveries.
 _Avoid_: User, buyer, client, account
 
 **Merchant**:
-A restaurant or shop that sells items and prepares orders.
+A business that sells menu items and prepares orders.
 _Avoid_: Restaurant, store, vendor, seller
 
 **Menu Item**:
-One thing a merchant sells, with a current price and an availability flag.
+One thing a merchant sells at a current price; the merchant can mark it unavailable.
 _Avoid_: Product, dish, SKU
 
 **Courier**:
@@ -23,7 +23,7 @@ _Avoid_: Driver, dasher, rider, shopper
 ## Ordering
 
 **Order**:
-A customer's request to buy one or more menu items from a single merchant, delivered by one courier.
+A customer's request to buy one or more menu items from a single merchant.
 _Avoid_: Purchase, transaction, cart
 
 **Order Line**:
@@ -48,10 +48,14 @@ _Avoid_: Refund, void, rejection
 Choosing a courier for a ready order.
 _Avoid_: Assignment, matching, routing
 
+**Reassignment**:
+Dispatching an order again because its courier declined, did not respond, or went offline before pickup.
+_Avoid_: Redispatch, retry
+
 **Courier Status**:
 Whether a courier can take work right now: Offline, Available, or Busy.
-_Avoid_: Availability, online flag
+_Avoid_: Online flag, online/offline
 
-**Delivery Radius**:
-How far from the merchant dispatch looks for available couriers, measured in straight-line distance.
-_Avoid_: Range, zone, area
+**Dispatch Radius**:
+The distance from a merchant within which dispatch looks for available couriers.
+_Avoid_: Delivery radius, range, zone
