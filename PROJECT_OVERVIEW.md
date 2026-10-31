@@ -164,7 +164,7 @@ WS     /ws  (STOMP)  SUBSCRIBE /topic/orders/{id}   live order + courier updates
 ### Dispatch
 - [ ] Courier registration, status, and location endpoints
 - [ ] Redis geo index for available couriers
-- [ ] Nearest-courier matching when an order is `READY`
+- [ ] Dispatch to the nearest available courier when an order is `READY`
 - [ ] Reassignment when a courier declines or goes offline
 - [ ] Integration tests with Testcontainers
 
