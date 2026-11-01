@@ -13,7 +13,7 @@ A business that sells menu items and prepares orders.
 _Avoid_: Restaurant, store, vendor, seller
 
 **Menu Item**:
-One thing a merchant sells at a current price; the merchant can mark it unavailable.
+One thing a merchant sells at a listed price; the merchant can mark it unavailable.
 _Avoid_: Product, dish, SKU
 
 **Courier**:

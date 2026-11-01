@@ -31,7 +31,7 @@ Entry-level backend and software engineering roles at delivery and marketplace c
 - **Merchants and menus:** create merchants, menus, and items, and toggle item availability.
 - **Orders:** customers place orders, and each order moves through a status lifecycle: `PLACED → ACCEPTED → PREPARING → READY → PICKED_UP → DELIVERED` (or `CANCELLED`).
 - **Couriers:** register couriers, set their status (Offline, Available, Busy), and update their location.
-- **Dispatch:** assign the nearest available courier to a ready order using Redis geo queries.
+- **Dispatch:** pick the nearest available courier for a ready order using Redis geo queries.
 - **REST APIs:** documented with OpenAPI/Swagger.
 - **Validation and error handling:** consistent error responses and input validation.
 
@@ -40,7 +40,7 @@ Entry-level backend and software engineering roles at delivery and marketplace c
 - **Event-driven flow:** services publish and consume Kafka events such as `OrderPlaced`, `OrderReady`, `CourierAssigned`, and `OrderDelivered`.
 - **Live tracking:** WebSocket updates for order status and courier location.
 - **Idempotency:** retry-safe order creation using idempotency keys.
-- **Failure handling:** reassign an order if a courier declines or goes offline, and retry consumers with a dead-letter topic.
+- **Failure handling:** reassign an order if its courier declines, does not respond, or goes offline before pickup, and retry consumers with a dead-letter topic.
 - **Load testing:** k6 scripts that simulate high order volume, with results in the README.
 - **Performance writeup:** before-and-after measurements of an optimization such as an index, a cache, or batching.
 - **Monitoring:** Prometheus metrics and a Grafana dashboard for request latency, orders per minute, and dispatch time.
@@ -165,7 +165,7 @@ WS     /ws  (STOMP)  SUBSCRIBE /topic/orders/{id}   live order + courier updates
 - [ ] Courier registration, status, and location endpoints
 - [ ] Redis geo index for available couriers
 - [ ] Dispatch to the nearest available courier when an order is `READY`
-- [ ] Reassignment when a courier declines or goes offline
+- [ ] Reassignment when a courier declines, does not respond, or goes offline before pickup
 - [ ] Integration tests with Testcontainers
 
 ### Events and Real-time
