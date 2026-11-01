@@ -4,7 +4,7 @@
 
 ## Summary
 
-Dropoff is a backend for a three-sided delivery marketplace: **customers** place orders, **merchants** prepare them, and **couriers** deliver them. It is built as a small set of services that communicate through REST APIs and events, with real-time courier matching and live order tracking.
+Dropoff is a backend for a three-sided delivery marketplace: **customers** place orders, **merchants** prepare them, and **couriers** deliver them. It starts as a modular monolith (one Spring Boot app) and splits into a small set of services that communicate through REST APIs and events, with real-time dispatch and live order tracking.
 
 The goal is a portfolio project that demonstrates production-style backend engineering:
 
@@ -30,7 +30,7 @@ Entry-level backend and software engineering roles at delivery and marketplace c
 
 - **Merchants and menus:** create merchants, menus, and items, and toggle item availability.
 - **Orders:** customers place orders, and each order moves through a status lifecycle: `PLACED → ACCEPTED → PREPARING → READY → PICKED_UP → DELIVERED` (or `CANCELLED`).
-- **Couriers:** register couriers, toggle them online or offline, and update their location.
+- **Couriers:** register couriers, set their status (Offline, Available, Busy), and update their location.
 - **Dispatch:** assign the nearest available courier to a ready order using Redis geo queries.
 - **REST APIs:** documented with OpenAPI/Swagger.
 - **Validation and error handling:** consistent error responses and input validation.
@@ -85,9 +85,9 @@ Entry-level backend and software engineering roles at delivery and marketplace c
 |---|---|---|
 | **merchant-service** | Merchants, menus, items, availability | PostgreSQL |
 | **order-service** | Order creation, status lifecycle, idempotency, WebSocket updates | PostgreSQL |
-| **dispatch-service** | Courier state and location, nearest-courier matching, reassignment | Redis (geo) and PostgreSQL |
+| **dispatch-service** | Courier status and location, dispatch to the nearest available courier, reassignment | Redis (geo) and PostgreSQL |
 
-> Tip: start as a single Spring Boot app with clear packages per domain, then split it into services once the core works. This is faster to build and easy to explain in interviews.
+> Decision: start as a single Spring Boot app with clear packages per domain, then split it into services once the core works (see `docs/adr/0001-modular-monolith-first.md`).
 
 ---
 
@@ -121,9 +121,11 @@ menu_items(id, merchant_id, name, price_cents, is_available)
 customers(id, name, address, lat, lng)
 couriers(id, name, status, last_lat, last_lng, updated_at)
 orders(id, customer_id, merchant_id, courier_id, status, total_cents,
-       idempotency_key UNIQUE, created_at, updated_at)
-order_items(id, order_id, menu_item_id, quantity, price_cents)
+       idempotency_key UNIQUE, request_hash, created_at, updated_at)
+order_lines(id, order_id, menu_item_id, quantity, price_cents)
 order_events(id, order_id, from_status, to_status, created_at)
+dispatch_attempts(id, order_id, courier_id, result, created_at)
+processed_events(event_id UNIQUE, processed_at)
 ```
 
 ---
@@ -140,10 +142,10 @@ GET    /orders/{id}                     get order + status
 PATCH  /orders/{id}/status              advance status (merchant/courier)
 
 POST   /couriers                        register courier
-PATCH  /couriers/{id}/status            online / offline
+PATCH  /couriers/{id}/status            available / offline
 PUT    /couriers/{id}/location          update location
 
-WS     /ws/orders/{id}                  live order + courier updates
+WS     /ws  (STOMP)  SUBSCRIBE /topic/orders/{id}   live order + courier updates
 ```
 
 ---
@@ -161,8 +163,8 @@ WS     /ws/orders/{id}                  live order + courier updates
 
 ### Dispatch
 - [ ] Courier registration, status, and location endpoints
-- [ ] Redis geo index for online couriers
-- [ ] Nearest-courier matching when an order is `READY`
+- [ ] Redis geo index for available couriers
+- [ ] Dispatch to the nearest available courier when an order is `READY`
 - [ ] Reassignment when a courier declines or goes offline
 - [ ] Integration tests with Testcontainers
 
