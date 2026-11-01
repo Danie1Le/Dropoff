@@ -19,7 +19,7 @@
   --bg: #f6f7f9; --surface: #ffffff; --surface-2: #f0f2f5; --text: #17202a; --muted: #5d6875;
   --border: #d9dee5; --accent: #2f6fde; --accent-soft: #e5eefc;
   --ok: #1f8a4c; --ok-soft: #e3f4ea; --warn: #b26a00; --warn-soft: #fbefd9;
-  --block: #8a94a0; --block-soft: #eceff2;
+  --block: #8a94a0; --block-soft: #eceff2; --danger: #c2413b;
   --m-merchant: #c27c0e; --m-order: #2f6fde; --m-dispatch: #1f8a4c; --m-common: #7a6bd1;
   --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
   color-scheme: light;
@@ -29,7 +29,7 @@
     --bg: #0f1318; --surface: #171c23; --surface-2: #1f262f; --text: #e6eaef; --muted: #9aa5b1;
     --border: #2c3540; --accent: #6ea0ff; --accent-soft: #1b2a44;
     --ok: #4cc27f; --ok-soft: #16301f; --warn: #e5a443; --warn-soft: #362a14;
-    --block: #7c8794; --block-soft: #232a32;
+    --block: #7c8794; --block-soft: #232a32; --danger: #f07a73;
     --m-merchant: #e5a443; --m-order: #6ea0ff; --m-dispatch: #4cc27f; --m-common: #a597f0;
     --shadow: none; color-scheme: dark;
   }
@@ -38,13 +38,14 @@
   --bg: #0f1318; --surface: #171c23; --surface-2: #1f262f; --text: #e6eaef; --muted: #9aa5b1;
   --border: #2c3540; --accent: #6ea0ff; --accent-soft: #1b2a44;
   --ok: #4cc27f; --ok-soft: #16301f; --warn: #e5a443; --warn-soft: #362a14;
-  --block: #7c8794; --block-soft: #232a32;
+  --block: #7c8794; --block-soft: #232a32; --danger: #f07a73;
   --m-merchant: #e5a443; --m-order: #6ea0ff; --m-dispatch: #4cc27f; --m-common: #a597f0;
   --shadow: none; color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; scroll-padding-top: 64px; }
+html { scroll-padding-top: 64px; }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
 body {
   margin: 0; background: var(--bg); color: var(--text);
   font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -119,7 +120,7 @@ button.btn[aria-pressed="true"] { background: var(--accent); border-color: var(-
 /* planning graph */
 .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--muted); margin-bottom: 12px; }
 .legend span { display: inline-flex; gap: 6px; align-items: center; }
-.graph { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px 56px; padding: 16px; }
+.graph { position: relative; display: grid; grid-template-columns: repeat(var(--cols, 3), 1fr); gap: 14px 56px; padding: 16px; }
 .graph .col { display: flex; flex-direction: column; gap: 10px; }
 .graph .colh { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 .graph svg.edges { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
@@ -165,7 +166,7 @@ svg .ah2 { fill: var(--accent); }
 .st { padding: 8px 12px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--surface-2); font: 600 13px ui-monospace, Consolas, monospace; text-align: center; }
 .st small { display: block; font: 11px system-ui, sans-serif; color: var(--muted); }
 .st.fin { border-color: var(--ok); color: var(--ok); }
-.st.cx { border-color: #c2413b; color: #c2413b; }
+.st.cx { border-color: var(--danger); color: var(--danger); }
 .arr { color: var(--muted); font-size: 18px; flex: none; }
 .cxrow { display: flex; align-items: center; gap: 10px; margin-top: 12px; min-width: 760px; font-size: 13px; color: var(--muted); }
 
@@ -184,6 +185,7 @@ svg .ah2 { fill: var(--accent); }
 .tbl.order { border-top-color: var(--m-order); }
 .tbl.dispatch { border-top-color: var(--m-dispatch); }
 .tbl.common { border-top-color: var(--m-common); }
+.tbl.unowned { border-top-color: var(--border); }
 .tbl .th { padding: 10px 12px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; border-bottom: 1px solid var(--border); }
 .tbl .th b { font-family: ui-monospace, Consolas, monospace; }
 .tbl table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -215,7 +217,7 @@ table.list tr:last-child td { border-bottom: 0; }
 details.rounds { margin-top: 14px; }
 details.rounds summary { cursor: pointer; font-weight: 600; padding: 12px 16px; }
 details.rounds .body { padding: 0 16px 14px; display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
-details.rounds ol { margin: 6px 0 0; padding-left: 22px; font-size: 14px; }
+details.rounds ol, details.rounds ul { margin: 6px 0 0; padding-left: 22px; font-size: 14px; }
 details.rounds li { margin-bottom: 3px; }
 .gl { padding: 12px 14px; }
 .gl b { display: block; }
@@ -436,7 +438,7 @@ footer { padding: 40px 0 48px; color: var(--muted); font-size: 13px; }
 <!-- API -->
 <section id="api">
   <h2>API</h2>
-  <p class="lede">REST endpoints documented with springdoc (Swagger UI). Error format, versioning and pagination are open in <a href="https://github.com/Danie1Le/Dropoff/issues/8">API conventions: errors, versioning, pagination</a>. Endpoints for customers, merchant open/close and item availability are open in <a href="https://github.com/Danie1Le/Dropoff/issues/9">Missing endpoints</a>.</p>
+  <p class="lede">REST endpoints documented with springdoc (Swagger UI). Error format, versioning and pagination are open in <a href="https://github.com/Danie1Le/Dropoff/issues/8">API conventions: errors, versioning, pagination</a>. Endpoints for customers, merchant open/close and item availability are open in <a href="https://github.com/Danie1Le/Dropoff/issues/9">Missing endpoints</a>. Who may call the status endpoint is open in <a href="https://github.com/Danie1Le/Dropoff/issues/10">Who may change an order's status without auth?</a>; accept/decline endpoints for couriers are open in <a href="https://github.com/Danie1Le/Dropoff/issues/11">Courier offer lifecycle</a>.</p>
   <div class="card tw"><table class="list" id="apitable"><thead><tr><th>Method</th><th>Path</th><th>Does</th><th>Module</th><th>Milestone</th></tr></thead><tbody></tbody></table></div>
 </section>
 
@@ -453,7 +455,7 @@ footer { padding: 40px 0 48px; color: var(--muted); font-size: 13px; }
   <p class="lede">Architecture Decision Records in <code>docs/adr/</code>, plus the 27 foundational decisions from the first planning session.</p>
   <div class="grid" id="adrs"></div>
   <details class="card rounds">
-    <summary>The 27 foundational decisions (grilling rounds 1–5)</summary>
+    <summary>The 27 foundational decisions (rounds 1–4) and engineering choices (round 5)</summary>
     <div class="body" id="rounds"></div>
   </details>
 </section>
@@ -512,7 +514,6 @@ const MILESTONES = [
     { t: 'GitHub Actions: build + test on every push' },
     { t: 'main ruleset: require the CI check to pass' },
     { t: 'CODING_STANDARDS.md + formatter wired into the build' },
-    { t: 'MIT LICENSE' },
   ]},
   { id: 'M1', name: 'Merchants & menus', gh: 2, needs: [8, 9], goal: 'Merchants can list what they sell.', items: [
     { t: 'Migration: merchants, menu_items' },
@@ -522,7 +523,7 @@ const MILESTONES = [
     { t: 'Swagger UI via springdoc 3.2.0' },
     { t: 'Tests: web slice + Testcontainers repository tests' },
   ]},
-  { id: 'M2', name: 'Orders', gh: 3, needs: [9, 10, 13, 15], goal: 'Customers place orders that move through a safe lifecycle.', items: [
+  { id: 'M2', name: 'Orders', gh: 3, needs: [8, 9, 10, 13, 15], goal: 'Customers place orders that move through a safe lifecycle.', items: [
     { t: 'Migrations: customers, orders, order_lines, order_events' },
     { t: 'POST /orders: server computes total, price snapshot per order line' },
     { t: 'Reject unavailable or wrong-merchant menu items' },
@@ -539,14 +540,14 @@ const MILESTONES = [
     { t: 'On READY: GEOSEARCH 5 km dispatch radius, nearest first' },
     { t: 'Claim with UPDATE … WHERE status = AVAILABLE' },
     { t: '30 s offer; decline or timeout → reassignment' },
-    { t: 'Retry job every 10 s when no courier is found' },
+    { t: 'Job tries dispatch again every 10 s when no courier is found' },
     { t: 'Courier offline before pickup → auto-reassign' },
     { t: 'Testcontainers integration tests (Postgres + Redis)' },
   ]},
   { id: 'M4', name: 'Live tracking', gh: 5, needs: [12], goal: 'Customers watch their order and courier move live.', items: [
     { t: 'STOMP over WebSocket at /ws' },
     { t: 'Push status changes to /topic/orders/{id}' },
-    { t: 'Push courier location at most every 5 s after assignment' },
+    { t: 'Push courier location at most every 5 s once a courier is dispatched' },
     { t: 'Integration test with a STOMP client' },
   ]},
   { id: 'M5', name: 'Kafka & service split', gh: 6, needs: [15, 16], goal: 'Three services talking through durable events.', items: [
@@ -569,12 +570,12 @@ const MILESTONES = [
     { t: 'One or two optimizations, measured before and after' },
     { t: 'Results written up in the README' },
   ]},
-  { id: 'M8', name: 'Polish', gh: 9, needs: [], goal: 'A repo a recruiter can understand in two minutes.', items: [
+  { id: 'M8', name: 'Polish', gh: 9, needs: [], goal: 'A repo a reviewer can understand at a glance.', items: [
     { t: 'README: architecture diagram, setup steps, screenshots' },
     { t: 'Swagger docs complete' },
     { t: 'Demo GIF or short video' },
     { t: 'Notes on how AI tools were used and checked' },
-    { t: 'Known gaps section (no auth, no payments)' },
+    { t: 'Known gap noted: no auth' },
   ]},
 ];
 
@@ -594,26 +595,26 @@ const OUT_OF_SCOPE = [
 ];
 
 const FLOW = [
-  { h: 'Customer places an order', m: 'M2', p: 'POST /orders with an Idempotency-Key header and only menu item ids + quantities. The order module checks every item belongs to the merchant and is available, copies each price onto its order line (price snapshot), computes the total, and saves orders + order_lines + order_events in one transaction. Same key again returns the original order.', tags: [['Postgres', 'acc'], ['OrderPlaced', 'warn'], ['PLACED', '']] },
-  { h: 'Merchant accepts and prepares', m: 'M2', p: 'Each status change is checked by the state machine, written to orders, and logged as an order_events row. The customer can still cancel while the order is PLACED or ACCEPTED.', tags: [['Postgres', 'acc'], ['ACCEPTED → PREPARING', '']] },
+  { h: 'Customer places an order', m: 'M2', p: 'POST /orders with an Idempotency-Key header and only menu item ids + quantities. The order module checks every item belongs to the merchant and is available, copies each price onto its order line (price snapshot), computes the total, and saves orders, order_lines and an order_events row. Same key again returns the original order.', tags: [['Postgres', 'acc'], ['OrderPlaced', 'warn'], ['PLACED', '']] },
+  { h: 'Merchant accepts and prepares', m: 'M2', p: 'Each status change is checked by the state machine, written to orders, and logged as an order_events row. Cancellation is still allowed while the order is PLACED or ACCEPTED (who may cancel: ticket "Who may change an order\'s status without auth?").', tags: [['Postgres', 'acc'], ['ACCEPTED → PREPARING', '']] },
   { h: 'Order is ready: dispatch starts', m: 'M3', p: 'READY publishes OrderReady. The dispatch module runs GEOSEARCH in Redis for AVAILABLE couriers within 5 km of the merchant (the dispatch radius), nearest first, skipping couriers who declined this order.', tags: [['OrderReady', 'warn'], ['Redis GEO', 'acc'], ['READY', '']] },
-  { h: 'Claim the courier and send an offer', m: 'M3', p: 'An UPDATE couriers SET status = BUSY … WHERE status = AVAILABLE claims the courier; if two orders race, only one UPDATE wins. A dispatch_attempts row records the OFFERED offer, and the courier has 30 s to respond.', tags: [['Postgres', 'acc'], ['dispatch_attempts', '']] },
-  { h: 'Decline, timeout or nobody nearby', m: 'M3', p: 'Decline or no answer → reassignment to the next nearest courier. Nobody in range → a job retries every 10 s. A courier going offline before pickup is reassigned automatically.', tags: [['@Scheduled jobs', ''], ['Reassignment', 'warn']] },
-  { h: 'Courier assigned: live tracking begins', m: 'M4', p: 'CourierAssigned sets orders.courier_id. Status changes and the courier’s location (at most every 5 s) are pushed over STOMP to /topic/orders/{id}.', tags: [['CourierAssigned', 'warn'], ['WebSocket', 'acc']] },
-  { h: 'Pickup and delivery', m: 'M3', p: 'PICKED_UP needs an assigned courier, then DELIVERED. The courier goes back to AVAILABLE and is re-added to the Redis geo index, ready for the next order.', tags: [['OrderPickedUp', 'warn'], ['OrderDelivered', 'warn'], ['DELIVERED', 'ok']] },
+  { h: 'Claim the courier and send an offer', m: 'M3', p: 'An UPDATE couriers SET status = BUSY … WHERE status = AVAILABLE claims the courier; if two orders race, only one UPDATE wins. A dispatch_attempts row records the OFFERED offer, and the courier has 30 s to decline. Whether an explicit accept is needed, and when orders.courier_id is set, is open in "Courier offer lifecycle".', tags: [['Postgres', 'acc'], ['dispatch_attempts', '']] },
+  { h: 'Decline, timeout or nobody nearby', m: 'M3', p: 'Decline or no answer → reassignment to the next nearest courier. No courier within the dispatch radius → a job tries dispatch again every 10 s. A courier going offline before pickup is reassigned automatically.', tags: [['@Scheduled jobs', ''], ['Reassignment', 'warn']] },
+  { h: 'Courier dispatched: live tracking begins', m: 'M4', p: 'CourierAssigned fires once the courier is dispatched. Status changes and the courier’s location (at most every 5 s) are pushed over STOMP to /topic/orders/{id}.', tags: [['CourierAssigned', 'warn'], ['WebSocket', 'acc']] },
+  { h: 'Pickup and delivery', m: 'M3', p: 'PICKED_UP needs a courier on the order, then DELIVERED. The courier goes back to AVAILABLE and is re-added to the Redis geo index, ready for the next order.', tags: [['OrderPickedUp', 'warn'], ['OrderDelivered', 'warn'], ['DELIVERED', 'ok']] },
   { h: 'At M5 the same flow runs on Kafka', m: 'M5', p: 'Each event is written to an outbox table in the same transaction as the change, then relayed to Kafka keyed by orderId. Consumers skip duplicates using processed_events; failures retry 3 times, then go to a dead-letter topic.', tags: [['Kafka', 'acc'], ['Outbox', ''], ['DLT', 'blk']] },
 ];
 
 const TABLES = [
-  { name: 'merchants', mod: 'merchant', ms: 'M1', cols: [['id', 'BIGINT', 'pk'], ['name', 'TEXT'], ['address', 'TEXT'], ['lat, lng', 'coordinates'], ['is_open', 'BOOLEAN']] },
-  { name: 'menu_items', mod: 'merchant', ms: 'M1', cols: [['id', 'BIGINT', 'pk'], ['merchant_id', '→ merchants', 'fk'], ['name', 'TEXT'], ['price_cents', 'BIGINT ≥ 0'], ['is_available', 'BOOLEAN']] },
-  { name: 'customers', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['name', 'TEXT'], ['address', 'TEXT'], ['lat, lng', 'coordinates']], note: 'Endpoints and address snapshot open in ticket 9.' },
-  { name: 'orders', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['customer_id', '→ customers', 'fk'], ['merchant_id', '→ merchants', 'fk'], ['courier_id', '→ couriers (nullable)', 'fk'], ['status', 'TEXT + CHECK'], ['total_cents', 'BIGINT ≥ 0'], ['idempotency_key', 'TEXT', 'uq'], ['request_hash', 'TEXT'], ['created_at, updated_at', 'TIMESTAMPTZ']] },
-  { name: 'order_lines', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['order_id', '→ orders', 'fk'], ['menu_item_id', '→ menu_items', 'fk'], ['quantity', 'INT > 0'], ['price_cents', 'price snapshot']], note: 'price_cents is copied on purpose (ADR-0004).' },
-  { name: 'order_events', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['order_id', '→ orders', 'fk'], ['from_status', 'TEXT'], ['to_status', 'TEXT'], ['created_at', 'TIMESTAMPTZ']], note: 'Relation to the M5 outbox open in ticket 15.' },
-  { name: 'couriers', mod: 'dispatch', ms: 'M3', cols: [['id', 'BIGINT', 'pk'], ['name', 'TEXT'], ['status', 'OFFLINE / AVAILABLE / BUSY'], ['last_lat, last_lng', 'last known'], ['updated_at', 'TIMESTAMPTZ']], note: 'Live location of AVAILABLE couriers lives in Redis.' },
+  { name: 'merchants', mod: 'merchant', ms: 'M1', cols: [['id', 'BIGINT', 'pk'], ['name', ''], ['address', ''], ['lat, lng', 'coordinates'], ['is_open', 'BOOLEAN']] },
+  { name: 'menu_items', mod: 'merchant', ms: 'M1', cols: [['id', 'BIGINT', 'pk'], ['merchant_id', '→ merchants', 'fk'], ['name', ''], ['price_cents', 'BIGINT ≥ 0'], ['is_available', 'BOOLEAN']] },
+  { name: 'customers', mod: 'unowned', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['name', ''], ['address', ''], ['lat, lng', 'coordinates']], note: 'Endpoints open in "Missing endpoints"; owning module open in "Service split".' },
+  { name: 'orders', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['customer_id', '→ customers', 'fk'], ['merchant_id', '→ merchants', 'fk'], ['courier_id', '→ couriers (nullable)', 'fk'], ['status', 'CHECK-guarded'], ['total_cents', 'BIGINT ≥ 0'], ['idempotency_key', '', 'uq'], ['request_hash', ''], ['created_at, updated_at', 'TIMESTAMPTZ']] },
+  { name: 'order_lines', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['order_id', '→ orders', 'fk'], ['menu_item_id', '→ menu_items', 'fk'], ['quantity', ''], ['price_cents', 'price snapshot']], note: 'price_cents is copied on purpose (ADR-0004).' },
+  { name: 'order_events', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['order_id', '→ orders', 'fk'], ['from_status', ''], ['to_status', ''], ['created_at', 'TIMESTAMPTZ']], note: 'Relation to the M5 outbox open in ticket 15.' },
+  { name: 'couriers', mod: 'dispatch', ms: 'M3', cols: [['id', 'BIGINT', 'pk'], ['name', ''], ['status', 'OFFLINE / AVAILABLE / BUSY'], ['last_lat, last_lng', 'last known'], ['updated_at', 'TIMESTAMPTZ']], note: 'Live location of AVAILABLE couriers lives in Redis.' },
   { name: 'dispatch_attempts', mod: 'dispatch', ms: 'M3', cols: [['id', 'BIGINT', 'pk'], ['order_id', '→ orders', 'fk'], ['courier_id', '→ couriers', 'fk'], ['result', 'OFFERED / ACCEPTED / DECLINED / TIMED_OUT'], ['created_at', 'TIMESTAMPTZ']] },
-  { name: 'processed_events', mod: 'common', ms: 'M5', cols: [['event_id', 'UUID', 'uq'], ['processed_at', 'TIMESTAMPTZ']], note: 'Consumer dedupe. The outbox table also lands at M5.' },
+  { name: 'processed_events', mod: 'common', ms: 'M5', cols: [['event_id', '', 'uq'], ['processed_at', 'TIMESTAMPTZ']], note: 'Consumer dedupe. The outbox table also lands at M5.' },
 ];
 const FK = { menu_items: ['merchants'], orders: ['customers', 'merchants', 'couriers'], order_lines: ['orders', 'menu_items'], order_events: ['orders'], dispatch_attempts: ['orders', 'couriers'] };
 
@@ -643,6 +644,8 @@ const STACK = [
   ['Load testing', 'grafana/k6:2.3.0', '', '#6'],
   ['Monitoring', 'Micrometer 1.17, prom/prometheus:v3.13.5, grafana/grafana:13.3.0', '', '#6'],
   ['CI/CD', 'GitHub Actions + GHCR', 'build+test from M0, images at M6', ''],
+  ['Containers', 'Docker + Docker Compose', '', ''],
+  ['Tools', 'IntelliJ IDEA Community, Postman/Bruno, Git', '', ''],
 ];
 
 const ADRS = [
@@ -664,21 +667,21 @@ const GLOSSARY = [
   ['Marketplace', [
     ['Customer', 'A person who places orders and receives deliveries.', ['User', 'buyer', 'client', 'account']],
     ['Merchant', 'A business that sells menu items and prepares orders.', ['Restaurant', 'store', 'vendor', 'seller']],
-    ['Menu Item', 'One thing a merchant sells at a current price; can be marked unavailable.', ['Product', 'dish', 'SKU']],
-    ['Courier', 'A person who picks up a ready order and delivers it.', ['Driver', 'dasher', 'rider', 'shopper']],
+    ['Menu Item', 'One thing a merchant sells at a listed price; the merchant can mark it unavailable.', ['Product', 'dish', 'SKU']],
+    ['Courier', 'A person who picks up a ready order from a merchant and delivers it to a customer.', ['Driver', 'dasher', 'rider', 'shopper']],
   ]],
   ['Ordering', [
-    ['Order', 'A customer’s request to buy menu items from a single merchant.', ['Purchase', 'transaction', 'cart']],
-    ['Order Line', 'One menu item on an order, with quantity and price snapshot.', ['Order item', 'line item', 'cart item']],
-    ['Price Snapshot', 'The menu item’s price copied onto the order line at order time; never changes.', ['Cached price', 'current price']],
-    ['Order Status', 'Placed, Accepted, Preparing, Ready, Picked Up, Delivered, or Cancelled.', ['State', 'stage', 'phase']],
+    ['Order', "A customer's request to buy one or more menu items from a single merchant.", ['Purchase', 'transaction', 'cart']],
+    ['Order Line', 'One menu item on an order, with its quantity and price snapshot.', ['Order item', 'line item', 'cart item']],
+    ['Price Snapshot', 'The price of a menu item copied onto an order line at the moment the order is placed; never changes afterward.', ['Cached price', 'current price']],
+    ['Order Status', 'Where an order is in its lifecycle: Placed, Accepted, Preparing, Ready, Picked Up, Delivered, or Cancelled.', ['State', 'stage', 'phase']],
     ['Cancellation', 'Ending an order before the merchant starts preparing it.', ['Refund', 'void', 'rejection']],
   ]],
   ['Dispatch', [
     ['Dispatch', 'Choosing a courier for a ready order.', ['Assignment', 'matching', 'routing']],
-    ['Reassignment', 'Dispatching again after a decline, no response, or going offline before pickup.', ['Redispatch', 'retry']],
-    ['Courier Status', 'Offline, Available, or Busy.', ['Online flag', 'online/offline']],
-    ['Dispatch Radius', 'Distance from a merchant within which dispatch looks for couriers.', ['Delivery radius', 'range', 'zone']],
+    ['Reassignment', 'Dispatching an order again because its courier declined, did not respond, or went offline before pickup.', ['Redispatch', 'retry']],
+    ['Courier Status', 'Whether a courier can take work right now: Offline, Available, or Busy.', ['Online flag', 'online/offline']],
+    ['Dispatch Radius', 'The distance from a merchant within which dispatch looks for available couriers.', ['Delivery radius', 'range', 'zone']],
   ]],
 ];
 
@@ -692,11 +695,16 @@ const SCOPE = [
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const byN = Object.fromEntries(TICKETS.map(t => [t.n, t]));
-const issue = n => `${REPO}/issues/${n}`;
+const issue = n => `${REPO}/issues/${esc(n)}`;
+const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Ticket helpers. Ids missing from TICKETS are ignored everywhere.
+const isOpen = n => !!byN[n] && byN[n].state !== 'closed';
+const blockers = t => (t.blockedBy || []).map(b => byN[b]).filter(Boolean);
+const unblocks = n => TICKETS.filter(x => blockers(x).some(b => b.n === n));
 
 function ticketStatus(t) {
   if (t.state === 'closed') return 'closed';
-  if ((t.blockedBy || []).some(b => byN[b] && byN[b].state !== 'closed')) return 'blocked';
+  if (blockers(t).some(b => isOpen(b.n))) return 'blocked';
   if (t.claimed) return 'claimed';
   return 'frontier';
 }
@@ -722,30 +730,31 @@ function renderRoadmap() {
   $('#kpis').innerHTML = `
     <div class="card kpi"><div class="label">Planning decisions</div><div class="value">${closed} / ${TICKETS.length}</div><div class="bar ok" style="margin:6px 0"><i style="width:${closed / TICKETS.length * 100}%"></i></div><div class="sub">${frontier} ready to take now</div></div>
     <div class="card kpi"><div class="label">Build milestones</div><div class="value">${doneMs} / ${MILESTONES.length}</div><div class="bar ok" style="margin:6px 0"><i style="width:${doneMs / MILESTONES.length * 100}%"></i></div><div class="sub">${planningDone ? 'Planning complete' : 'Build starts after planning'}</div></div>
-    <div class="card kpi"><div class="label">Next milestone</div><div class="value">${next ? next.id : '—'}</div><div class="sub">${next ? esc(next.name) + ' · needs ' + next.needs.filter(n => byN[n].state !== 'closed').length + ' open decision(s)' : 'All done'}</div></div>
-    <div class="card kpi"><div class="label">Working on</div><div class="value" style="font-size:1rem;line-height:1.35;margin-top:4px">${current ? `<a href="${issue(current.n)}">${esc(current.title)}</a>` : 'Nothing claimed'}</div><div class="sub">${current ? 'wayfinder ticket, ' + current.type : ''}</div></div>`;
+    <div class="card kpi"><div class="label">Next milestone</div><div class="value">${next ? esc(next.id) : '—'}</div><div class="sub">${next ? esc(next.name) + ' · needs ' + next.needs.filter(isOpen).length + ' open decision(s)' : 'All done'}</div></div>
+    <div class="card kpi"><div class="label">Working on</div><div class="value" style="font-size:1rem;line-height:1.35;margin-top:4px">${current ? `<a href="${issue(current.n)}">${esc(current.title)}</a>` : 'Nothing claimed'}</div><div class="sub">${current ? 'wayfinder ticket, ' + esc(current.type) : ''}</div></div>`;
 
   const stages = [{ id: 'Plan', name: 'Planning map', done: closed, total: TICKETS.length, anchor: '#planning' }]
     .concat(MILESTONES.map(m => ({ id: m.id, name: m.name, done: msCount(m), total: m.items.length, anchor: '#ms-' + m.id })));
   const nextId = planningDone ? (next && next.id) : 'Plan';
   $('#track').innerHTML = stages.map(s => {
     const cls = s.done === s.total ? 'done' : (s.id === nextId ? 'next' : '');
-    return `<button class="stage ${cls}" type="button" data-go="${s.anchor}"><div class="id">${s.id}${s.done === s.total ? ' ✓' : ''}</div><div class="nm">${esc(s.name)}</div><div class="bar"><i style="width:${s.done / s.total * 100}%"></i></div></button>`;
+    return `<button class="stage ${cls}" type="button" data-go="${esc(s.anchor)}"><div class="id">${esc(s.id)}${s.done === s.total ? ' ✓' : ''}</div><div class="nm">${esc(s.name)}</div><div class="bar"><i style="width:${s.done / s.total * 100}%"></i></div></button>`;
   }).join('');
 
   $('#milestones').innerHTML = MILESTONES.map(m => {
     const c = msCount(m), all = c === m.items.length;
-    const needs = m.needs.length ? `<div class="needs"><span class="muted">Decisions:</span>${m.needs.map(n => {
-      const t = byN[n], [lbl, cls] = STATUS_LABEL[ticketStatus(t)];
-      return `<a class="chip ${cls}" href="${issue(n)}" title="${esc(t.title)} · ${lbl}">${esc(shortTitle(t.title))}</a>`;
+    const needTickets = m.needs.map(n => byN[n]).filter(Boolean);
+    const needs = needTickets.length ? `<div class="needs"><span class="muted">Decisions:</span>${needTickets.map(t => {
+      const [lbl, cls] = STATUS_LABEL[ticketStatus(t)];
+      return `<a class="chip ${cls}" href="${issue(t.n)}" title="${esc(t.title)} · ${lbl}">${esc(shortTitle(t.title))}</a>`;
     }).join('')}</div>` : '';
-    return `<article class="card ms ${m === next ? 'next' : ''} ${all ? 'done' : ''}" id="ms-${m.id}">
-      <div class="head"><h3><span>${m.id}</span>${esc(m.name)}</h3>${m === next ? '<span class="chip acc">Next</span>' : all ? '<span class="chip ok">Done</span>' : ''}</div>
+    return `<article class="card ms ${m === next ? 'next' : ''} ${all ? 'done' : ''}" id="ms-${esc(m.id)}">
+      <div class="head"><h3><span>${esc(m.id)}</span>${esc(m.name)}</h3>${m === next ? '<span class="chip acc">Next</span>' : all ? '<span class="chip ok">Done</span>' : ''}</div>
       <p class="goal">${esc(m.goal)}</p>
       <div class="bar ${all ? 'ok' : ''}"><i style="width:${c / m.items.length * 100}%"></i></div>
       ${needs}
-      <ul>${m.items.map((it, i) => `<li class="${isDone(m, it) ? 'checked' : ''}"><label><input type="checkbox" data-ms="${m.id}" data-i="${i}" ${isDone(m, it) ? 'checked' : ''}><span>${esc(it.t)}</span></label></li>`).join('')}</ul>
-      <div class="foot"><span class="muted">${c} / ${m.items.length} done</span><a href="${REPO}/milestone/${m.gh}">GitHub milestone →</a></div>
+      <ul>${m.items.map((it, i) => `<li class="${isDone(m, it) ? 'checked' : ''}"><label><input type="checkbox" data-ms="${esc(m.id)}" data-i="${i}" ${isDone(m, it) ? 'checked' : ''}><span>${esc(it.t)}</span></label></li>`).join('')}</ul>
+      <div class="foot"><span class="muted">${c} / ${m.items.length} done</span><a href="${REPO}/milestone/${esc(m.gh)}">GitHub milestone →</a></div>
     </article>`;
   }).join('');
 }
@@ -756,33 +765,44 @@ document.addEventListener('change', e => {
   if (!cb) return;
   const m = MILESTONES.find(x => x.id === cb.dataset.ms), it = m.items[+cb.dataset.i];
   if (cb.checked === !!it.done) delete marks[key(m, it)]; else marks[key(m, it)] = cb.checked;
+  const { ms, i } = cb.dataset;
   saveMarks(); renderRoadmap();
+  const again = [...document.querySelectorAll('input[data-ms][data-i]')].find(x => x.dataset.ms === ms && x.dataset.i === i);
+  if (again) again.focus();
 });
 document.addEventListener('click', e => {
   const st = e.target.closest('[data-go]');
-  if (st) { const el = $(st.dataset.go); if (el) el.scrollIntoView({ behavior: 'smooth' }); }
+  if (st) { const el = $(st.dataset.go); if (el) el.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth' }); }
 });
 $('#reset').addEventListener('click', () => { marks = {}; saveMarks(); renderRoadmap(); });
 
 /* planning graph */
-function depth(t, seen = new Set()) {
-  if (seen.has(t.n)) return 0; seen.add(t.n);
-  const bs = (t.blockedBy || []).map(b => byN[b]).filter(Boolean);
-  return bs.length ? 1 + Math.max(...bs.map(b => depth(b, seen))) : 0;
+// Longest chain of blockers above a ticket. Memoized per ticket; `path` holds only the
+// tickets on the current chain, so a cycle stops at 0 without hiding sibling branches.
+const depthMemo = new Map();
+function depth(t, path = new Set()) {
+  if (depthMemo.has(t.n)) return depthMemo.get(t.n);
+  if (path.has(t.n)) return 0;
+  path.add(t.n);
+  const bs = blockers(t);
+  const d = bs.length ? 1 + Math.max(...bs.map(b => depth(b, path))) : 0;
+  path.delete(t.n);
+  depthMemo.set(t.n, d);
+  return d;
 }
 function renderGraph() {
   const cols = [];
   TICKETS.forEach(t => { const d = depth(t); (cols[d] = cols[d] || []).push(t); });
-  const heads = ['Takeable once its blockers close →', 'Needs one decision first', 'Needs two in a row'];
+  const heads = ['No blockers', 'Needs one decision first', 'Needs two in a row'];
   const g = $('#graph');
-  g.style.gridTemplateColumns = `repeat(${cols.length}, 1fr)`;
-  g.innerHTML = '<svg class="edges" aria-hidden="true"></svg>' + cols.map((col, i) => `<div class="col"><div class="colh">${i === 0 ? 'No blockers' : heads[i] || ''}</div>${col.map(t => {
+  g.style.setProperty('--cols', cols.length);
+  g.innerHTML = '<svg class="edges" aria-hidden="true"></svg>' + cols.map((col, i) => `<div class="col"><div class="colh">${esc(heads[i] || '')}</div>${(col || []).map(t => {
     const st = ticketStatus(t), [lbl, cls] = STATUS_LABEL[st];
-    const blockers = (t.blockedBy || []).map(b => shortTitle(byN[b].title));
-    return `<div class="tk ${st}" data-n="${t.n}">
+    const after = blockers(t).map(b => shortTitle(b.title));
+    return `<div class="tk ${st}" data-n="${esc(t.n)}">
       <a class="t" href="${issue(t.n)}">${esc(t.title)}</a>
       <div class="gist">${esc(t.gist || t.q || '')}</div>
-      <div class="meta"><span class="chip ${cls}">${lbl}</span><span class="chip">${t.type}</span>${blockers.length ? `<span class="small muted">after: ${esc(blockers.join(', '))}</span>` : ''}</div>
+      <div class="meta"><span class="chip ${cls}">${lbl}</span><span class="chip">${esc(t.type)}</span>${after.length ? `<span class="small muted">after: ${esc(after.join(', '))}</span>` : ''}</div>
     </div>`;
   }).join('')}</div>`).join('');
   drawEdges();
@@ -792,61 +812,77 @@ function drawEdges(hl) {
   if (!svg || getComputedStyle(svg).display === 'none') return;
   const gr = g.getBoundingClientRect();
   let out = '';
-  TICKETS.forEach(t => (t.blockedBy || []).forEach(b => {
+  TICKETS.forEach(t => blockers(t).forEach(({ n: b }) => {
     const a = $(`.tk[data-n="${b}"]`, g), c = $(`.tk[data-n="${t.n}"]`, g);
     if (!a || !c) return;
     const ra = a.getBoundingClientRect(), rc = c.getBoundingClientRect();
     const x1 = ra.right - gr.left, y1 = ra.top + ra.height / 2 - gr.top;
     const x2 = rc.left - gr.left, y2 = rc.top + rc.height / 2 - gr.top;
     const dx = Math.max(24, (x2 - x1) / 2);
-    const live = byN[b].state !== 'closed';
+    const live = isOpen(b);
     const on = hl && (hl === b || hl === t.n);
     out += `<path class="${live ? 'live' : ''} ${on ? 'hl' : ''}" d="M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2 - 4},${y2}" marker-end="url(#gh)"/>`;
   }));
   svg.innerHTML = `<defs><marker id="gh" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent);stroke:none"/></marker></defs>` + out;
 }
-$('#graph').addEventListener('mouseover', e => {
+function highlightTicket(e) {
   const tk = e.target.closest('.tk'); if (!tk) return;
-  const n = +tk.dataset.n, t = byN[n];
-  const linked = new Set([n, ...(t.blockedBy || []), ...TICKETS.filter(x => (x.blockedBy || []).includes(n)).map(x => x.n)]);
+  const n = +tk.dataset.n, t = byN[n]; if (!t) return;
+  const linked = new Set([n, ...blockers(t).map(b => b.n), ...unblocks(n).map(x => x.n)]);
   document.querySelectorAll('#graph .tk').forEach(el => el.classList.toggle('hl', linked.has(+el.dataset.n) && linked.size > 1));
   drawEdges(n);
-});
-$('#graph').addEventListener('mouseleave', () => { document.querySelectorAll('#graph .tk').forEach(el => el.classList.remove('hl')); drawEdges(); });
-let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => drawEdges(), 80); });
+}
+function clearTicketHighlight() { document.querySelectorAll('#graph .tk').forEach(el => el.classList.remove('hl')); drawEdges(); }
+$('#graph').addEventListener('mouseover', highlightTicket);
+$('#graph').addEventListener('focusin', highlightTicket);
+$('#graph').addEventListener('mouseleave', clearTicketHighlight);
+$('#graph').addEventListener('focusout', e => { if (!$('#graph').contains(e.relatedTarget)) clearTicketHighlight(); });
+let resizeTimer; window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => drawEdges(), 80); });
 
 /* the rest */
 function renderStatic() {
   $('#fog').innerHTML = FOG.map(([h, d]) => `<li><b>${esc(h)}</b>: ${esc(d)}</li>`).join('');
   $('#oos').innerHTML = OUT_OF_SCOPE.map(([h, d]) => `<li><b>${esc(h)}</b>${d ? ': ' + esc(d) : ''}</li>`).join('');
 
-  $('#flowsteps').innerHTML = FLOW.map(s => `<li class="card"><div><h3>${esc(s.h)} <span class="chip" style="margin-left:6px">${s.m}</span></h3><p>${esc(s.p)}</p><div class="tags">${s.tags.map(([t, c]) => `<span class="chip ${c}">${esc(t)}</span>`).join('')}</div></div></li>`).join('');
+  $('#flowsteps').innerHTML = FLOW.map(s => `<li class="card"><div><h3>${esc(s.h)} <span class="chip" style="margin-left:6px">${esc(s.m)}</span></h3><p>${esc(s.p)}</p><div class="tags">${s.tags.map(([t, c]) => `<span class="chip ${esc(c)}">${esc(t)}</span>`).join('')}</div></div></li>`).join('');
 
-  $('#tables').innerHTML = TABLES.map(t => `<div class="card tbl ${t.mod}" data-t="${t.name}">
-    <div class="th"><b>${t.name}</b><span class="chip">${t.mod} · ${t.ms}</span></div>
-    <table>${t.cols.map(([c, ty, k]) => `<tr><td>${esc(c)}${k ? `<span class="k ${k}">${k.toUpperCase()}</span>` : ''}</td><td>${esc(ty)}</td></tr>`).join('')}</table>
+  $('#tables').innerHTML = TABLES.map(t => `<div class="card tbl ${esc(t.mod)}" data-t="${esc(t.name)}" tabindex="0">
+    <div class="th"><b>${esc(t.name)}</b><span class="chip">${t.mod === 'unowned' ? 'owner open' : esc(t.mod)} · ${esc(t.ms)}</span></div>
+    <table>${t.cols.map(([c, ty, k]) => `<tr><td>${esc(c)}${k ? `<span class="k ${esc(k)}">${esc(k.toUpperCase())}</span>` : ''}</td><td>${esc(ty)}</td></tr>`).join('')}</table>
     ${t.note ? `<div class="note">${esc(t.note)}</div>` : ''}</div>`).join('');
-  const tw = $('#tables');
-  tw.addEventListener('mouseover', e => {
+  const tablesEl = $('#tables');
+  const highlightTable = e => {
     const card = e.target.closest('.tbl'); if (!card) return;
     const n = card.dataset.t;
-    const rel = new Set([n, ...(FK[n] || []), ...Object.keys(FK).filter(k => FK[k].includes(n))]);
-    tw.classList.add('focus');
-    tw.querySelectorAll('.tbl').forEach(el => el.classList.toggle('on', rel.has(el.dataset.t)));
-  });
-  tw.addEventListener('mouseleave', () => { tw.classList.remove('focus'); tw.querySelectorAll('.tbl').forEach(el => el.classList.remove('on')); });
+    const rel = new Set([n, ...(FK[n] || []), ...Object.keys(FK).filter(from => FK[from].includes(n))]);
+    tablesEl.classList.add('focus');
+    tablesEl.querySelectorAll('.tbl').forEach(el => el.classList.toggle('on', rel.has(el.dataset.t)));
+  };
+  const clearTableHighlight = () => { tablesEl.classList.remove('focus'); tablesEl.querySelectorAll('.tbl').forEach(el => el.classList.remove('on')); };
+  tablesEl.addEventListener('mouseover', highlightTable);
+  tablesEl.addEventListener('focusin', highlightTable);
+  tablesEl.addEventListener('mouseleave', clearTableHighlight);
+  tablesEl.addEventListener('focusout', e => { if (!tablesEl.contains(e.relatedTarget)) clearTableHighlight(); });
 
-  $('#apitable tbody').innerHTML = API.map(([v, p, d, mod, ms]) => `<tr><td><span class="verb ${v}">${v}</span></td><td><code>${esc(p)}</code></td><td>${esc(d)}</td><td><i class="dot" style="background:var(--m-${mod})"></i> ${mod}</td><td>${ms}</td></tr>`).join('');
+  $('#apitable tbody').innerHTML = API.map(([v, p, d, mod, ms]) => `<tr><td><span class="verb ${esc(v)}">${esc(v)}</span></td><td><code>${esc(p)}</code></td><td>${esc(d)}</td><td><i class="dot" style="background:var(--m-${esc(mod)})"></i> ${esc(mod)}</td><td>${esc(ms)}</td></tr>`).join('');
 
-  $('#stacktable tbody').innerHTML = STACK.map(([l, c, n, src]) => `<tr><td class="muted">${esc(l)}</td><td><b>${esc(c)}</b></td><td class="small muted">${esc(n)}</td><td>${src ? `<a href="${issue(src.slice(1))}">ticket ${src.slice(1)}</a>` : ''}</td></tr>`).join('');
+  $('#stacktable tbody').innerHTML = STACK.map(([l, c, n, src]) => `<tr><td class="muted">${esc(l)}</td><td><b>${esc(c)}</b></td><td class="small muted">${esc(n)}</td><td>${src ? `<a href="${issue(src.slice(1))}">ticket ${esc(src.slice(1))}</a>` : ''}</td></tr>`).join('');
 
-  $('#adrs').innerHTML = ADRS.map(([n, h, p, f]) => `<div class="card adr"><span class="chip">ADR-${n}</span><h3 style="margin-top:8px">${esc(h)}</h3><p>${esc(p)}</p><p class="small" style="margin-top:8px"><a href="${REPO}/blob/main/${f}">Read ADR →</a></p></div>`).join('');
-  let k = 0;
-  $('#rounds').innerHTML = ROUNDS.map(([h, items]) => `<div><h3>${esc(h)}</h3><ol start="${k + 1}">${items.map(i => (k++, `<li>${esc(i)}</li>`)).join('')}</ol></div>`).join('');
+  $('#adrs').innerHTML = ADRS.map(([n, h, p, f]) => `<div class="card adr"><span class="chip">ADR-${esc(n)}</span><h3 style="margin-top:8px">${esc(h)}</h3><p>${esc(p)}</p><p class="small" style="margin-top:8px"><a href="${REPO}/blob/main/${esc(f)}">Read ADR →</a></p></div>`).join('');
+  // Rounds 1–4 hold the 27 numbered decisions (numbering continues across rounds); round 5 is unnumbered.
+  const NUMBERED_ROUNDS = 4;
+  let decisionNo = 0;
+  $('#rounds').innerHTML = ROUNDS.map(([h, items], r) => {
+    const lis = items.map(i => `<li>${esc(i)}</li>`).join('');
+    if (r >= NUMBERED_ROUNDS) return `<div><h3>${esc(h)}</h3><ul>${lis}</ul></div>`;
+    const start = decisionNo + 1;
+    decisionNo += items.length;
+    return `<div><h3>${esc(h)}</h3><ol start="${start}">${lis}</ol></div>`;
+  }).join('');
 
-  $('#gloss').innerHTML = GLOSSARY.map(([grp, terms]) => `<div class="glh">${grp}</div><div class="grid">${terms.map(([t, d, avoid]) => `<div class="card gl"><b>${esc(t)}</b><p>${esc(d)}</p><div class="avoid">${avoid.map(a => `<span class="chip">${esc(a)}</span>`).join('')}</div></div>`).join('')}</div>`).join('');
+  $('#gloss').innerHTML = GLOSSARY.map(([grp, terms]) => `<div class="glh">${esc(grp)}</div><div class="grid">${terms.map(([t, d, avoid]) => `<div class="card gl"><b>${esc(t)}</b><p>${esc(d)}</p><div class="avoid">${avoid.map(a => `<span class="chip">${esc(a)}</span>`).join('')}</div></div>`).join('')}</div>`).join('');
 
-  $('#scopegrid').innerHTML = SCOPE.map(([h, c, items]) => `<div class="card" style="padding:14px 16px"><span class="chip ${c}">${h}</span><ul style="margin:10px 0 0;padding-left:18px;font-size:14px">${items.map(i => `<li>${esc(i)}</li>`).join('')}</ul></div>`).join('');
+  $('#scopegrid').innerHTML = SCOPE.map(([h, c, items]) => `<div class="card" style="padding:14px 16px"><span class="chip ${esc(c)}">${esc(h)}</span><ul style="margin:10px 0 0;padding-left:18px;font-size:14px">${items.map(i => `<li>${esc(i)}</li>`).join('')}</ul></div>`).join('');
 }
 
 document.querySelectorAll('[data-arch]').forEach(b => b.addEventListener('click', () => {
