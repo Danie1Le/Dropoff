@@ -17,10 +17,9 @@ Single-context repo:
 /
 ├── GLOSSARY.md
 ├── docs/adr/
-│   ├── 0001-modular-monolith-first.md
-│   ├── 0002-flyway-owns-schema-hybrid-jpa.md
+│   ├── 0001-<decision-slug>.md
 │   └── ...
-└── src/main/java/...
+└── src/
 ```
 
 ## Use the glossary's vocabulary
