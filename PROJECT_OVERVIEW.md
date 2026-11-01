@@ -96,13 +96,13 @@ Entry-level backend and software engineering roles at delivery and marketplace c
 | Layer | Technology |
 |---|---|
 | Language | **Java 21** (optional: Kotlin for one service) |
-| Framework | **Spring Boot 3** (Web, Data JPA, Validation, Actuator, WebSocket) |
-| Build | Gradle |
+| Framework | **Spring Boot 4** (Web MVC, Data JPA, Validation, Actuator, WebSocket/STOMP) + **Spring Modulith** (module boundary checks) |
+| Build | Gradle (Kotlin DSL) |
 | Database | **PostgreSQL**, with Flyway for migrations |
 | Cache / Geo | **Redis** (`GEOADD` / `GEOSEARCH`) |
-| Messaging | **Kafka** (Redis Streams as a lighter fallback) |
+| Messaging | **Kafka** in KRaft mode (Spring in-app events until the service split) |
 | API Docs | springdoc-openapi (Swagger UI) |
-| Testing | JUnit 5, Mockito, Testcontainers |
+| Testing | JUnit 5, Mockito, Testcontainers 2 |
 | Load Testing | k6 |
 | Containers | Docker and Docker Compose |
 | CI/CD | **GitHub Actions** (test, build, publish images to GHCR) |
