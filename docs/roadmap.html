@@ -1,0 +1,900 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dropoff Roadmap</title>
+<!--
+  One-page map of the Dropoff project: milestones, planning tickets, architecture,
+  order flow, data model, API, stack, decisions and glossary.
+  Open it straight from disk (no server, no build).
+
+  Updating it:
+  - Mark a milestone task done for everyone: set `done: true` on the item in MILESTONES.
+  - Ticket closed / claimed on GitHub: update its entry in TICKETS.
+  Clicking a checkbox only saves in your own browser (localStorage); "Reset" drops those clicks.
+-->
+<style>
+:root {
+  --bg: #f6f7f9; --surface: #ffffff; --surface-2: #f0f2f5; --text: #17202a; --muted: #5d6875;
+  --border: #d9dee5; --accent: #2f6fde; --accent-soft: #e5eefc;
+  --ok: #1f8a4c; --ok-soft: #e3f4ea; --warn: #b26a00; --warn-soft: #fbefd9;
+  --block: #8a94a0; --block-soft: #eceff2; --danger: #c2413b;
+  --m-merchant: #c27c0e; --m-order: #2f6fde; --m-dispatch: #1f8a4c; --m-common: #7a6bd1;
+  --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1318; --surface: #171c23; --surface-2: #1f262f; --text: #e6eaef; --muted: #9aa5b1;
+    --border: #2c3540; --accent: #6ea0ff; --accent-soft: #1b2a44;
+    --ok: #4cc27f; --ok-soft: #16301f; --warn: #e5a443; --warn-soft: #362a14;
+    --block: #7c8794; --block-soft: #232a32; --danger: #f07a73;
+    --m-merchant: #e5a443; --m-order: #6ea0ff; --m-dispatch: #4cc27f; --m-common: #a597f0;
+    --shadow: none; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1318; --surface: #171c23; --surface-2: #1f262f; --text: #e6eaef; --muted: #9aa5b1;
+  --border: #2c3540; --accent: #6ea0ff; --accent-soft: #1b2a44;
+  --ok: #4cc27f; --ok-soft: #16301f; --warn: #e5a443; --warn-soft: #362a14;
+  --block: #7c8794; --block-soft: #232a32; --danger: #f07a73;
+  --m-merchant: #e5a443; --m-order: #6ea0ff; --m-dispatch: #4cc27f; --m-common: #a597f0;
+  --shadow: none; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-padding-top: 64px; }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { font: 0.86em ui-monospace, "Cascadia Code", Consolas, monospace; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+h1, h2, h3 { line-height: 1.25; margin: 0; }
+h2 { font-size: 1.35rem; margin-bottom: 4px; }
+h3 { font-size: 1rem; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 16px; }
+.lede { color: var(--muted); margin: 0 0 18px; max-width: 760px; }
+
+/* nav */
+nav.top { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); }
+nav.top .wrap { display: flex; gap: 4px; align-items: center; overflow-x: auto; scrollbar-width: none; height: 52px; }
+nav.top .brand { font-weight: 700; margin-right: 12px; white-space: nowrap; }
+nav.top a { color: var(--muted); padding: 6px 10px; border-radius: 6px; white-space: nowrap; font-size: 14px; }
+nav.top a:hover { background: var(--surface-2); color: var(--text); text-decoration: none; }
+
+section { padding: 36px 0 8px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); }
+.grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); white-space: nowrap; }
+.chip.ok { background: var(--ok-soft); border-color: transparent; color: var(--ok); }
+.chip.warn { background: var(--warn-soft); border-color: transparent; color: var(--warn); }
+.chip.acc { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+.chip.blk { background: var(--block-soft); border-color: transparent; color: var(--block); }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
+
+/* hero */
+header.hero { padding: 32px 0 6px; }
+header.hero h1 { font-size: 2rem; }
+header.hero p { color: var(--muted); max-width: 780px; margin: 8px 0 0; }
+.kpis { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-top: 20px; }
+.kpi { padding: 14px 16px; }
+.kpi .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.kpi .value { font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.kpi .sub { font-size: 13px; color: var(--muted); }
+
+/* stage track */
+.track { display: flex; gap: 6px; margin: 4px 0 18px; overflow-x: auto; padding-bottom: 4px; }
+.stage { flex: 1 0 92px; padding: 10px 10px 8px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; text-align: left; color: var(--text); font: inherit; }
+.stage .id { font-weight: 700; font-size: 13px; }
+.stage .nm { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stage .bar { margin-top: 8px; }
+.stage.done { border-color: color-mix(in srgb, var(--ok) 50%, var(--border)); }
+.stage.next { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.bar { height: 6px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--accent); border-radius: 99px; transition: width .25s; }
+.done .bar > i, .bar.ok > i { background: var(--ok); }
+
+/* milestones */
+.ms { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.ms.next { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.ms .head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.ms .head h3 span { color: var(--muted); font-weight: 600; margin-right: 4px; }
+.ms .goal { font-size: 13px; color: var(--muted); margin: 0; }
+.ms ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.ms label { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; cursor: pointer; }
+.ms input { margin-top: 3px; accent-color: var(--ok); flex: none; }
+.ms li.checked span { color: var(--muted); text-decoration: line-through; }
+.ms .needs { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 12px; }
+.ms .foot { display: flex; justify-content: space-between; font-size: 13px; border-top: 1px solid var(--border); padding-top: 8px; margin-top: auto; }
+.toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+button.btn { font: inherit; font-size: 13px; padding: 5px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; }
+button.btn:hover { background: var(--surface-2); }
+button.btn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* planning graph */
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+.legend span { display: inline-flex; gap: 6px; align-items: center; }
+.graph { position: relative; display: grid; grid-template-columns: repeat(var(--cols, 3), 1fr); gap: 14px 56px; padding: 16px; }
+.graph .col { display: flex; flex-direction: column; gap: 10px; }
+.graph .colh { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.graph svg.edges { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.tk { position: relative; z-index: 1; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); border-left-width: 4px; background: var(--surface); font-size: 13px; }
+.tk .t { font-weight: 600; font-size: 14px; color: var(--text); }
+.tk .meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; align-items: center; }
+.tk .gist { color: var(--muted); margin-top: 4px; }
+.tk.closed { border-left-color: var(--ok); }
+.tk.frontier { border-left-color: var(--accent); }
+.tk.claimed { border-left-color: var(--warn); }
+.tk.blocked { border-left-color: var(--block); opacity: .85; }
+.tk.hl { box-shadow: 0 0 0 2px var(--accent); }
+svg.edges path { fill: none; stroke: var(--block); stroke-width: 1.5; }
+svg.edges path.live { stroke: var(--accent); }
+svg.edges path.hl { stroke: var(--accent); stroke-width: 2.5; }
+.fog { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-top: 14px; }
+.fog .card { padding: 14px 16px; }
+.fog ul { margin: 8px 0 0; padding-left: 18px; font-size: 14px; }
+.fog li { margin-bottom: 4px; }
+
+/* diagrams */
+.diagram { padding: 12px; overflow-x: auto; }
+.diagram svg { display: block; width: 100%; min-width: 640px; height: auto; }
+svg .box { fill: var(--surface); stroke: var(--border); stroke-width: 1.5; }
+svg .box.client { fill: var(--surface-2); }
+svg .box.merchant { stroke: var(--m-merchant); stroke-width: 2; }
+svg .box.order { stroke: var(--m-order); stroke-width: 2; }
+svg .box.dispatch { stroke: var(--m-dispatch); stroke-width: 2; }
+svg .box.store { fill: var(--surface-2); }
+svg .container { fill: none; stroke: var(--border); stroke-width: 1.5; stroke-dasharray: 6 5; }
+svg .bus { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+svg .t { fill: var(--text); font: 600 14px system-ui, sans-serif; }
+svg .s { fill: var(--muted); font: 12px system-ui, sans-serif; }
+svg .ln { stroke: var(--muted); stroke-width: 1.5; fill: none; }
+svg .ln.ws { stroke: var(--accent); stroke-dasharray: 5 4; }
+svg .ah { fill: var(--muted); }
+svg .ah2 { fill: var(--accent); }
+.mods { display: flex; gap: 12px; flex-wrap: wrap; font-size: 13px; margin: 10px 0 0; color: var(--muted); }
+
+/* state machine */
+.sm { padding: 18px 16px; overflow-x: auto; }
+.sm .row { display: flex; align-items: center; gap: 6px; min-width: 760px; }
+.st { padding: 8px 12px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--surface-2); font: 600 13px ui-monospace, Consolas, monospace; text-align: center; }
+.st small { display: block; font: 11px system-ui, sans-serif; color: var(--muted); }
+.st.fin { border-color: var(--ok); color: var(--ok); }
+.st.cx { border-color: var(--danger); color: var(--danger); }
+.arr { color: var(--muted); font-size: 18px; flex: none; }
+.cxrow { display: flex; align-items: center; gap: 10px; margin-top: 12px; min-width: 760px; font-size: 13px; color: var(--muted); }
+
+/* flow */
+.flow { list-style: none; margin: 0; padding: 0; counter-reset: step; display: flex; flex-direction: column; gap: 10px; }
+.flow li { counter-increment: step; display: grid; grid-template-columns: 34px 1fr; gap: 12px; padding: 14px 16px; }
+.flow li::before { content: counter(step); width: 30px; height: 30px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-weight: 700; display: grid; place-items: center; }
+.flow h3 { margin-bottom: 4px; }
+.flow p { margin: 0 0 8px; font-size: 14px; }
+.flow .tags { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* data model */
+.tables { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+.tbl { padding: 0; overflow: hidden; border-top: 4px solid var(--border); transition: opacity .15s, box-shadow .15s; }
+.tbl.merchant { border-top-color: var(--m-merchant); }
+.tbl.order { border-top-color: var(--m-order); }
+.tbl.dispatch { border-top-color: var(--m-dispatch); }
+.tbl.common { border-top-color: var(--m-common); }
+.tbl.unowned { border-top-color: var(--border); }
+.tbl .th { padding: 10px 12px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; border-bottom: 1px solid var(--border); }
+.tbl .th b { font-family: ui-monospace, Consolas, monospace; }
+.tbl table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tbl td { padding: 4px 12px; border-bottom: 1px solid var(--surface-2); vertical-align: top; }
+.tbl td:first-child { font-family: ui-monospace, Consolas, monospace; white-space: nowrap; }
+.tbl td:last-child { color: var(--muted); text-align: right; overflow-wrap: anywhere; }
+table.list td:last-child { white-space: nowrap; }
+.tbl .note { padding: 8px 12px; font-size: 12px; color: var(--muted); }
+.tables.focus .tbl { opacity: .35; }
+.tables.focus .tbl.on { opacity: 1; box-shadow: 0 0 0 2px var(--accent); }
+.k { font-size: 10px; font-weight: 700; padding: 1px 4px; border-radius: 3px; margin-left: 4px; }
+.k.pk { background: var(--warn-soft); color: var(--warn); }
+.k.fk { background: var(--accent-soft); color: var(--accent); }
+.k.uq { background: var(--ok-soft); color: var(--ok); }
+
+/* api + generic tables */
+.tw { overflow-x: auto; }
+table.list { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.list th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); padding: 10px 14px; border-bottom: 1px solid var(--border); }
+table.list td { padding: 8px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+table.list tr:last-child td { border-bottom: 0; }
+.verb { font: 700 11px ui-monospace, Consolas, monospace; padding: 2px 6px; border-radius: 4px; background: var(--surface-2); }
+.verb.POST { color: var(--ok); } .verb.GET { color: var(--accent); } .verb.PATCH, .verb.PUT { color: var(--warn); } .verb.WS { color: var(--m-common); }
+
+/* decisions + glossary */
+.adr { padding: 14px 16px; }
+.adr h3 { margin-bottom: 6px; }
+.adr p { margin: 0; font-size: 14px; color: var(--muted); }
+details.rounds { margin-top: 14px; }
+details.rounds summary { cursor: pointer; font-weight: 600; padding: 12px 16px; }
+details.rounds .body { padding: 0 16px 14px; display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+details.rounds ol, details.rounds ul { margin: 6px 0 0; padding-left: 22px; font-size: 14px; }
+details.rounds li { margin-bottom: 3px; }
+.gl { padding: 12px 14px; }
+.gl b { display: block; }
+.gl p { margin: 4px 0 8px; font-size: 14px; }
+.gl .avoid { display: flex; gap: 4px; flex-wrap: wrap; }
+.gl .avoid .chip { text-decoration: line-through; color: var(--muted); }
+.glh { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 18px 0 8px; }
+
+footer { padding: 40px 0 48px; color: var(--muted); font-size: 13px; }
+
+@media (max-width: 760px) {
+  .graph { grid-template-columns: 1fr; gap: 10px; }
+  .graph svg.edges { display: none; }
+  header.hero h1 { font-size: 1.6rem; }
+}
+</style>
+</head>
+<body>
+
+<nav class="top"><div class="wrap">
+  <span class="brand">Dropoff</span>
+  <a href="#roadmap">Roadmap</a>
+  <a href="#planning">Planning map</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#flow">Order flow</a>
+  <a href="#data">Data model</a>
+  <a href="#api">API</a>
+  <a href="#stack">Stack</a>
+  <a href="#decisions">Decisions</a>
+  <a href="#glossary">Glossary</a>
+  <a href="#scope">Scope</a>
+</div></nav>
+
+<div class="wrap">
+
+<header class="hero">
+  <h1>Dropoff</h1>
+  <p>A real-time order and courier dispatch backend for a three-sided delivery marketplace: <b>customers</b> place orders, <b>merchants</b> prepare them, <b>couriers</b> deliver them. Java 21, Spring Boot 4, PostgreSQL, Redis, Kafka. Everything runs locally in Docker Compose for $0.</p>
+  <div class="kpis" id="kpis"></div>
+</header>
+
+<!-- ROADMAP -->
+<section id="roadmap">
+  <h2>Roadmap</h2>
+  <p class="lede">Planning first, then nine build milestones. Each milestone ships as several small PRs, with a code review before each one. Chips under a milestone are the planning tickets whose answers it depends on.</p>
+  <div class="track" id="track"></div>
+  <div class="toolbar">
+    <button class="btn" id="reset" type="button">Reset my checkmarks</button>
+    <span class="small muted">Checkmarks you click are saved in this browser only. Defaults come from the file.</span>
+  </div>
+  <div class="grid" id="milestones"></div>
+</section>
+
+<!-- PLANNING -->
+<section id="planning">
+  <h2>Planning map</h2>
+  <p class="lede">The <a href="https://github.com/Danie1Le/Dropoff/issues/2">wayfinder map</a> tracks every decision the build needs. Destination: a gap-free plan for M0–M8 (<code>docs/PLAN.md</code> + glossary + ADRs), so implementation starts with no open questions. Arrows point from a ticket to the tickets it unblocks. Hover a ticket to trace its edges.</p>
+  <div class="legend">
+    <span><i class="dot" style="background:var(--ok)"></i>Decided</span>
+    <span><i class="dot" style="background:var(--warn)"></i>In progress (claimed)</span>
+    <span><i class="dot" style="background:var(--accent)"></i>Frontier: ready to take</span>
+    <span><i class="dot" style="background:var(--block)"></i>Blocked</span>
+  </div>
+  <div class="card graph" id="graph"></div>
+  <div class="fog">
+    <div class="card"><h3>Not yet specified (fog)</h3><p class="small muted" style="margin:4px 0 0">In scope, but too fuzzy to ticket yet.</p><ul id="fog"></ul></div>
+    <div class="card"><h3>Out of scope</h3><p class="small muted" style="margin:4px 0 0">Ruled out of this effort on purpose.</p><ul id="oos"></ul></div>
+  </div>
+</section>
+
+<!-- ARCHITECTURE -->
+<section id="architecture">
+  <h2>Architecture</h2>
+  <p class="lede">Start as one Spring Boot app with a package per domain (ADR-0001). At M5, when Kafka arrives, split it into three services. Enforced module boundaries keep that split mechanical.</p>
+  <div class="toolbar" role="group" aria-label="Architecture phase">
+    <button class="btn" type="button" data-arch="mono" aria-pressed="true">M0–M4 · Modular monolith</button>
+    <button class="btn" type="button" data-arch="svc" aria-pressed="false">M5+ · Services + Kafka</button>
+  </div>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
+      <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah2"/></marker>
+    </defs>
+  </svg>
+  <div class="card diagram" id="arch-mono">
+    <svg viewBox="0 0 800 420" role="img" aria-label="Modular monolith: client calls one app with merchant, order and dispatch modules sharing in-app events, backed by Postgres and Redis">
+      <rect class="box client" x="320" y="10" width="160" height="48" rx="10"/>
+      <text class="t" x="400" y="39" text-anchor="middle">Client</text>
+      <line class="ln" x1="380" y1="58" x2="380" y2="97" marker-end="url(#ah)"/>
+      <text class="s" x="372" y="84" text-anchor="end">REST + OpenAPI</text>
+      <line class="ln ws" x1="420" y1="99" x2="420" y2="60" marker-end="url(#ah2)"/>
+      <text class="s" x="428" y="84">STOMP WebSocket (M4)</text>
+
+      <rect class="container" x="20" y="100" width="760" height="200" rx="14"/>
+      <text class="s" x="36" y="123">dropoff app · Spring Boot 4.1 · Java 21 · Spring Modulith checks the boundaries · shared code in common</text>
+
+      <rect class="box merchant" x="40" y="135" width="220" height="70" rx="10"/>
+      <text class="t" x="150" y="164" text-anchor="middle">merchant</text>
+      <text class="s" x="150" y="185" text-anchor="middle">merchants · menu items</text>
+      <rect class="box order" x="290" y="135" width="220" height="70" rx="10"/>
+      <text class="t" x="400" y="164" text-anchor="middle">order</text>
+      <text class="s" x="400" y="185" text-anchor="middle">orders · lifecycle · idempotency</text>
+      <rect class="box dispatch" x="540" y="135" width="220" height="70" rx="10"/>
+      <text class="t" x="650" y="164" text-anchor="middle">dispatch</text>
+      <text class="s" x="650" y="185" text-anchor="middle">couriers · offers · reassignment</text>
+
+      <line class="ln" x1="150" y1="207" x2="150" y2="223" marker-start="url(#ah)" marker-end="url(#ah)"/>
+      <line class="ln" x1="400" y1="207" x2="400" y2="223" marker-start="url(#ah)" marker-end="url(#ah)"/>
+      <line class="ln" x1="650" y1="207" x2="650" y2="223" marker-start="url(#ah)" marker-end="url(#ah)"/>
+      <rect class="bus" x="40" y="225" width="720" height="58" rx="10"/>
+      <text class="t" x="400" y="249" text-anchor="middle">In-app Spring events (Kafka takes over at M5)</text>
+      <text class="s" x="400" y="270" text-anchor="middle">OrderPlaced · OrderCancelled · OrderReady · CourierAssigned · OrderPickedUp · OrderDelivered</text>
+
+      <line class="ln" x1="255" y1="300" x2="255" y2="338" marker-end="url(#ah)"/>
+      <text class="s" x="263" y="324">JPA + hand-written SQL</text>
+      <line class="ln" x1="650" y1="300" x2="650" y2="338" marker-end="url(#ah)"/>
+      <text class="s" x="658" y="324">GEOADD / GEOSEARCH</text>
+
+      <rect class="box store" x="20" y="340" width="470" height="70" rx="10"/>
+      <text class="t" x="255" y="369" text-anchor="middle">PostgreSQL 18</text>
+      <text class="s" x="255" y="390" text-anchor="middle">one database · Flyway owns the schema · FKs across modules (ADR-0002, 0003)</text>
+      <rect class="box store" x="520" y="340" width="260" height="70" rx="10"/>
+      <text class="t" x="650" y="369" text-anchor="middle">Redis 8 · GEO</text>
+      <text class="s" x="650" y="390" text-anchor="middle">live location of AVAILABLE couriers</text>
+    </svg>
+    <div class="mods">
+      <span><i class="dot" style="background:var(--m-merchant)"></i>merchant module</span>
+      <span><i class="dot" style="background:var(--m-order)"></i>order module</span>
+      <span><i class="dot" style="background:var(--m-dispatch)"></i>dispatch module</span>
+    </div>
+  </div>
+  <div class="card diagram" id="arch-svc" hidden>
+    <svg viewBox="0 0 800 465" role="img" aria-label="Services: client calls merchant, order and dispatch services; each has its own store; all publish and consume Kafka events; Prometheus scrapes them">
+      <rect class="box client" x="320" y="10" width="160" height="48" rx="10"/>
+      <text class="t" x="400" y="39" text-anchor="middle">Client</text>
+      <line class="ln" x1="345" y1="58" x2="140" y2="108" marker-end="url(#ah)"/>
+      <line class="ln" x1="385" y1="58" x2="385" y2="108" marker-end="url(#ah)"/>
+      <line class="ln" x1="455" y1="58" x2="660" y2="108" marker-end="url(#ah)"/>
+      <text class="s" x="230" y="76">REST</text>
+      <line class="ln ws" x1="415" y1="110" x2="415" y2="60" marker-end="url(#ah2)"/>
+      <text class="s" x="423" y="92">WebSocket</text>
+
+      <rect class="box merchant" x="20" y="110" width="230" height="70" rx="10"/>
+      <text class="t" x="135" y="140" text-anchor="middle">merchant-service</text>
+      <text class="s" x="135" y="161" text-anchor="middle">merchants · menus · availability</text>
+      <rect class="box order" x="285" y="110" width="230" height="70" rx="10"/>
+      <text class="t" x="400" y="140" text-anchor="middle">order-service</text>
+      <text class="s" x="400" y="161" text-anchor="middle">orders · idempotency · live updates</text>
+      <rect class="box dispatch" x="550" y="110" width="230" height="70" rx="10"/>
+      <text class="t" x="665" y="140" text-anchor="middle">dispatch-service</text>
+      <text class="s" x="665" y="161" text-anchor="middle">couriers · nearest-courier dispatch</text>
+
+      <line class="ln" x1="90" y1="180" x2="90" y2="223" marker-end="url(#ah)"/>
+      <line class="ln" x1="355" y1="180" x2="355" y2="223" marker-end="url(#ah)"/>
+      <line class="ln" x1="597" y1="180" x2="597" y2="223" marker-end="url(#ah)"/>
+      <line class="ln" x1="702" y1="180" x2="702" y2="223" marker-end="url(#ah)"/>
+      <rect class="box store" x="20" y="225" width="140" height="55" rx="10"/>
+      <text class="t" x="90" y="258" text-anchor="middle">Postgres*</text>
+      <rect class="box store" x="285" y="225" width="140" height="55" rx="10"/>
+      <text class="t" x="355" y="258" text-anchor="middle">Postgres*</text>
+      <rect class="box store" x="550" y="225" width="95" height="55" rx="10"/>
+      <text class="t" x="597" y="258" text-anchor="middle">Postgres*</text>
+      <rect class="box store" x="655" y="225" width="95" height="55" rx="10"/>
+      <text class="t" x="702" y="258" text-anchor="middle">Redis GEO</text>
+
+      <line class="ln" x1="215" y1="182" x2="215" y2="318" marker-start="url(#ah)" marker-end="url(#ah)"/>
+      <line class="ln" x1="480" y1="182" x2="480" y2="318" marker-start="url(#ah)" marker-end="url(#ah)"/>
+      <line class="ln" x1="766" y1="182" x2="766" y2="318" marker-start="url(#ah)" marker-end="url(#ah)"/>
+      <text class="s" x="223" y="304">publish / consume</text>
+
+      <rect class="bus" x="20" y="320" width="760" height="62" rx="10"/>
+      <text class="t" x="400" y="346" text-anchor="middle">Kafka 4.4 (KRaft, single broker) · topics keyed by orderId</text>
+      <text class="s" x="400" y="368" text-anchor="middle">transactional outbox → topic · consumers dedupe via processed_events · 3 retries with backoff → dead-letter topic</text>
+
+      <rect class="box" x="20" y="405" width="760" height="44" rx="10" style="stroke-dasharray:5 4"/>
+      <text class="s" x="400" y="432" text-anchor="middle">Prometheus scrapes every service (Actuator + Micrometer) → Grafana dashboard: latency, orders/min, dispatch time (M6)</text>
+    </svg>
+    <p class="small muted" style="margin:8px 4px 0">* One database or one schema per service, where the WebSocket endpoint lives, and how order-service gets menu prices are open in <a href="https://github.com/Danie1Le/Dropoff/issues/16">Service split: data ownership and cross-service price lookup</a>. Cross-module foreign keys get dropped at the split (ADR-0003).</p>
+  </div>
+</section>
+
+<!-- ORDER FLOW -->
+<section id="flow">
+  <h2>Order flow</h2>
+  <p class="lede">How one order moves through the system, start to finish. This is where the modules, stores and events tie together.</p>
+
+  <div class="card sm">
+    <div class="row">
+      <div class="st">PLACED<small>customer</small></div><span class="arr">→</span>
+      <div class="st">ACCEPTED<small>merchant</small></div><span class="arr">→</span>
+      <div class="st">PREPARING<small>merchant</small></div><span class="arr">→</span>
+      <div class="st">READY<small>merchant · starts dispatch</small></div><span class="arr">→</span>
+      <div class="st">PICKED_UP<small>courier · needs a courier</small></div><span class="arr">→</span>
+      <div class="st fin">DELIVERED<small>courier</small></div>
+    </div>
+    <div class="cxrow"><div class="st cx">CANCELLED</div><span>Only from PLACED or ACCEPTED (before the merchant starts preparing). Any other jump is rejected with <code>409 Conflict</code>. Rules live in Java; a <code>CHECK</code> guards the column. Who counts as "merchant" or "courier" with no auth is open in <a href="https://github.com/Danie1Le/Dropoff/issues/10">Who may change an order's status without auth?</a></span></div>
+  </div>
+
+  <ol class="flow" style="margin-top:14px" id="flowsteps"></ol>
+</section>
+
+<!-- DATA MODEL -->
+<section id="data">
+  <h2>Data model</h2>
+  <p class="lede">Flyway SQL migrations create every table; Hibernate only validates (ADR-0002). Ids are <code>BIGINT</code> identity, money is integer cents with <code>CHECK (&gt;= 0)</code>, times are <code>TIMESTAMPTZ</code>. Hover a table to light up the tables it links to.</p>
+  <div class="mods" style="margin:0 0 12px">
+    <span><i class="dot" style="background:var(--m-merchant)"></i>merchant</span>
+    <span><i class="dot" style="background:var(--m-order)"></i>order</span>
+    <span><i class="dot" style="background:var(--m-dispatch)"></i>dispatch</span>
+    <span><i class="dot" style="background:var(--m-common)"></i>infrastructure (M5)</span>
+    <span><span class="k pk">PK</span> primary key</span>
+    <span><span class="k fk">FK</span> foreign key</span>
+    <span><span class="k uq">UQ</span> unique</span>
+  </div>
+  <div class="tables" id="tables"></div>
+</section>
+
+<!-- API -->
+<section id="api">
+  <h2>API</h2>
+  <p class="lede">REST endpoints documented with springdoc (Swagger UI). Error format, versioning and pagination are open in <a href="https://github.com/Danie1Le/Dropoff/issues/8">API conventions: errors, versioning, pagination</a>. Endpoints for customers, merchant open/close and item availability are open in <a href="https://github.com/Danie1Le/Dropoff/issues/9">Missing endpoints</a>. Who may call the status endpoint is open in <a href="https://github.com/Danie1Le/Dropoff/issues/10">Who may change an order's status without auth?</a>; accept/decline endpoints for couriers are open in <a href="https://github.com/Danie1Le/Dropoff/issues/11">Courier offer lifecycle</a>.</p>
+  <div class="card tw"><table class="list" id="apitable"><thead><tr><th>Method</th><th>Path</th><th>Does</th><th>Module</th><th>Milestone</th></tr></thead><tbody></tbody></table></div>
+</section>
+
+<!-- STACK -->
+<section id="stack">
+  <h2>Stack</h2>
+  <p class="lede">Pinned from the research tickets <a href="https://github.com/Danie1Le/Dropoff/issues/5">Version matrix</a> and <a href="https://github.com/Danie1Le/Dropoff/issues/6">Free Docker images</a>. All free and open source.</p>
+  <div class="card tw"><table class="list" id="stacktable"><thead><tr><th>Layer</th><th>Choice</th><th>Notes</th><th>From</th></tr></thead><tbody></tbody></table></div>
+</section>
+
+<!-- DECISIONS -->
+<section id="decisions">
+  <h2>Decisions</h2>
+  <p class="lede">Architecture Decision Records in <code>docs/adr/</code>, plus the 27 foundational decisions from the first planning session.</p>
+  <div class="grid" id="adrs"></div>
+  <details class="card rounds">
+    <summary>The 27 foundational decisions (rounds 1–4) and engineering choices (round 5)</summary>
+    <div class="body" id="rounds"></div>
+  </details>
+</section>
+
+<!-- GLOSSARY -->
+<section id="glossary">
+  <h2>Glossary</h2>
+  <p class="lede">The words the code, issues and docs use. Struck-through words are the ones to avoid.</p>
+  <div id="gloss"></div>
+</section>
+
+<!-- SCOPE -->
+<section id="scope">
+  <h2>Scope</h2>
+  <p class="lede">What this effort builds, what stand-out features sit on top, and what stays out.</p>
+  <div class="grid" id="scopegrid"></div>
+</section>
+
+<footer>
+  Sources: <code>PROJECT_OVERVIEW.md</code>, <code>GLOSSARY.md</code>, <code>docs/adr/</code>, and the <a href="https://github.com/Danie1Le/Dropoff/issues/2">wayfinder map</a>. Data last synced 2026-11-01. Update the arrays at the bottom of this file when tickets close or tasks land.
+</footer>
+</div>
+
+<script>
+const REPO = 'https://github.com/Danie1Le/Dropoff';
+
+/* ---------- DATA: edit these when things change ---------- */
+
+// Planning tickets (children of the wayfinder map). state: closed | open. claimed: assigned on GitHub.
+const TICKETS = [
+  { n: 3,  title: 'Foundational decisions from the first grilling session', type: 'grilling', state: 'closed', gist: '27 decisions: modular monolith, Flyway + JPA, BIGINT ids, cents, state machine, Redis geo dispatch, outbox, idempotency keys, STOMP, Testcontainers, M0–M8.' },
+  { n: 4,  title: 'Repo visibility: go public now or stay private?', type: 'grilling', state: 'closed', gist: 'Public once the LICENSE + roadmap PRs merge. History rewritten to the no-reply email, MIT license, PR-required main ruleset and secret scanning at go-public.' },
+  { n: 5,  title: 'Version matrix: Spring Boot 3.5 vs 4.x for this stack', type: 'research', state: 'closed', gist: 'Spring Boot 4.1.2 on Java 21; springdoc 3.2.0, Modulith 2.1.2, Gradle 9.8.2.' },
+  { n: 6,  title: 'Free Docker images and licenses for Compose services', type: 'research', state: 'closed', gist: 'postgres 18.6, redis 8.10.3, apache/kafka 4.4.0 KRaft, Prometheus, Grafana, k6. No Bitnami.' },
+  { n: 7,  title: 'Coding standards for code review', type: 'grilling', state: 'open', blockedBy: [5], q: 'Records vs Lombok, nulls, test naming, formatter, static analysis, CI enforcement.' },
+  { n: 8,  title: 'API conventions: errors, versioning, pagination', type: 'grilling', state: 'open', q: 'Problem Details errors, /api/v1?, pagination, validation error shape, 409 vs 422.' },
+  { n: 9,  title: 'Missing endpoints: customers, delivery address, merchant open/close, item availability', type: 'grilling', state: 'open', blockedBy: [8], q: 'Endpoints for customers and toggles; snapshot the delivery address?; order at a closed merchant?' },
+  { n: 10, title: "Who may change an order's status without auth?", type: 'grilling', state: 'open', q: 'Separate endpoints per actor, an actor field, or path-scoped routes?' },
+  { n: 11, title: 'Courier offer lifecycle: accept, decline, timeout endpoints', type: 'grilling', state: 'open', blockedBy: [10], q: 'Explicit accept or silence = accept? Offer states, endpoints, when courier_id is set.' },
+  { n: 12, title: "Where a busy courier's location lives", type: 'grilling', state: 'open', q: 'Pings from a BUSY courier: which Redis key, which module pushes them to WebSocket.' },
+  { n: 13, title: 'Stuck orders: merchant never accepts, no courier ever found', type: 'grilling', state: 'open', blockedBy: [11], q: 'Auto-cancel after N minutes, widen the radius, alert? Who is notified?' },
+  { n: 14, title: 'Background jobs with multiple app instances', type: 'grilling', state: 'open', q: 'SKIP LOCKED, ShedLock, or a single-instance rule for @Scheduled jobs?' },
+  { n: 15, title: 'order_events vs outbox: keep both?', type: 'grilling', state: 'open', q: 'Both tables, one feeding the other, or the outbox replaces order_events?' },
+  { n: 16, title: 'Service split: data ownership and cross-service price lookup', type: 'grilling', state: 'open', blockedBy: [12, 14, 15], q: 'DB vs schema per service; price lookup via REST or local copy; where WebSocket lives.' },
+];
+
+// Build milestones. GitHub milestone numbers are in `gh`. Set done: true as tasks land.
+const MILESTONES = [
+  { id: 'M0', name: 'Project setup', gh: 1, needs: [4, 7], goal: 'An empty app that builds, tests and runs in Docker, with CI on every push.', items: [
+    { t: 'Gradle 9.8.2 wrapper, Kotlin DSL, Java 21 toolchain' },
+    { t: 'Spring Boot 4.1.2 skeleton (webmvc, data-jpa, validation, actuator)' },
+    { t: 'Spring Modulith 2.1.2: merchant · order · dispatch · common, boundary test' },
+    { t: 'Docker Compose: postgres:18.6-alpine + redis:8.10.3-alpine' },
+    { t: 'Flyway baseline migration, ddl-auto=validate' },
+    { t: 'Testcontainers 2 smoke test against real Postgres' },
+    { t: 'GitHub Actions: build + test on every push' },
+    { t: 'main ruleset: require the CI check to pass' },
+    { t: 'CODING_STANDARDS.md + formatter wired into the build' },
+  ]},
+  { id: 'M1', name: 'Merchants & menus', gh: 2, needs: [8, 9], goal: 'Merchants can list what they sell.', items: [
+    { t: 'Migration: merchants, menu_items' },
+    { t: 'POST /merchants, POST /merchants/{id}/items, GET /merchants/{id}/menu' },
+    { t: 'Toggle merchant open/close and menu item availability' },
+    { t: 'Input validation + consistent error responses' },
+    { t: 'Swagger UI via springdoc 3.2.0' },
+    { t: 'Tests: web slice + Testcontainers repository tests' },
+  ]},
+  { id: 'M2', name: 'Orders', gh: 3, needs: [8, 9, 10, 13, 15], goal: 'Customers place orders that move through a safe lifecycle.', items: [
+    { t: 'Migrations: customers, orders, order_lines, order_events' },
+    { t: 'POST /orders: server computes total, price snapshot per order line' },
+    { t: 'Reject unavailable or wrong-merchant menu items' },
+    { t: 'Order status state machine; illegal jump → 409' },
+    { t: 'Cancellation only from PLACED or ACCEPTED' },
+    { t: 'Idempotency-Key: same key → same order; changed body → 422' },
+    { t: 'order_events row for every status change' },
+    { t: 'TDD unit tests for the state machine' },
+  ]},
+  { id: 'M3', name: 'Dispatch', gh: 4, needs: [11, 12, 13, 14], goal: 'Ready orders get the nearest available courier, with reassignment.', items: [
+    { t: 'Migrations: couriers, dispatch_attempts' },
+    { t: 'POST /couriers, PATCH /couriers/{id}/status, PUT /couriers/{id}/location' },
+    { t: 'Redis GEO index of AVAILABLE couriers' },
+    { t: 'On READY: GEOSEARCH 5 km dispatch radius, nearest first' },
+    { t: 'Claim with UPDATE … WHERE status = AVAILABLE' },
+    { t: '30 s offer; decline or timeout → reassignment' },
+    { t: 'Job tries dispatch again every 10 s when no courier is found' },
+    { t: 'Courier offline before pickup → auto-reassign' },
+    { t: 'Testcontainers integration tests (Postgres + Redis)' },
+  ]},
+  { id: 'M4', name: 'Live tracking', gh: 5, needs: [12], goal: 'Customers watch their order and courier move live.', items: [
+    { t: 'STOMP over WebSocket at /ws' },
+    { t: 'Push status changes to /topic/orders/{id}' },
+    { t: 'Push courier location at most every 5 s once a courier is dispatched' },
+    { t: 'Integration test with a STOMP client' },
+  ]},
+  { id: 'M5', name: 'Kafka & service split', gh: 6, needs: [15, 16], goal: 'Three services talking through durable events.', items: [
+    { t: 'apache/kafka:4.4.0 (KRaft) in Compose' },
+    { t: 'Transactional outbox → Kafka, key = orderId' },
+    { t: 'Consumers dedupe via processed_events' },
+    { t: '3 retries with backoff, then dead-letter topic' },
+    { t: 'Split into merchant / order / dispatch services' },
+    { t: 'Drop cross-module foreign keys (ADR-0003)' },
+  ]},
+  { id: 'M6', name: 'Ops', gh: 7, needs: [], goal: 'Containers, published images and dashboards.', items: [
+    { t: 'Dockerfile per service' },
+    { t: 'CI publishes images to GHCR' },
+    { t: 'Actuator + Micrometer + Prometheus v3.13.5' },
+    { t: 'Grafana 13.3.0 dashboard provisioned in Compose' },
+  ]},
+  { id: 'M7', name: 'Performance', gh: 8, needs: [], goal: 'Measured load and one or two measured wins.', items: [
+    { t: 'k6 2.3.0 load scripts' },
+    { t: 'Baseline: throughput and p95 latency' },
+    { t: 'One or two optimizations, measured before and after' },
+    { t: 'Results written up in the README' },
+  ]},
+  { id: 'M8', name: 'Polish', gh: 9, needs: [], goal: 'A repo a reviewer can understand at a glance.', items: [
+    { t: 'README: architecture diagram, setup steps, screenshots' },
+    { t: 'Swagger docs complete' },
+    { t: 'Demo GIF or short video' },
+    { t: 'Notes on how AI tools were used and checked' },
+    { t: 'Known gap noted: no auth' },
+  ]},
+];
+
+const FOG = [
+  ['Performance target for M7', 'pick the optimization after a k6 baseline shows the bottleneck.'],
+  ['Metrics and Grafana dashboard', 'metric names, panels, alert thresholds.'],
+  ['Demo data and courier simulator', 'seeding merchants/customers, fake moving couriers.'],
+  ['Gradle layout after the split', 'multi-project shape, shared event-contract module or not.'],
+  ['Kafka topic settings', 'partitions, retention, DLT naming, replay procedure.'],
+  ['Image publishing details', 'GHCR tags, when CI publishes, image size targets.'],
+  ['README and demo content', 'screenshots, diagram source, AI-usage notes format.'],
+];
+const OUT_OF_SCOPE = [
+  ['Authentication / authorization', 'deliberate known gap, noted in README.'],
+  ['Payments and refunds', ''],
+  ['Stretch goals', 'ETA estimation, multi-order batching, surge pricing, Kotlin service, React/Leaflet map, hosted deploy, broadcast offers, road-distance routing.'],
+];
+
+const FLOW = [
+  { h: 'Customer places an order', m: 'M2', p: 'POST /orders with an Idempotency-Key header and only menu item ids + quantities. The order module checks every item belongs to the merchant and is available, copies each price onto its order line (price snapshot), computes the total, and saves orders, order_lines and an order_events row. Same key again returns the original order.', tags: [['Postgres', 'acc'], ['OrderPlaced', 'warn'], ['PLACED', '']] },
+  { h: 'Merchant accepts and prepares', m: 'M2', p: 'Each status change is checked by the state machine, written to orders, and logged as an order_events row. Cancellation is still allowed while the order is PLACED or ACCEPTED (who may cancel: ticket "Who may change an order\'s status without auth?").', tags: [['Postgres', 'acc'], ['ACCEPTED → PREPARING', '']] },
+  { h: 'Order is ready: dispatch starts', m: 'M3', p: 'READY publishes OrderReady. The dispatch module runs GEOSEARCH in Redis for AVAILABLE couriers within 5 km of the merchant (the dispatch radius), nearest first, skipping couriers who declined this order.', tags: [['OrderReady', 'warn'], ['Redis GEO', 'acc'], ['READY', '']] },
+  { h: 'Claim the courier and send an offer', m: 'M3', p: 'An UPDATE couriers SET status = BUSY … WHERE status = AVAILABLE claims the courier; if two orders race, only one UPDATE wins. A dispatch_attempts row records the OFFERED offer, and the courier has 30 s to decline. Whether an explicit accept is needed, and when orders.courier_id is set, is open in "Courier offer lifecycle".', tags: [['Postgres', 'acc'], ['dispatch_attempts', '']] },
+  { h: 'Decline, timeout or nobody nearby', m: 'M3', p: 'Decline or no answer → reassignment to the next nearest courier. No courier within the dispatch radius → a job tries dispatch again every 10 s. A courier going offline before pickup is reassigned automatically.', tags: [['@Scheduled jobs', ''], ['Reassignment', 'warn']] },
+  { h: 'Courier dispatched: live tracking begins', m: 'M4', p: 'CourierAssigned fires once the courier is dispatched. Status changes and the courier’s location (at most every 5 s) are pushed over STOMP to /topic/orders/{id}.', tags: [['CourierAssigned', 'warn'], ['WebSocket', 'acc']] },
+  { h: 'Pickup and delivery', m: 'M3', p: 'PICKED_UP needs a courier on the order, then DELIVERED. The courier goes back to AVAILABLE and is re-added to the Redis geo index, ready for the next order.', tags: [['OrderPickedUp', 'warn'], ['OrderDelivered', 'warn'], ['DELIVERED', 'ok']] },
+  { h: 'At M5 the same flow runs on Kafka', m: 'M5', p: 'Each event is written to an outbox table in the same transaction as the change, then relayed to Kafka keyed by orderId. Consumers skip duplicates using processed_events; failures retry 3 times, then go to a dead-letter topic.', tags: [['Kafka', 'acc'], ['Outbox', ''], ['DLT', 'blk']] },
+];
+
+const TABLES = [
+  { name: 'merchants', mod: 'merchant', ms: 'M1', cols: [['id', 'BIGINT', 'pk'], ['name', ''], ['address', ''], ['lat, lng', 'coordinates'], ['is_open', 'BOOLEAN']] },
+  { name: 'menu_items', mod: 'merchant', ms: 'M1', cols: [['id', 'BIGINT', 'pk'], ['merchant_id', '→ merchants', 'fk'], ['name', ''], ['price_cents', 'BIGINT ≥ 0'], ['is_available', 'BOOLEAN']] },
+  { name: 'customers', mod: 'unowned', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['name', ''], ['address', ''], ['lat, lng', 'coordinates']], note: 'Endpoints open in "Missing endpoints"; owning module open in "Service split".' },
+  { name: 'orders', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['customer_id', '→ customers', 'fk'], ['merchant_id', '→ merchants', 'fk'], ['courier_id', '→ couriers (nullable)', 'fk'], ['status', 'CHECK-guarded'], ['total_cents', 'BIGINT ≥ 0'], ['idempotency_key', '', 'uq'], ['request_hash', ''], ['created_at, updated_at', 'TIMESTAMPTZ']] },
+  { name: 'order_lines', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['order_id', '→ orders', 'fk'], ['menu_item_id', '→ menu_items', 'fk'], ['quantity', ''], ['price_cents', 'price snapshot']], note: 'price_cents is copied on purpose (ADR-0004).' },
+  { name: 'order_events', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['order_id', '→ orders', 'fk'], ['from_status', ''], ['to_status', ''], ['created_at', 'TIMESTAMPTZ']], note: 'Relation to the M5 outbox open in ticket 15.' },
+  { name: 'couriers', mod: 'dispatch', ms: 'M3', cols: [['id', 'BIGINT', 'pk'], ['name', ''], ['status', 'OFFLINE / AVAILABLE / BUSY'], ['last_lat, last_lng', 'last known'], ['updated_at', 'TIMESTAMPTZ']], note: 'Live location of AVAILABLE couriers lives in Redis.' },
+  { name: 'dispatch_attempts', mod: 'dispatch', ms: 'M3', cols: [['id', 'BIGINT', 'pk'], ['order_id', '→ orders', 'fk'], ['courier_id', '→ couriers', 'fk'], ['result', 'OFFERED / ACCEPTED / DECLINED / TIMED_OUT'], ['created_at', 'TIMESTAMPTZ']] },
+  { name: 'processed_events', mod: 'common', ms: 'M5', cols: [['event_id', '', 'uq'], ['processed_at', 'TIMESTAMPTZ']], note: 'Consumer dedupe. The outbox table also lands at M5.' },
+];
+const FK = { menu_items: ['merchants'], orders: ['customers', 'merchants', 'couriers'], order_lines: ['orders', 'menu_items'], order_events: ['orders'], dispatch_attempts: ['orders', 'couriers'] };
+
+const API = [
+  ['POST', '/merchants', 'create merchant', 'merchant', 'M1'],
+  ['POST', '/merchants/{id}/items', 'add menu item', 'merchant', 'M1'],
+  ['GET', '/merchants/{id}/menu', 'get menu', 'merchant', 'M1'],
+  ['POST', '/orders', 'place order (Idempotency-Key header)', 'order', 'M2'],
+  ['GET', '/orders/{id}', 'get order + status', 'order', 'M2'],
+  ['PATCH', '/orders/{id}/status', 'advance status (merchant / courier)', 'order', 'M2'],
+  ['POST', '/couriers', 'register courier', 'dispatch', 'M3'],
+  ['PATCH', '/couriers/{id}/status', 'available / offline', 'dispatch', 'M3'],
+  ['PUT', '/couriers/{id}/location', 'update location', 'dispatch', 'M3'],
+  ['WS', '/ws  →  /topic/orders/{id}', 'live order + courier updates (STOMP)', 'order', 'M4'],
+];
+
+const STACK = [
+  ['Language', 'Java 21', 'Kotlin for one service is a stretch goal', ''],
+  ['Framework', 'Spring Boot 4.1.2', 'webmvc, data-jpa, validation, actuator, websocket, flyway, kafka starters', '#5'],
+  ['Modules', 'Spring Modulith 2.1.2', 'enforces package boundaries before the split', '#5'],
+  ['Build', 'Gradle 9.8.2, Kotlin DSL', '', '#5'],
+  ['Database', 'postgres:18.6-alpine + Flyway 12', 'volume moved to /var/lib/postgresql in 18', '#6'],
+  ['Geo / cache', 'redis:8.10.3-alpine', 'GEOADD / GEOSEARCH are core commands', '#6'],
+  ['Messaging', 'apache/kafka:4.4.0 (KRaft)', 'pin the tag; no Bitnami images', '#6'],
+  ['API docs', 'springdoc-openapi 3.2.0', 'Swagger UI', '#5'],
+  ['Testing', 'JUnit 5, Mockito, Testcontainers 2.0.5', 'TDD for domain rules; real Postgres/Redis in integration tests', '#5'],
+  ['Load testing', 'grafana/k6:2.3.0', '', '#6'],
+  ['Monitoring', 'Micrometer 1.17, prom/prometheus:v3.13.5, grafana/grafana:13.3.0', '', '#6'],
+  ['CI/CD', 'GitHub Actions + GHCR', 'build+test from M0, images at M6', ''],
+  ['Containers', 'Docker + Docker Compose', '', ''],
+  ['Tools', 'IntelliJ IDEA Community, Postman/Bruno, Git', '', ''],
+];
+
+const ADRS = [
+  ['0001', 'Modular monolith first, split into services later', 'One Spring Boot app with a package per domain, boundaries checked by Spring Modulith. Split at M5 when Kafka arrives, after the data model settles.', 'docs/adr/0001-modular-monolith-first.md'],
+  ['0002', 'Flyway owns the schema; JPA for CRUD, hand-written SQL for the rest', 'Hibernate runs with ddl-auto=validate. Joins, order history and courier claiming are hand-written SQL so they stay visible and reviewable.', 'docs/adr/0002-flyway-owns-schema-hybrid-jpa.md'],
+  ['0003', 'Foreign keys across modules until the split', 'Postgres rejects orphaned rows while it is one app. Cross-module FKs are dropped deliberately at the split.', 'docs/adr/0003-foreign-keys-across-modules-until-split.md'],
+  ['0004', 'Price snapshot on each order line', 'order_lines.price_cents copies the price at order time so receipts stay correct. A price-history table was rejected.', 'docs/adr/0004-price-snapshot-on-order-lines.md'],
+];
+
+const ROUNDS = [
+  ['Round 1 · Foundations', ['Claude writes all code; user is quizzed during the build.', 'Modular monolith first; split at the Kafka milestone.', 'Hybrid DB access: Flyway SQL owns schema, JPA for CRUD, SQL for interesting queries.', 'Docker Desktop (WSL2), installed by the user.', 'No auth in v1; documented gap.', 'Money as integer cents with CHECK (>= 0).']],
+  ['Round 2 · Data model', ['Hybrid JPA confirmed.', 'BIGINT identity primary keys.', 'Order state machine with 409 on illegal transitions; CANCELLED only from PLACED/ACCEPTED; PICKED_UP needs a courier.', 'Price snapshot on order lines.', 'Server computes total_cents; client sends ids + quantities.', 'Foreign keys everywhere until the split.', 'TIMESTAMPTZ everywhere (Instant in Java).']],
+  ['Round 3 · Dispatch', ['Dispatch starts at READY.', 'Redis = live AVAILABLE couriers; Postgres = courier record.', 'Courier status OFFLINE / AVAILABLE / BUSY; one order per courier.', 'GEOSEARCH within 5 km, nearest first; retry every 10 s.', '30 s to respond; next nearest on decline; dispatch_attempts audit.', 'Claim with conditional UPDATE (optimistic concurrency).', 'Offline before pickup → reassign; after pickup → 409.']],
+  ['Round 4 · Events & real-time', ['Offers go to one courier at a time.', 'Offer timeout via @Scheduled job over Postgres.', 'Spring events first, Kafka at the split; key = orderId.', 'Transactional outbox at the Kafka milestone.', 'processed_events dedupe; 3 retries then DLT.', 'Idempotency-Key: same key → same order, changed body → 422.', 'STOMP /topic/orders/{id}; location at most every 5 s.']],
+  ['Round 5 · Engineering', ['Testcontainers for integration, JUnit + Mockito for logic.', 'TDD for domain rules, not plumbing.', 'Package-by-feature, boundaries checked by Spring Modulith.', 'Gradle Kotlin DSL.', 'GitHub Actions from M0; GHCR + Prometheus/Grafana at Ops.', 'Milestones M0–M8 as small PRs, code review before each.']],
+];
+
+const GLOSSARY = [
+  ['Marketplace', [
+    ['Customer', 'A person who places orders and receives deliveries.', ['User', 'buyer', 'client', 'account']],
+    ['Merchant', 'A business that sells menu items and prepares orders.', ['Restaurant', 'store', 'vendor', 'seller']],
+    ['Menu Item', 'One thing a merchant sells at a listed price; the merchant can mark it unavailable.', ['Product', 'dish', 'SKU']],
+    ['Courier', 'A person who picks up a ready order from a merchant and delivers it to a customer.', ['Driver', 'dasher', 'rider', 'shopper']],
+  ]],
+  ['Ordering', [
+    ['Order', "A customer's request to buy one or more menu items from a single merchant.", ['Purchase', 'transaction', 'cart']],
+    ['Order Line', 'One menu item on an order, with its quantity and price snapshot.', ['Order item', 'line item', 'cart item']],
+    ['Price Snapshot', 'The price of a menu item copied onto an order line at the moment the order is placed; never changes afterward.', ['Cached price', 'current price']],
+    ['Order Status', 'Where an order is in its lifecycle: Placed, Accepted, Preparing, Ready, Picked Up, Delivered, or Cancelled.', ['State', 'stage', 'phase']],
+    ['Cancellation', 'Ending an order before the merchant starts preparing it.', ['Refund', 'void', 'rejection']],
+  ]],
+  ['Dispatch', [
+    ['Dispatch', 'Choosing a courier for a ready order.', ['Assignment', 'matching', 'routing']],
+    ['Reassignment', 'Dispatching an order again because its courier declined, did not respond, or went offline before pickup.', ['Redispatch', 'retry']],
+    ['Courier Status', 'Whether a courier can take work right now: Offline, Available, or Busy.', ['Online flag', 'online/offline']],
+    ['Dispatch Radius', 'The distance from a merchant within which dispatch looks for available couriers.', ['Delivery radius', 'range', 'zone']],
+  ]],
+];
+
+const SCOPE = [
+  ['Core (MVP)', 'ok', ['Merchants, menus, item availability', 'Orders with a status lifecycle', 'Couriers: status and location', 'Dispatch to nearest available courier (Redis geo)', 'REST APIs with OpenAPI', 'Validation and consistent errors']],
+  ['Stand-out', 'acc', ['Kafka event-driven flow', 'Live tracking over WebSocket', 'Idempotent order creation', 'Reassignment, retries, dead-letter topic', 'k6 load tests', 'Before/after performance write-up', 'Prometheus + Grafana monitoring']],
+  ['Out of scope', 'blk', ['Auth (documented gap)', 'Payments and refunds', 'ETA, batching, surge pricing', 'Kotlin service, React/Leaflet map', 'Hosted deploy', 'Road-distance routing']],
+];
+
+/* ---------- RENDERING ---------- */
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const byN = Object.fromEntries(TICKETS.map(t => [t.n, t]));
+const issue = n => `${REPO}/issues/${esc(n)}`;
+const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Ticket helpers. Ids missing from TICKETS are ignored everywhere.
+const isOpen = n => !!byN[n] && byN[n].state !== 'closed';
+const blockers = t => (t.blockedBy || []).map(b => byN[b]).filter(Boolean);
+const unblocks = n => TICKETS.filter(x => blockers(x).some(b => b.n === n));
+
+function ticketStatus(t) {
+  if (t.state === 'closed') return 'closed';
+  if (blockers(t).some(b => isOpen(b.n))) return 'blocked';
+  if (t.claimed) return 'claimed';
+  return 'frontier';
+}
+const STATUS_LABEL = { closed: ['Decided', 'ok'], claimed: ['In progress', 'warn'], frontier: ['Frontier', 'acc'], blocked: ['Blocked', 'blk'] };
+
+// checkmark storage (per browser)
+const LS_KEY = 'dropoff-roadmap-v1';
+let marks = {};
+try { marks = JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {}; } catch (e) { marks = {}; }
+const saveMarks = () => { try { localStorage.setItem(LS_KEY, JSON.stringify(marks)); } catch (e) {} };
+const key = (m, it) => m.id + '::' + it.t;
+const isDone = (m, it) => (key(m, it) in marks ? marks[key(m, it)] : !!it.done);
+const msCount = m => m.items.filter(it => isDone(m, it)).length;
+
+function renderRoadmap() {
+  const closed = TICKETS.filter(t => t.state === 'closed').length;
+  const doneMs = MILESTONES.filter(m => msCount(m) === m.items.length).length;
+  const planningDone = closed === TICKETS.length;
+  const next = MILESTONES.find(m => msCount(m) < m.items.length);
+  const frontier = TICKETS.filter(t => ticketStatus(t) === 'frontier').length;
+  const current = TICKETS.find(t => ticketStatus(t) === 'claimed');
+
+  $('#kpis').innerHTML = `
+    <div class="card kpi"><div class="label">Planning decisions</div><div class="value">${closed} / ${TICKETS.length}</div><div class="bar ok" style="margin:6px 0"><i style="width:${closed / TICKETS.length * 100}%"></i></div><div class="sub">${frontier} ready to take now</div></div>
+    <div class="card kpi"><div class="label">Build milestones</div><div class="value">${doneMs} / ${MILESTONES.length}</div><div class="bar ok" style="margin:6px 0"><i style="width:${doneMs / MILESTONES.length * 100}%"></i></div><div class="sub">${planningDone ? 'Planning complete' : 'Build starts after planning'}</div></div>
+    <div class="card kpi"><div class="label">Next milestone</div><div class="value">${next ? esc(next.id) : '—'}</div><div class="sub">${next ? esc(next.name) + ' · needs ' + next.needs.filter(isOpen).length + ' open decision(s)' : 'All done'}</div></div>
+    <div class="card kpi"><div class="label">Working on</div><div class="value" style="font-size:1rem;line-height:1.35;margin-top:4px">${current ? `<a href="${issue(current.n)}">${esc(current.title)}</a>` : 'Nothing claimed'}</div><div class="sub">${current ? 'wayfinder ticket, ' + esc(current.type) : ''}</div></div>`;
+
+  const stages = [{ id: 'Plan', name: 'Planning map', done: closed, total: TICKETS.length, anchor: '#planning' }]
+    .concat(MILESTONES.map(m => ({ id: m.id, name: m.name, done: msCount(m), total: m.items.length, anchor: '#ms-' + m.id })));
+  const nextId = planningDone ? (next && next.id) : 'Plan';
+  $('#track').innerHTML = stages.map(s => {
+    const cls = s.done === s.total ? 'done' : (s.id === nextId ? 'next' : '');
+    return `<button class="stage ${cls}" type="button" data-go="${esc(s.anchor)}"><div class="id">${esc(s.id)}${s.done === s.total ? ' ✓' : ''}</div><div class="nm">${esc(s.name)}</div><div class="bar"><i style="width:${s.done / s.total * 100}%"></i></div></button>`;
+  }).join('');
+
+  $('#milestones').innerHTML = MILESTONES.map(m => {
+    const c = msCount(m), all = c === m.items.length;
+    const needTickets = m.needs.map(n => byN[n]).filter(Boolean);
+    const needs = needTickets.length ? `<div class="needs"><span class="muted">Decisions:</span>${needTickets.map(t => {
+      const [lbl, cls] = STATUS_LABEL[ticketStatus(t)];
+      return `<a class="chip ${cls}" href="${issue(t.n)}" title="${esc(t.title)} · ${lbl}">${esc(shortTitle(t.title))}</a>`;
+    }).join('')}</div>` : '';
+    return `<article class="card ms ${m === next ? 'next' : ''} ${all ? 'done' : ''}" id="ms-${esc(m.id)}">
+      <div class="head"><h3><span>${esc(m.id)}</span>${esc(m.name)}</h3>${m === next ? '<span class="chip acc">Next</span>' : all ? '<span class="chip ok">Done</span>' : ''}</div>
+      <p class="goal">${esc(m.goal)}</p>
+      <div class="bar ${all ? 'ok' : ''}"><i style="width:${c / m.items.length * 100}%"></i></div>
+      ${needs}
+      <ul>${m.items.map((it, i) => `<li class="${isDone(m, it) ? 'checked' : ''}"><label><input type="checkbox" data-ms="${esc(m.id)}" data-i="${i}" ${isDone(m, it) ? 'checked' : ''}><span>${esc(it.t)}</span></label></li>`).join('')}</ul>
+      <div class="foot"><span class="muted">${c} / ${m.items.length} done</span><a href="${REPO}/milestone/${esc(m.gh)}">GitHub milestone →</a></div>
+    </article>`;
+  }).join('');
+}
+function shortTitle(s) { const i = s.indexOf(':'); const base = i > 0 && i < 40 ? s.slice(0, i) : s; return base.length > 34 ? base.slice(0, 32) + '…' : base; }
+
+document.addEventListener('change', e => {
+  const cb = e.target.closest('input[data-ms]');
+  if (!cb) return;
+  const m = MILESTONES.find(x => x.id === cb.dataset.ms), it = m.items[+cb.dataset.i];
+  if (cb.checked === !!it.done) delete marks[key(m, it)]; else marks[key(m, it)] = cb.checked;
+  const { ms, i } = cb.dataset;
+  saveMarks(); renderRoadmap();
+  const again = [...document.querySelectorAll('input[data-ms][data-i]')].find(x => x.dataset.ms === ms && x.dataset.i === i);
+  if (again) again.focus();
+});
+document.addEventListener('click', e => {
+  const st = e.target.closest('[data-go]');
+  if (st) { const el = $(st.dataset.go); if (el) el.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth' }); }
+});
+$('#reset').addEventListener('click', () => { marks = {}; saveMarks(); renderRoadmap(); });
+
+/* planning graph */
+// Longest chain of blockers above a ticket. Memoized per ticket; `path` holds only the
+// tickets on the current chain, so a cycle stops at 0 without hiding sibling branches.
+const depthMemo = new Map();
+function depth(t, path = new Set()) {
+  if (depthMemo.has(t.n)) return depthMemo.get(t.n);
+  if (path.has(t.n)) return 0;
+  path.add(t.n);
+  const bs = blockers(t);
+  const d = bs.length ? 1 + Math.max(...bs.map(b => depth(b, path))) : 0;
+  path.delete(t.n);
+  depthMemo.set(t.n, d);
+  return d;
+}
+function renderGraph() {
+  const cols = [];
+  TICKETS.forEach(t => { const d = depth(t); (cols[d] = cols[d] || []).push(t); });
+  const heads = ['No blockers', 'Needs one decision first', 'Needs two in a row'];
+  const g = $('#graph');
+  g.style.setProperty('--cols', cols.length);
+  g.innerHTML = '<svg class="edges" aria-hidden="true"></svg>' + cols.map((col, i) => `<div class="col"><div class="colh">${esc(heads[i] || '')}</div>${(col || []).map(t => {
+    const st = ticketStatus(t), [lbl, cls] = STATUS_LABEL[st];
+    const after = blockers(t).map(b => shortTitle(b.title));
+    return `<div class="tk ${st}" data-n="${esc(t.n)}">
+      <a class="t" href="${issue(t.n)}">${esc(t.title)}</a>
+      <div class="gist">${esc(t.gist || t.q || '')}</div>
+      <div class="meta"><span class="chip ${cls}">${lbl}</span><span class="chip">${esc(t.type)}</span>${after.length ? `<span class="small muted">after: ${esc(after.join(', '))}</span>` : ''}</div>
+    </div>`;
+  }).join('')}</div>`).join('');
+  drawEdges();
+}
+function drawEdges(hl) {
+  const g = $('#graph'), svg = $('svg.edges', g);
+  if (!svg || getComputedStyle(svg).display === 'none') return;
+  const gr = g.getBoundingClientRect();
+  let out = '';
+  TICKETS.forEach(t => blockers(t).forEach(({ n: b }) => {
+    const a = $(`.tk[data-n="${b}"]`, g), c = $(`.tk[data-n="${t.n}"]`, g);
+    if (!a || !c) return;
+    const ra = a.getBoundingClientRect(), rc = c.getBoundingClientRect();
+    const x1 = ra.right - gr.left, y1 = ra.top + ra.height / 2 - gr.top;
+    const x2 = rc.left - gr.left, y2 = rc.top + rc.height / 2 - gr.top;
+    const dx = Math.max(24, (x2 - x1) / 2);
+    const live = isOpen(b);
+    const on = hl && (hl === b || hl === t.n);
+    out += `<path class="${live ? 'live' : ''} ${on ? 'hl' : ''}" d="M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2 - 4},${y2}" marker-end="url(#gh)"/>`;
+  }));
+  svg.innerHTML = `<defs><marker id="gh" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent);stroke:none"/></marker></defs>` + out;
+}
+function highlightTicket(e) {
+  const tk = e.target.closest('.tk'); if (!tk) return;
+  const n = +tk.dataset.n, t = byN[n]; if (!t) return;
+  const linked = new Set([n, ...blockers(t).map(b => b.n), ...unblocks(n).map(x => x.n)]);
+  document.querySelectorAll('#graph .tk').forEach(el => el.classList.toggle('hl', linked.has(+el.dataset.n) && linked.size > 1));
+  drawEdges(n);
+}
+function clearTicketHighlight() { document.querySelectorAll('#graph .tk').forEach(el => el.classList.remove('hl')); drawEdges(); }
+$('#graph').addEventListener('mouseover', highlightTicket);
+$('#graph').addEventListener('focusin', highlightTicket);
+$('#graph').addEventListener('mouseleave', clearTicketHighlight);
+$('#graph').addEventListener('focusout', e => { if (!$('#graph').contains(e.relatedTarget)) clearTicketHighlight(); });
+let resizeTimer; window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => drawEdges(), 80); });
+
+/* the rest */
+function renderStatic() {
+  $('#fog').innerHTML = FOG.map(([h, d]) => `<li><b>${esc(h)}</b>: ${esc(d)}</li>`).join('');
+  $('#oos').innerHTML = OUT_OF_SCOPE.map(([h, d]) => `<li><b>${esc(h)}</b>${d ? ': ' + esc(d) : ''}</li>`).join('');
+
+  $('#flowsteps').innerHTML = FLOW.map(s => `<li class="card"><div><h3>${esc(s.h)} <span class="chip" style="margin-left:6px">${esc(s.m)}</span></h3><p>${esc(s.p)}</p><div class="tags">${s.tags.map(([t, c]) => `<span class="chip ${esc(c)}">${esc(t)}</span>`).join('')}</div></div></li>`).join('');
+
+  $('#tables').innerHTML = TABLES.map(t => `<div class="card tbl ${esc(t.mod)}" data-t="${esc(t.name)}" tabindex="0">
+    <div class="th"><b>${esc(t.name)}</b><span class="chip">${t.mod === 'unowned' ? 'owner open' : esc(t.mod)} · ${esc(t.ms)}</span></div>
+    <table>${t.cols.map(([c, ty, k]) => `<tr><td>${esc(c)}${k ? `<span class="k ${esc(k)}">${esc(k.toUpperCase())}</span>` : ''}</td><td>${esc(ty)}</td></tr>`).join('')}</table>
+    ${t.note ? `<div class="note">${esc(t.note)}</div>` : ''}</div>`).join('');
+  const tablesEl = $('#tables');
+  const highlightTable = e => {
+    const card = e.target.closest('.tbl'); if (!card) return;
+    const n = card.dataset.t;
+    const rel = new Set([n, ...(FK[n] || []), ...Object.keys(FK).filter(from => FK[from].includes(n))]);
+    tablesEl.classList.add('focus');
+    tablesEl.querySelectorAll('.tbl').forEach(el => el.classList.toggle('on', rel.has(el.dataset.t)));
+  };
+  const clearTableHighlight = () => { tablesEl.classList.remove('focus'); tablesEl.querySelectorAll('.tbl').forEach(el => el.classList.remove('on')); };
+  tablesEl.addEventListener('mouseover', highlightTable);
+  tablesEl.addEventListener('focusin', highlightTable);
+  tablesEl.addEventListener('mouseleave', clearTableHighlight);
+  tablesEl.addEventListener('focusout', e => { if (!tablesEl.contains(e.relatedTarget)) clearTableHighlight(); });
+
+  $('#apitable tbody').innerHTML = API.map(([v, p, d, mod, ms]) => `<tr><td><span class="verb ${esc(v)}">${esc(v)}</span></td><td><code>${esc(p)}</code></td><td>${esc(d)}</td><td><i class="dot" style="background:var(--m-${esc(mod)})"></i> ${esc(mod)}</td><td>${esc(ms)}</td></tr>`).join('');
+
+  $('#stacktable tbody').innerHTML = STACK.map(([l, c, n, src]) => `<tr><td class="muted">${esc(l)}</td><td><b>${esc(c)}</b></td><td class="small muted">${esc(n)}</td><td>${src ? `<a href="${issue(src.slice(1))}">ticket ${esc(src.slice(1))}</a>` : ''}</td></tr>`).join('');
+
+  $('#adrs').innerHTML = ADRS.map(([n, h, p, f]) => `<div class="card adr"><span class="chip">ADR-${esc(n)}</span><h3 style="margin-top:8px">${esc(h)}</h3><p>${esc(p)}</p><p class="small" style="margin-top:8px"><a href="${REPO}/blob/main/${esc(f)}">Read ADR →</a></p></div>`).join('');
+  // Rounds 1–4 hold the 27 numbered decisions (numbering continues across rounds); round 5 is unnumbered.
+  const NUMBERED_ROUNDS = 4;
+  let decisionNo = 0;
+  $('#rounds').innerHTML = ROUNDS.map(([h, items], r) => {
+    const lis = items.map(i => `<li>${esc(i)}</li>`).join('');
+    if (r >= NUMBERED_ROUNDS) return `<div><h3>${esc(h)}</h3><ul>${lis}</ul></div>`;
+    const start = decisionNo + 1;
+    decisionNo += items.length;
+    return `<div><h3>${esc(h)}</h3><ol start="${start}">${lis}</ol></div>`;
+  }).join('');
+
+  $('#gloss').innerHTML = GLOSSARY.map(([grp, terms]) => `<div class="glh">${esc(grp)}</div><div class="grid">${terms.map(([t, d, avoid]) => `<div class="card gl"><b>${esc(t)}</b><p>${esc(d)}</p><div class="avoid">${avoid.map(a => `<span class="chip">${esc(a)}</span>`).join('')}</div></div>`).join('')}</div>`).join('');
+
+  $('#scopegrid').innerHTML = SCOPE.map(([h, c, items]) => `<div class="card" style="padding:14px 16px"><span class="chip ${esc(c)}">${esc(h)}</span><ul style="margin:10px 0 0;padding-left:18px;font-size:14px">${items.map(i => `<li>${esc(i)}</li>`).join('')}</ul></div>`).join('');
+}
+
+document.querySelectorAll('[data-arch]').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('[data-arch]').forEach(x => x.setAttribute('aria-pressed', x === b));
+  $('#arch-mono').hidden = b.dataset.arch !== 'mono';
+  $('#arch-svc').hidden = b.dataset.arch !== 'svc';
+}));
+
+renderRoadmap();
+renderGraph();
+renderStatic();
+window.addEventListener('load', () => drawEdges());
+</script>
+</body>
+</html>
