@@ -16,6 +16,14 @@ _Avoid_: Restaurant, store, vendor, seller
 One thing a merchant sells at a listed price; the merchant can mark it unavailable.
 _Avoid_: Product, dish, SKU
 
+**Menu**:
+All the menu items a merchant lists, available or not.
+_Avoid_: Catalog, inventory
+
+**Open**:
+Whether a merchant accepts new orders right now; closing never affects orders already placed.
+_Avoid_: Online, active
+
 **Courier**:
 A person who picks up a ready order from a merchant and delivers it to a customer.
 _Avoid_: Driver, dasher, rider, shopper
@@ -33,6 +41,10 @@ _Avoid_: Order item, line item, cart item
 **Price Snapshot**:
 The price of a menu item copied onto an order line at the moment the order is placed; never changes afterward.
 _Avoid_: Cached price, current price
+
+**Delivery Address**:
+Where an order is delivered: the customer's address copied onto the order when it is placed; never changes afterward.
+_Avoid_: Shipping address, destination
 
 **Order Status**:
 Where an order is in its lifecycle: Placed, Accepted, Preparing, Ready, Picked Up, Delivered, or Cancelled.
