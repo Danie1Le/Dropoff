@@ -413,7 +413,7 @@ footer { padding: 40px 0 48px; color: var(--muted); font-size: 13px; }
       <div class="st">PICKED_UP<small>courier · needs a courier</small></div><span class="arr">→</span>
       <div class="st fin">DELIVERED<small>courier</small></div>
     </div>
-    <div class="cxrow"><div class="st cx">CANCELLED</div><span>Only from PLACED or ACCEPTED (before the merchant starts preparing). Any other jump is rejected with <code>409 Conflict</code>. Rules live in Java; a <code>CHECK</code> guards the column. Who counts as "merchant" or "courier" with no auth is open in <a href="https://github.com/Danie1Le/Dropoff/issues/10">Who may change an order's status without auth?</a></span></div>
+    <div class="cxrow"><div class="st cx">CANCELLED</div><span>Only from PLACED or ACCEPTED (before the merchant starts preparing). Any other jump is rejected with <code>409 Conflict</code>. Rules live in Java; a <code>CHECK</code> guards the column. The merchant or the customer can cancel. Each step is its own command endpoint, scoped to the caller (ADR-0005, <a href="https://github.com/Danie1Le/Dropoff/issues/10">Who may change an order's status without auth?</a>).</span></div>
   </div>
 
   <ol class="flow" style="margin-top:14px" id="flowsteps"></ol>
@@ -438,7 +438,7 @@ footer { padding: 40px 0 48px; color: var(--muted); font-size: 13px; }
 <!-- API -->
 <section id="api">
   <h2>API</h2>
-  <p class="lede">REST endpoints documented with springdoc (Swagger UI). Every REST path sits under <code>/api/v1</code>; errors are RFC 9457 Problem Details with a <code>code</code> field, settled in <a href="https://github.com/Danie1Le/Dropoff/issues/8">API conventions: errors, versioning, pagination</a>. Customer, open/close and availability endpoints are settled in <a href="https://github.com/Danie1Le/Dropoff/issues/9">Missing endpoints</a>. Who may call the status endpoint is open in <a href="https://github.com/Danie1Le/Dropoff/issues/10">Who may change an order's status without auth?</a>; accept/decline endpoints for couriers are open in <a href="https://github.com/Danie1Le/Dropoff/issues/11">Courier offer lifecycle</a>.</p>
+  <p class="lede">REST endpoints documented with springdoc (Swagger UI). Every REST path sits under <code>/api/v1</code>; errors are RFC 9457 Problem Details with a <code>code</code> field, settled in <a href="https://github.com/Danie1Le/Dropoff/issues/8">API conventions: errors, versioning, pagination</a>. Customer, open/close and availability endpoints are settled in <a href="https://github.com/Danie1Le/Dropoff/issues/9">Missing endpoints</a>. Order status moves through path-scoped command endpoints, one per step, settled in <a href="https://github.com/Danie1Le/Dropoff/issues/10">Who may change an order's status without auth?</a>; accept/decline endpoints for couriers are open in <a href="https://github.com/Danie1Le/Dropoff/issues/11">Courier offer lifecycle</a>.</p>
   <div class="card tw"><table class="list" id="apitable"><thead><tr><th>Method</th><th>Path</th><th>Does</th><th>Module</th><th>Milestone</th></tr></thead><tbody></tbody></table></div>
 </section>
 
@@ -493,7 +493,7 @@ const TICKETS = [
   { n: 7,  title: 'Coding standards for code review', type: 'grilling', state: 'closed', blockedBy: [5], gist: 'Palantir format via Spotless (CI-enforced), Error Prone + NullAway (standard mode) on @NullMarked packages, records not Lombok, Modulith base-package API, XxxTest/XxxIT + AssertJ, JaCoCo without a gate, Java 21 toolchain.' },
   { n: 8,  title: 'API conventions: errors, versioning, pagination', type: 'grilling', state: 'closed', gist: 'Problem Details with a code field, /api/v1 prefix, offset paging via PagedModel (max 100), 400 validation errors[], 404 path / 409 state / 422 content, DomainException categories, 201 + Location, Idempotent-Replayed header.' },
   { n: 9,  title: 'Missing endpoints: customers, delivery address, merchant open/close, item availability', type: 'grilling', state: 'closed', blockedBy: [8], gist: 'Delivery address snapshot on orders, customer endpoints in the order module, PATCH per resource for open/available, /menu-items with no DELETE, 422 MERCHANT_CLOSED, merchant + customer order lists.' },
-  { n: 10, title: "Who may change an order's status without auth?", type: 'grilling', state: 'open', q: 'Separate endpoints per actor, an actor field, or path-scoped routes?' },
+  { n: 10, title: "Who may change an order's status without auth?", type: 'grilling', state: 'closed', gist: 'Path-scoped POST commands per actor (accept, start-preparing, ready, pick-up, deliver, cancel) replace PATCH status; wrong caller 404, wrong state 409, repeat 200 no-op; order_events.actor.' },
   { n: 11, title: 'Courier offer lifecycle: accept, decline, timeout endpoints', type: 'grilling', state: 'open', blockedBy: [10], q: 'Explicit accept or silence = accept? Offer states, endpoints, when courier_id is set.' },
   { n: 12, title: "Where a busy courier's location lives", type: 'grilling', state: 'open', q: 'Pings from a BUSY courier: which Redis key, which module pushes them to WebSocket.' },
   { n: 13, title: 'Stuck orders: merchant never accepts, no courier ever found', type: 'grilling', state: 'open', blockedBy: [11], q: 'Auto-cancel after N minutes, widen the radius, alert? Who is notified?' },
@@ -529,15 +529,18 @@ const MILESTONES = [
     { t: 'Reject unavailable or wrong-merchant menu items; closed merchant → 422 MERCHANT_CLOSED' },
     { t: 'Customer endpoints (POST/GET/PATCH /api/v1/customers); lat/lng range-checked, no geocoder; delivery address snapshot on each order, no override in the request' },
     { t: 'Order lists (paginated): GET /api/v1/merchants/{id}/orders?status= and GET /api/v1/customers/{id}/orders (hand-written SQL, ADR-0002)' },
-    { t: 'Order status state machine; illegal jump → 409' },
+    { t: 'Order status state machine: wrong caller → 404, illegal jump → 409, repeated command → 200 no-op' },
+    { t: 'Merchant commands: POST /api/v1/merchants/{id}/orders/{orderId}/accept, start-preparing, ready, cancel' },
+    { t: 'Customer cancel: POST /api/v1/customers/{id}/orders/{orderId}/cancel' },
     { t: 'Cancellation only from PLACED or ACCEPTED' },
     { t: 'Idempotency-Key: same key → same order; changed body → 422' },
-    { t: 'order_events row for every status change' },
+    { t: 'order_events row for every status change, with its actor (CHECK-guarded)' },
     { t: 'TDD unit tests for the state machine' },
   ]},
   { id: 'M3', name: 'Dispatch', gh: 4, needs: [11, 12, 13, 14], goal: 'Ready orders get the nearest available courier, with reassignment.', items: [
     { t: 'Migrations: couriers, dispatch_attempts' },
     { t: 'POST /api/v1/couriers, PATCH /api/v1/couriers/{id}/status, PUT /api/v1/couriers/{id}/location' },
+    { t: 'Courier commands: POST /api/v1/couriers/{id}/orders/{orderId}/pick-up and deliver' },
     { t: 'Redis GEO index of AVAILABLE couriers' },
     { t: 'On READY: GEOSEARCH 5 km dispatch radius, nearest first' },
     { t: 'Claim with UPDATE … WHERE status = AVAILABLE' },
@@ -599,12 +602,12 @@ const OUT_OF_SCOPE = [
 
 const FLOW = [
   { h: 'Customer places an order', m: 'M2', p: 'POST /api/v1/orders with an Idempotency-Key header and only menu item ids + quantities. The order module checks every item belongs to the merchant and is available; a closed merchant is rejected with 422 MERCHANT_CLOSED. It copies the address of the customer onto the order as its delivery address, copies each price onto its order line (price snapshot), computes the total, and saves orders, order_lines and an order_events row. Same key again returns the original order.', tags: [['Postgres', 'acc'], ['OrderPlaced', 'warn'], ['PLACED', '']] },
-  { h: 'Merchant accepts and prepares', m: 'M2', p: 'Each status change is checked by the state machine, written to orders, and logged as an order_events row. Cancellation is still allowed while the order is PLACED or ACCEPTED (who may cancel: ticket "Who may change an order\'s status without auth?").', tags: [['Postgres', 'acc'], ['ACCEPTED → PREPARING', '']] },
+  { h: 'Merchant accepts and prepares', m: 'M2', p: 'The merchant calls accept, start-preparing and ready, each a POST scoped to its own id. Each step is checked by the state machine, written to orders, and logged as an order_events row with its actor. The merchant or the customer can still cancel while the order is PLACED or ACCEPTED.', tags: [['Postgres', 'acc'], ['ACCEPTED → PREPARING', '']] },
   { h: 'Order is ready: dispatch starts', m: 'M3', p: 'READY publishes OrderReady. The dispatch module runs GEOSEARCH in Redis for AVAILABLE couriers within 5 km of the merchant (the dispatch radius), nearest first, skipping couriers who declined this order.', tags: [['OrderReady', 'warn'], ['Redis GEO', 'acc'], ['READY', '']] },
   { h: 'Claim the courier and send an offer', m: 'M3', p: 'An UPDATE couriers SET status = BUSY … WHERE status = AVAILABLE claims the courier; if two orders race, only one UPDATE wins. A dispatch_attempts row records the OFFERED offer, and the courier has 30 s to decline. Whether an explicit accept is needed, and when orders.courier_id is set, is open in "Courier offer lifecycle".', tags: [['Postgres', 'acc'], ['dispatch_attempts', '']] },
   { h: 'Decline, timeout or nobody nearby', m: 'M3', p: 'Decline or no answer → reassignment to the next nearest courier. No courier within the dispatch radius → a job tries dispatch again every 10 s. A courier going offline before pickup is reassigned automatically.', tags: [['@Scheduled jobs', ''], ['Reassignment', 'warn']] },
   { h: 'Courier dispatched: live tracking begins', m: 'M4', p: 'CourierAssigned fires once the courier is dispatched. Status changes and the courier’s location (at most every 5 s) are pushed over STOMP to /topic/orders/{id}.', tags: [['CourierAssigned', 'warn'], ['WebSocket', 'acc']] },
-  { h: 'Pickup and delivery', m: 'M3', p: 'PICKED_UP needs a courier on the order, then DELIVERED. The courier goes back to AVAILABLE and is re-added to the Redis geo index, ready for the next order.', tags: [['OrderPickedUp', 'warn'], ['OrderDelivered', 'warn'], ['DELIVERED', 'ok']] },
+  { h: 'Pickup and delivery', m: 'M3', p: 'The assigned courier calls pick-up, then deliver; any other courier gets 404. The courier goes back to AVAILABLE and is re-added to the Redis geo index, ready for the next order.', tags: [['OrderPickedUp', 'warn'], ['OrderDelivered', 'warn'], ['DELIVERED', 'ok']] },
   { h: 'At M5 the same flow runs on Kafka', m: 'M5', p: 'Each event is written to an outbox table in the same transaction as the change, then relayed to Kafka keyed by orderId. Consumers skip duplicates using processed_events; failures retry 3 times, then go to a dead-letter topic.', tags: [['Kafka', 'acc'], ['Outbox', ''], ['DLT', 'blk']] },
 ];
 
@@ -614,7 +617,7 @@ const TABLES = [
   { name: 'customers', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['name', ''], ['address', ''], ['lat, lng', 'coordinates']], note: 'Owned by the order module.' },
   { name: 'orders', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['customer_id', '→ customers', 'fk'], ['merchant_id', '→ merchants', 'fk'], ['courier_id', '→ couriers (nullable)', 'fk'], ['status', 'CHECK-guarded'], ['total_cents', 'BIGINT ≥ 0'], ['delivery_address', 'snapshot'], ['delivery_lat, delivery_lng', 'snapshot'], ['idempotency_key', '', 'uq'], ['request_hash', ''], ['created_at, updated_at', 'TIMESTAMPTZ']] },
   { name: 'order_lines', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['order_id', '→ orders', 'fk'], ['menu_item_id', '→ menu_items', 'fk'], ['quantity', ''], ['price_cents', 'price snapshot']], note: 'price_cents is copied on purpose (ADR-0004).' },
-  { name: 'order_events', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['order_id', '→ orders', 'fk'], ['from_status', ''], ['to_status', ''], ['created_at', 'TIMESTAMPTZ']], note: 'Relation to the M5 outbox open in ticket 15.' },
+  { name: 'order_events', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['order_id', '→ orders', 'fk'], ['from_status', ''], ['to_status', ''], ['actor', 'CHECK: CUSTOMER / MERCHANT / COURIER / SYSTEM'], ['created_at', 'TIMESTAMPTZ']], note: 'Relation to the M5 outbox open in ticket 15.' },
   { name: 'couriers', mod: 'dispatch', ms: 'M3', cols: [['id', 'BIGINT', 'pk'], ['name', ''], ['status', 'OFFLINE / AVAILABLE / BUSY'], ['last_lat, last_lng', 'last known'], ['updated_at', 'TIMESTAMPTZ']], note: 'Live location of AVAILABLE couriers lives in Redis.' },
   { name: 'dispatch_attempts', mod: 'dispatch', ms: 'M3', cols: [['id', 'BIGINT', 'pk'], ['order_id', '→ orders', 'fk'], ['courier_id', '→ couriers', 'fk'], ['result', 'OFFERED / ACCEPTED / DECLINED / TIMED_OUT'], ['created_at', 'TIMESTAMPTZ']] },
   { name: 'processed_events', mod: 'common', ms: 'M5', cols: [['event_id', '', 'uq'], ['processed_at', 'TIMESTAMPTZ']], note: 'Consumer dedupe. The outbox table also lands at M5.' },
@@ -634,7 +637,13 @@ const API = [
   ['PATCH', '/api/v1/customers/{id}', 'name, address', 'order', 'M2'],
   ['POST', '/api/v1/orders', 'place order (Idempotency-Key header)', 'order', 'M2'],
   ['GET', '/api/v1/orders/{id}', 'get order + status', 'order', 'M2'],
-  ['PATCH', '/api/v1/orders/{id}/status', 'advance status (merchant / courier)', 'order', 'M2'],
+  ['POST', '/api/v1/merchants/{id}/orders/{orderId}/accept', 'merchant accepts (PLACED → ACCEPTED)', 'order', 'M2'],
+  ['POST', '/api/v1/merchants/{id}/orders/{orderId}/start-preparing', 'merchant starts preparing (ACCEPTED → PREPARING)', 'order', 'M2'],
+  ['POST', '/api/v1/merchants/{id}/orders/{orderId}/ready', 'merchant marks ready; starts dispatch (PREPARING → READY)', 'order', 'M2'],
+  ['POST', '/api/v1/merchants/{id}/orders/{orderId}/cancel', 'merchant cancels (PLACED / ACCEPTED)', 'order', 'M2'],
+  ['POST', '/api/v1/customers/{id}/orders/{orderId}/cancel', 'customer cancels (PLACED / ACCEPTED)', 'order', 'M2'],
+  ['POST', '/api/v1/couriers/{id}/orders/{orderId}/pick-up', 'assigned courier picks up (READY → PICKED_UP); owned by order module', 'order', 'M3'],
+  ['POST', '/api/v1/couriers/{id}/orders/{orderId}/deliver', 'assigned courier delivers (PICKED_UP → DELIVERED)', 'order', 'M3'],
   ['GET', '/api/v1/merchants/{id}/orders', "merchant's orders, ?status= filter, oldest first (paginated)", 'order', 'M2'],
   ['GET', '/api/v1/customers/{id}/orders', 'order history, newest first (paginated)', 'order', 'M2'],
   ['POST', '/api/v1/couriers', 'register courier', 'dispatch', 'M3'],
@@ -665,6 +674,7 @@ const ADRS = [
   ['0002', 'Flyway owns the schema; JPA for CRUD, hand-written SQL for the rest', 'Hibernate runs with ddl-auto=validate. Joins, order history and courier claiming are hand-written SQL so they stay visible and reviewable.', 'docs/adr/0002-flyway-owns-schema-hybrid-jpa.md'],
   ['0003', 'Foreign keys across modules until the split', 'Postgres rejects orphaned rows while it is one app. Cross-module FKs are dropped deliberately at the split.', 'docs/adr/0003-foreign-keys-across-modules-until-split.md'],
   ['0004', 'Price snapshot on each order line', 'order_lines.price_cents copies the price at order time so receipts stay correct. A price-history table was rejected.', 'docs/adr/0004-price-snapshot-on-order-lines.md'],
+  ['0005', 'Path-scoped command endpoints for order status', 'One POST command per status step, scoped to the caller id in the path; wrong caller 404, wrong status 409, repeat 200 no-op; order_events.actor records who. An actor field in the body was rejected: anyone can fill it, and one endpoint would carry every rule.', 'docs/adr/0005-path-scoped-order-commands.md'],
 ];
 
 const ROUNDS = [
