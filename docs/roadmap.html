@@ -540,6 +540,7 @@ const MILESTONES = [
   { id: 'M3', name: 'Dispatch', gh: 4, needs: [11, 12, 13, 14], goal: 'Ready orders get the nearest available courier, with reassignment.', items: [
     { t: 'Migrations: couriers, dispatch_attempts' },
     { t: 'POST /api/v1/couriers, PATCH /api/v1/couriers/{id}/status, PUT /api/v1/couriers/{id}/location' },
+    { t: 'Courier commands: POST /api/v1/couriers/{id}/orders/{orderId}/pick-up and deliver' },
     { t: 'Redis GEO index of AVAILABLE couriers' },
     { t: 'On READY: GEOSEARCH 5 km dispatch radius, nearest first' },
     { t: 'Claim with UPDATE … WHERE status = AVAILABLE' },
@@ -601,12 +602,12 @@ const OUT_OF_SCOPE = [
 
 const FLOW = [
   { h: 'Customer places an order', m: 'M2', p: 'POST /api/v1/orders with an Idempotency-Key header and only menu item ids + quantities. The order module checks every item belongs to the merchant and is available; a closed merchant is rejected with 422 MERCHANT_CLOSED. It copies the address of the customer onto the order as its delivery address, copies each price onto its order line (price snapshot), computes the total, and saves orders, order_lines and an order_events row. Same key again returns the original order.', tags: [['Postgres', 'acc'], ['OrderPlaced', 'warn'], ['PLACED', '']] },
-  { h: 'Merchant accepts and prepares', m: 'M2', p: 'Each status change is checked by the state machine, written to orders, and logged as an order_events row. Cancellation is still allowed while the order is PLACED or ACCEPTED (who may cancel: ticket "Who may change an order\'s status without auth?").', tags: [['Postgres', 'acc'], ['ACCEPTED → PREPARING', '']] },
+  { h: 'Merchant accepts and prepares', m: 'M2', p: 'The merchant calls accept, start-preparing and ready, each a POST scoped to its own id. Each step is checked by the state machine, written to orders, and logged as an order_events row with its actor. The customer or the merchant can still cancel while the order is PLACED or ACCEPTED.', tags: [['Postgres', 'acc'], ['ACCEPTED → PREPARING', '']] },
   { h: 'Order is ready: dispatch starts', m: 'M3', p: 'READY publishes OrderReady. The dispatch module runs GEOSEARCH in Redis for AVAILABLE couriers within 5 km of the merchant (the dispatch radius), nearest first, skipping couriers who declined this order.', tags: [['OrderReady', 'warn'], ['Redis GEO', 'acc'], ['READY', '']] },
   { h: 'Claim the courier and send an offer', m: 'M3', p: 'An UPDATE couriers SET status = BUSY … WHERE status = AVAILABLE claims the courier; if two orders race, only one UPDATE wins. A dispatch_attempts row records the OFFERED offer, and the courier has 30 s to decline. Whether an explicit accept is needed, and when orders.courier_id is set, is open in "Courier offer lifecycle".', tags: [['Postgres', 'acc'], ['dispatch_attempts', '']] },
   { h: 'Decline, timeout or nobody nearby', m: 'M3', p: 'Decline or no answer → reassignment to the next nearest courier. No courier within the dispatch radius → a job tries dispatch again every 10 s. A courier going offline before pickup is reassigned automatically.', tags: [['@Scheduled jobs', ''], ['Reassignment', 'warn']] },
   { h: 'Courier dispatched: live tracking begins', m: 'M4', p: 'CourierAssigned fires once the courier is dispatched. Status changes and the courier’s location (at most every 5 s) are pushed over STOMP to /topic/orders/{id}.', tags: [['CourierAssigned', 'warn'], ['WebSocket', 'acc']] },
-  { h: 'Pickup and delivery', m: 'M3', p: 'PICKED_UP needs a courier on the order, then DELIVERED. The courier goes back to AVAILABLE and is re-added to the Redis geo index, ready for the next order.', tags: [['OrderPickedUp', 'warn'], ['OrderDelivered', 'warn'], ['DELIVERED', 'ok']] },
+  { h: 'Pickup and delivery', m: 'M3', p: 'The assigned courier calls pick-up, then deliver; any other courier gets 404. The courier goes back to AVAILABLE and is re-added to the Redis geo index, ready for the next order.', tags: [['OrderPickedUp', 'warn'], ['OrderDelivered', 'warn'], ['DELIVERED', 'ok']] },
   { h: 'At M5 the same flow runs on Kafka', m: 'M5', p: 'Each event is written to an outbox table in the same transaction as the change, then relayed to Kafka keyed by orderId. Consumers skip duplicates using processed_events; failures retry 3 times, then go to a dead-letter topic.', tags: [['Kafka', 'acc'], ['Outbox', ''], ['DLT', 'blk']] },
 ];
 
