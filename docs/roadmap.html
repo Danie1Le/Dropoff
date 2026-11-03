@@ -438,7 +438,7 @@ footer { padding: 40px 0 48px; color: var(--muted); font-size: 13px; }
 <!-- API -->
 <section id="api">
   <h2>API</h2>
-  <p class="lede">REST endpoints documented with springdoc (Swagger UI). Every REST path sits under <code>/api/v1</code>; errors are RFC 9457 Problem Details with a <code>code</code> field, settled in <a href="https://github.com/Danie1Le/Dropoff/issues/8">API conventions: errors, versioning, pagination</a>. Endpoints for customers, merchant open/close and item availability are open in <a href="https://github.com/Danie1Le/Dropoff/issues/9">Missing endpoints</a>. Who may call the status endpoint is open in <a href="https://github.com/Danie1Le/Dropoff/issues/10">Who may change an order's status without auth?</a>; accept/decline endpoints for couriers are open in <a href="https://github.com/Danie1Le/Dropoff/issues/11">Courier offer lifecycle</a>.</p>
+  <p class="lede">REST endpoints documented with springdoc (Swagger UI). Every REST path sits under <code>/api/v1</code>; errors are RFC 9457 Problem Details with a <code>code</code> field, settled in <a href="https://github.com/Danie1Le/Dropoff/issues/8">API conventions: errors, versioning, pagination</a>. Customer, open/close and availability endpoints are settled in <a href="https://github.com/Danie1Le/Dropoff/issues/9">Missing endpoints</a>. Who may call the status endpoint is open in <a href="https://github.com/Danie1Le/Dropoff/issues/10">Who may change an order's status without auth?</a>; accept/decline endpoints for couriers are open in <a href="https://github.com/Danie1Le/Dropoff/issues/11">Courier offer lifecycle</a>.</p>
   <div class="card tw"><table class="list" id="apitable"><thead><tr><th>Method</th><th>Path</th><th>Does</th><th>Module</th><th>Milestone</th></tr></thead><tbody></tbody></table></div>
 </section>
 
@@ -492,7 +492,7 @@ const TICKETS = [
   { n: 6,  title: 'Free Docker images and licenses for Compose services', type: 'research', state: 'closed', gist: 'postgres 18.6, redis 8.10.3, apache/kafka 4.4.0 KRaft, Prometheus, Grafana, k6. No Bitnami.' },
   { n: 7,  title: 'Coding standards for code review', type: 'grilling', state: 'closed', blockedBy: [5], gist: 'Palantir format via Spotless (CI-enforced), Error Prone + NullAway (standard mode) on @NullMarked packages, records not Lombok, Modulith base-package API, XxxTest/XxxIT + AssertJ, JaCoCo without a gate, Java 21 toolchain.' },
   { n: 8,  title: 'API conventions: errors, versioning, pagination', type: 'grilling', state: 'closed', gist: 'Problem Details with a code field, /api/v1 prefix, offset paging via PagedModel (max 100), 400 validation errors[], 404 path / 409 state / 422 content, DomainException categories, 201 + Location, Idempotent-Replayed header.' },
-  { n: 9,  title: 'Missing endpoints: customers, delivery address, merchant open/close, item availability', type: 'grilling', state: 'open', blockedBy: [8], q: 'Endpoints for customers and toggles; snapshot the delivery address?; order at a closed merchant?' },
+  { n: 9,  title: 'Missing endpoints: customers, delivery address, merchant open/close, item availability', type: 'grilling', state: 'closed', blockedBy: [8], gist: 'Delivery address snapshot on orders, customer endpoints in the order module, PATCH per resource for open/available, /menu-items with no DELETE, 422 MERCHANT_CLOSED, merchant + customer order lists.' },
   { n: 10, title: "Who may change an order's status without auth?", type: 'grilling', state: 'open', q: 'Separate endpoints per actor, an actor field, or path-scoped routes?' },
   { n: 11, title: 'Courier offer lifecycle: accept, decline, timeout endpoints', type: 'grilling', state: 'open', blockedBy: [10], q: 'Explicit accept or silence = accept? Offer states, endpoints, when courier_id is set.' },
   { n: 12, title: "Where a busy courier's location lives", type: 'grilling', state: 'open', q: 'Pings from a BUSY courier: which Redis key, which module pushes them to WebSocket.' },
@@ -517,8 +517,8 @@ const MILESTONES = [
   ]},
   { id: 'M1', name: 'Merchants & menus', gh: 2, needs: [8, 9], goal: 'Merchants can list what they sell.', items: [
     { t: 'Migration: merchants, menu_items' },
-    { t: 'POST /api/v1/merchants, POST /api/v1/merchants/{id}/items, GET /api/v1/merchants/{id}/menu' },
-    { t: 'Toggle merchant open/close and menu item availability' },
+    { t: 'POST/GET /api/v1/merchants (paginated list), POST /api/v1/merchants/{id}/menu-items, GET /api/v1/merchants/{id}/menu' },
+    { t: 'PATCH /api/v1/merchants/{id} (open) and PATCH /api/v1/menu-items/{id} (available, name, price); no DELETE' },
     { t: 'Input validation + Problem Details error responses (VALIDATION_FAILED, code field)' },
     { t: 'Swagger UI via springdoc 3.2.0' },
     { t: 'Tests: web slice + Testcontainers repository tests' },
@@ -526,7 +526,9 @@ const MILESTONES = [
   { id: 'M2', name: 'Orders', gh: 3, needs: [8, 9, 10, 13, 15], goal: 'Customers place orders that move through a safe lifecycle.', items: [
     { t: 'Migrations: customers, orders, order_lines, order_events' },
     { t: 'POST /api/v1/orders: server computes total, price snapshot per order line' },
-    { t: 'Reject unavailable or wrong-merchant menu items' },
+    { t: 'Reject unavailable or wrong-merchant menu items; closed merchant → 422 MERCHANT_CLOSED' },
+    { t: 'Customer endpoints (POST/GET/PATCH /api/v1/customers); delivery address snapshot on each order' },
+    { t: 'Order lists: GET /api/v1/merchants/{id}/orders?status= and GET /api/v1/customers/{id}/orders' },
     { t: 'Order status state machine; illegal jump → 409' },
     { t: 'Cancellation only from PLACED or ACCEPTED' },
     { t: 'Idempotency-Key: same key → same order; changed body → 422' },
@@ -591,6 +593,7 @@ const FOG = [
 const OUT_OF_SCOPE = [
   ['Authentication / authorization', 'deliberate known gap, noted in README.'],
   ['Payments and refunds', ''],
+  ['Maximum delivery distance', 'no limit in v1; demo data stays in one city.'],
   ['Stretch goals', 'ETA estimation, multi-order batching, surge pricing, Kotlin service, React/Leaflet map, hosted deploy, broadcast offers, road-distance routing.'],
 ];
 
@@ -608,8 +611,8 @@ const FLOW = [
 const TABLES = [
   { name: 'merchants', mod: 'merchant', ms: 'M1', cols: [['id', 'BIGINT', 'pk'], ['name', ''], ['address', ''], ['lat, lng', 'coordinates'], ['is_open', 'BOOLEAN']] },
   { name: 'menu_items', mod: 'merchant', ms: 'M1', cols: [['id', 'BIGINT', 'pk'], ['merchant_id', '→ merchants', 'fk'], ['name', ''], ['price_cents', 'BIGINT ≥ 0'], ['is_available', 'BOOLEAN']] },
-  { name: 'customers', mod: 'unowned', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['name', ''], ['address', ''], ['lat, lng', 'coordinates']], note: 'Endpoints open in "Missing endpoints"; owning module open in "Service split".' },
-  { name: 'orders', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['customer_id', '→ customers', 'fk'], ['merchant_id', '→ merchants', 'fk'], ['courier_id', '→ couriers (nullable)', 'fk'], ['status', 'CHECK-guarded'], ['total_cents', 'BIGINT ≥ 0'], ['idempotency_key', '', 'uq'], ['request_hash', ''], ['created_at, updated_at', 'TIMESTAMPTZ']] },
+  { name: 'customers', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['name', ''], ['address', ''], ['lat, lng', 'coordinates']], note: 'Owned by the order module; goes to order-service at the split.' },
+  { name: 'orders', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['customer_id', '→ customers', 'fk'], ['merchant_id', '→ merchants', 'fk'], ['courier_id', '→ couriers (nullable)', 'fk'], ['status', 'CHECK-guarded'], ['total_cents', 'BIGINT ≥ 0'], ['delivery_address', 'snapshot'], ['delivery_lat, delivery_lng', 'snapshot'], ['idempotency_key', '', 'uq'], ['request_hash', ''], ['created_at, updated_at', 'TIMESTAMPTZ']] },
   { name: 'order_lines', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['order_id', '→ orders', 'fk'], ['menu_item_id', '→ menu_items', 'fk'], ['quantity', ''], ['price_cents', 'price snapshot']], note: 'price_cents is copied on purpose (ADR-0004).' },
   { name: 'order_events', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['order_id', '→ orders', 'fk'], ['from_status', ''], ['to_status', ''], ['created_at', 'TIMESTAMPTZ']], note: 'Relation to the M5 outbox open in ticket 15.' },
   { name: 'couriers', mod: 'dispatch', ms: 'M3', cols: [['id', 'BIGINT', 'pk'], ['name', ''], ['status', 'OFFLINE / AVAILABLE / BUSY'], ['last_lat, last_lng', 'last known'], ['updated_at', 'TIMESTAMPTZ']], note: 'Live location of AVAILABLE couriers lives in Redis.' },
@@ -620,11 +623,20 @@ const FK = { menu_items: ['merchants'], orders: ['customers', 'merchants', 'cour
 
 const API = [
   ['POST', '/api/v1/merchants', 'create merchant', 'merchant', 'M1'],
-  ['POST', '/api/v1/merchants/{id}/items', 'add menu item', 'merchant', 'M1'],
-  ['GET', '/api/v1/merchants/{id}/menu', 'get menu', 'merchant', 'M1'],
+  ['GET', '/api/v1/merchants', 'list merchants (paginated)', 'merchant', 'M1'],
+  ['GET', '/api/v1/merchants/{id}', 'get merchant', 'merchant', 'M1'],
+  ['PATCH', '/api/v1/merchants/{id}', 'open / close, name, address', 'merchant', 'M1'],
+  ['POST', '/api/v1/merchants/{id}/menu-items', 'add menu item', 'merchant', 'M1'],
+  ['PATCH', '/api/v1/menu-items/{id}', 'availability, name, price', 'merchant', 'M1'],
+  ['GET', '/api/v1/merchants/{id}/menu', 'get menu (all items, available flag)', 'merchant', 'M1'],
+  ['POST', '/api/v1/customers', 'create customer', 'order', 'M2'],
+  ['GET', '/api/v1/customers/{id}', 'get customer', 'order', 'M2'],
+  ['PATCH', '/api/v1/customers/{id}', 'name, address', 'order', 'M2'],
   ['POST', '/api/v1/orders', 'place order (Idempotency-Key header)', 'order', 'M2'],
   ['GET', '/api/v1/orders/{id}', 'get order + status', 'order', 'M2'],
   ['PATCH', '/api/v1/orders/{id}/status', 'advance status (merchant / courier)', 'order', 'M2'],
+  ['GET', '/api/v1/merchants/{id}/orders', "merchant's orders, ?status= filter, oldest first", 'order', 'M2'],
+  ['GET', '/api/v1/customers/{id}/orders', 'order history, newest first', 'order', 'M2'],
   ['POST', '/api/v1/couriers', 'register courier', 'dispatch', 'M3'],
   ['PATCH', '/api/v1/couriers/{id}/status', 'available / offline', 'dispatch', 'M3'],
   ['PUT', '/api/v1/couriers/{id}/location', 'update location', 'dispatch', 'M3'],
@@ -668,12 +680,15 @@ const GLOSSARY = [
     ['Customer', 'A person who places orders and receives deliveries.', ['User', 'buyer', 'client', 'account']],
     ['Merchant', 'A business that sells menu items and prepares orders.', ['Restaurant', 'store', 'vendor', 'seller']],
     ['Menu Item', 'One thing a merchant sells at a listed price; the merchant can mark it unavailable.', ['Product', 'dish', 'SKU']],
+    ['Menu', 'All the menu items a merchant lists, available or not.', ['Catalog', 'inventory']],
+    ['Open', 'Whether a merchant accepts new orders right now; closing never affects orders already placed.', ['Online', 'active']],
     ['Courier', 'A person who picks up a ready order from a merchant and delivers it to a customer.', ['Driver', 'dasher', 'rider', 'shopper']],
   ]],
   ['Ordering', [
     ['Order', "A customer's request to buy one or more menu items from a single merchant.", ['Purchase', 'transaction', 'cart']],
     ['Order Line', 'One menu item on an order, with its quantity and price snapshot.', ['Order item', 'line item', 'cart item']],
     ['Price Snapshot', 'The price of a menu item copied onto an order line at the moment the order is placed; never changes afterward.', ['Cached price', 'current price']],
+    ['Delivery Address', "Where an order is delivered: the customer's address copied onto the order when it is placed; never changes afterward.", ['Shipping address', 'drop-off']],
     ['Order Status', 'Where an order is in its lifecycle: Placed, Accepted, Preparing, Ready, Picked Up, Delivered, or Cancelled.', ['State', 'stage', 'phase']],
     ['Cancellation', 'Ending an order before the merchant starts preparing it.', ['Refund', 'void', 'rejection']],
   ]],
@@ -688,7 +703,7 @@ const GLOSSARY = [
 const SCOPE = [
   ['Core (MVP)', 'ok', ['Merchants, menus, item availability', 'Orders with a status lifecycle', 'Couriers: status and location', 'Dispatch to nearest available courier (Redis geo)', 'REST APIs with OpenAPI', 'Validation and consistent errors']],
   ['Stand-out', 'acc', ['Kafka event-driven flow', 'Live tracking over WebSocket', 'Idempotent order creation', 'Reassignment, retries, dead-letter topic', 'k6 load tests', 'Before/after performance write-up', 'Prometheus + Grafana monitoring']],
-  ['Out of scope', 'blk', ['Auth (documented gap)', 'Payments and refunds', 'ETA, batching, surge pricing', 'Kotlin service, React/Leaflet map', 'Hosted deploy', 'Road-distance routing']],
+  ['Out of scope', 'blk', ['Auth (documented gap)', 'Payments and refunds', 'Max delivery distance', 'ETA, batching, surge pricing', 'Kotlin service, React/Leaflet map', 'Hosted deploy', 'Road-distance routing']],
 ];
 
 /* ---------- RENDERING ---------- */
