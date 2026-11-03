@@ -124,7 +124,7 @@ orders(id, customer_id, merchant_id, courier_id, status, total_cents,
        delivery_address, delivery_lat, delivery_lng,
        idempotency_key UNIQUE, request_hash, created_at, updated_at)
 order_lines(id, order_id, menu_item_id, quantity, price_cents)
-order_events(id, order_id, from_status, to_status, created_at)
+order_events(id, order_id, from_status, to_status, actor, created_at)
 dispatch_attempts(id, order_id, courier_id, result, created_at)
 processed_events(event_id UNIQUE, processed_at)
 ```
@@ -140,7 +140,9 @@ GET    /merchants/{id}/menu             get menu
 
 POST   /orders            (Idempotency-Key header)   place order
 GET    /orders/{id}                     get order + status
-PATCH  /orders/{id}/status              advance status (merchant/courier)
+POST   /merchants/{id}/orders/{oid}/accept  merchant step (also start-preparing, ready, cancel)
+POST   /couriers/{id}/orders/{oid}/pick-up  courier step (also deliver)
+POST   /customers/{id}/orders/{oid}/cancel  customer cancels
 
 POST   /couriers                        register courier
 PATCH  /couriers/{id}/status            available / offline
