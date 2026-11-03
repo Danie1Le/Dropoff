@@ -40,7 +40,7 @@ Entry-level backend and software engineering roles at delivery and marketplace c
 - **Event-driven flow:** services publish and consume Kafka events such as `OrderPlaced`, `OrderReady`, `CourierAssigned`, and `OrderDelivered`.
 - **Live tracking:** WebSocket updates for order status and courier location.
 - **Idempotency:** retry-safe order creation using idempotency keys.
-- **Failure handling:** reassign an order if its courier declines, does not respond, or goes offline before pickup, and retry consumers with a dead-letter topic.
+- **Failure handling:** reassign an order if its offer is declined or goes unanswered, or its courier goes offline before pickup, and retry consumers with a dead-letter topic.
 - **Load testing:** k6 scripts that simulate high order volume, with results in the README.
 - **Performance writeup:** before-and-after measurements of an optimization such as an index, a cache, or batching.
 - **Monitoring:** Prometheus metrics and a Grafana dashboard for request latency, orders per minute, and dispatch time.
@@ -148,7 +148,8 @@ POST   /couriers                        register courier
 PATCH  /couriers/{id}/status            available / offline
 PUT    /couriers/{id}/location          update location
 GET    /couriers/{id}/offers/current    open offer (204 if none)
-POST   /couriers/{id}/offers/{offerId}/accept   accept within 30 s (also decline)
+POST   /couriers/{id}/offers/{offerId}/accept    accept within 30 s
+POST   /couriers/{id}/offers/{offerId}/decline   decline
 
 WS     /ws  (STOMP)  SUBSCRIBE /topic/orders/{id}   live order + courier updates
 ```
@@ -170,7 +171,7 @@ WS     /ws  (STOMP)  SUBSCRIBE /topic/orders/{id}   live order + courier updates
 - [ ] Courier registration, status, and location endpoints
 - [ ] Redis geo index for available couriers
 - [ ] Dispatch to the nearest available courier when an order is `READY`
-- [ ] Reassignment when a courier declines, does not respond, or goes offline before pickup
+- [ ] Reassignment when an offer is declined or goes unanswered, or the courier goes offline before pickup
 - [ ] Integration tests with Testcontainers
 
 ### Events and Real-time

@@ -65,7 +65,7 @@ A proposal to one courier to deliver one ready order; the courier accepts or dec
 _Avoid_: Request, ping, attempt
 
 **Reassignment**:
-Dispatching an order again because the courier it was offered to declined or did not respond, or its courier went offline before pickup.
+Dispatching an order again because its offer was declined or went unanswered, or its courier went offline before pickup.
 _Avoid_: Redispatch, retry
 
 **Courier Status**:
