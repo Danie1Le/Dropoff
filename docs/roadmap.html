@@ -490,8 +490,8 @@ const TICKETS = [
   { n: 4,  title: 'Repo visibility: go public now or stay private?', type: 'grilling', state: 'closed', gist: 'Public once the LICENSE + roadmap PRs merge. History rewritten to the no-reply email, MIT license, PR-required main ruleset and secret scanning at go-public.' },
   { n: 5,  title: 'Version matrix: Spring Boot 3.5 vs 4.x for this stack', type: 'research', state: 'closed', gist: 'Spring Boot 4.1.2 on Java 21; springdoc 3.2.0, Modulith 2.1.2, Gradle 9.8.2.' },
   { n: 6,  title: 'Free Docker images and licenses for Compose services', type: 'research', state: 'closed', gist: 'postgres 18.6, redis 8.10.3, apache/kafka 4.4.0 KRaft, Prometheus, Grafana, k6. No Bitnami.' },
-  { n: 7,  title: 'Coding standards for code review', type: 'grilling', state: 'closed', blockedBy: [5], gist: 'Palantir format via Spotless (CI-enforced), Error Prone + NullAway on @NullMarked packages, records not Lombok, XxxTest/XxxIT + AssertJ, JaCoCo without a gate.' },
-  { n: 8,  title: 'API conventions: errors, versioning, pagination', type: 'grilling', state: 'closed', gist: 'Problem Details with a code field, /api/v1 prefix, offset paging (max 100), 400 validation errors[], 404 path / 409 state / 422 content, 201 + Location, Idempotent-Replayed header.' },
+  { n: 7,  title: 'Coding standards for code review', type: 'grilling', state: 'closed', blockedBy: [5], gist: 'Palantir format via Spotless (CI-enforced), Error Prone + NullAway (standard mode) on @NullMarked packages, records not Lombok, Modulith base-package API, XxxTest/XxxIT + AssertJ, JaCoCo without a gate, Java 21 toolchain.' },
+  { n: 8,  title: 'API conventions: errors, versioning, pagination', type: 'grilling', state: 'closed', gist: 'Problem Details with a code field, /api/v1 prefix, offset paging via PagedModel (max 100), 400 validation errors[], 404 path / 409 state / 422 content, DomainException categories, 201 + Location, Idempotent-Replayed header.' },
   { n: 9,  title: 'Missing endpoints: customers, delivery address, merchant open/close, item availability', type: 'grilling', state: 'open', blockedBy: [8], q: 'Endpoints for customers and toggles; snapshot the delivery address?; order at a closed merchant?' },
   { n: 10, title: "Who may change an order's status without auth?", type: 'grilling', state: 'open', q: 'Separate endpoints per actor, an actor field, or path-scoped routes?' },
   { n: 11, title: 'Courier offer lifecycle: accept, decline, timeout endpoints', type: 'grilling', state: 'open', blockedBy: [10], q: 'Explicit accept or silence = accept? Offer states, endpoints, when courier_id is set.' },
@@ -517,15 +517,15 @@ const MILESTONES = [
   ]},
   { id: 'M1', name: 'Merchants & menus', gh: 2, needs: [8, 9], goal: 'Merchants can list what they sell.', items: [
     { t: 'Migration: merchants, menu_items' },
-    { t: 'POST /merchants, POST /merchants/{id}/items, GET /merchants/{id}/menu' },
+    { t: 'POST /api/v1/merchants, POST /api/v1/merchants/{id}/items, GET /api/v1/merchants/{id}/menu' },
     { t: 'Toggle merchant open/close and menu item availability' },
-    { t: 'Input validation + consistent error responses' },
+    { t: 'Input validation + Problem Details error responses (VALIDATION_FAILED, code field)' },
     { t: 'Swagger UI via springdoc 3.2.0' },
     { t: 'Tests: web slice + Testcontainers repository tests' },
   ]},
   { id: 'M2', name: 'Orders', gh: 3, needs: [8, 9, 10, 13, 15], goal: 'Customers place orders that move through a safe lifecycle.', items: [
     { t: 'Migrations: customers, orders, order_lines, order_events' },
-    { t: 'POST /orders: server computes total, price snapshot per order line' },
+    { t: 'POST /api/v1/orders: server computes total, price snapshot per order line' },
     { t: 'Reject unavailable or wrong-merchant menu items' },
     { t: 'Order status state machine; illegal jump → 409' },
     { t: 'Cancellation only from PLACED or ACCEPTED' },
@@ -535,7 +535,7 @@ const MILESTONES = [
   ]},
   { id: 'M3', name: 'Dispatch', gh: 4, needs: [11, 12, 13, 14], goal: 'Ready orders get the nearest available courier, with reassignment.', items: [
     { t: 'Migrations: couriers, dispatch_attempts' },
-    { t: 'POST /couriers, PATCH /couriers/{id}/status, PUT /couriers/{id}/location' },
+    { t: 'POST /api/v1/couriers, PATCH /api/v1/couriers/{id}/status, PUT /api/v1/couriers/{id}/location' },
     { t: 'Redis GEO index of AVAILABLE couriers' },
     { t: 'On READY: GEOSEARCH 5 km dispatch radius, nearest first' },
     { t: 'Claim with UPDATE … WHERE status = AVAILABLE' },
@@ -595,7 +595,7 @@ const OUT_OF_SCOPE = [
 ];
 
 const FLOW = [
-  { h: 'Customer places an order', m: 'M2', p: 'POST /orders with an Idempotency-Key header and only menu item ids + quantities. The order module checks every item belongs to the merchant and is available, copies each price onto its order line (price snapshot), computes the total, and saves orders, order_lines and an order_events row. Same key again returns the original order.', tags: [['Postgres', 'acc'], ['OrderPlaced', 'warn'], ['PLACED', '']] },
+  { h: 'Customer places an order', m: 'M2', p: 'POST /api/v1/orders with an Idempotency-Key header and only menu item ids + quantities. The order module checks every item belongs to the merchant and is available, copies each price onto its order line (price snapshot), computes the total, and saves orders, order_lines and an order_events row. Same key again returns the original order.', tags: [['Postgres', 'acc'], ['OrderPlaced', 'warn'], ['PLACED', '']] },
   { h: 'Merchant accepts and prepares', m: 'M2', p: 'Each status change is checked by the state machine, written to orders, and logged as an order_events row. Cancellation is still allowed while the order is PLACED or ACCEPTED (who may cancel: ticket "Who may change an order\'s status without auth?").', tags: [['Postgres', 'acc'], ['ACCEPTED → PREPARING', '']] },
   { h: 'Order is ready: dispatch starts', m: 'M3', p: 'READY publishes OrderReady. The dispatch module runs GEOSEARCH in Redis for AVAILABLE couriers within 5 km of the merchant (the dispatch radius), nearest first, skipping couriers who declined this order.', tags: [['OrderReady', 'warn'], ['Redis GEO', 'acc'], ['READY', '']] },
   { h: 'Claim the courier and send an offer', m: 'M3', p: 'An UPDATE couriers SET status = BUSY … WHERE status = AVAILABLE claims the courier; if two orders race, only one UPDATE wins. A dispatch_attempts row records the OFFERED offer, and the courier has 30 s to decline. Whether an explicit accept is needed, and when orders.courier_id is set, is open in "Courier offer lifecycle".', tags: [['Postgres', 'acc'], ['dispatch_attempts', '']] },
