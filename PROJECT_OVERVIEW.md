@@ -125,7 +125,7 @@ orders(id, customer_id, merchant_id, courier_id, status, total_cents,
        idempotency_key UNIQUE, request_hash, created_at, updated_at)
 order_lines(id, order_id, menu_item_id, quantity, price_cents)
 order_events(id, order_id, from_status, to_status, actor, created_at)
-dispatch_attempts(id, order_id, courier_id, result, created_at)
+offers(id, order_id, courier_id, status, offered_at, expires_at, responded_at)
 processed_events(event_id UNIQUE, processed_at)
 ```
 
@@ -147,6 +147,8 @@ POST   /customers/{id}/orders/{orderId}/cancel   customer cancels
 POST   /couriers                        register courier
 PATCH  /couriers/{id}/status            available / offline
 PUT    /couriers/{id}/location          update location
+GET    /couriers/{id}/offers/current    open offer (204 if none)
+POST   /couriers/{id}/offers/{offerId}/accept   accept within 30 s (also decline)
 
 WS     /ws  (STOMP)  SUBSCRIBE /topic/orders/{id}   live order + courier updates
 ```

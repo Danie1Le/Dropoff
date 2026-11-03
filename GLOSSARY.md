@@ -60,8 +60,12 @@ _Avoid_: Refund, void, rejection
 Choosing a courier for a ready order.
 _Avoid_: Assignment, matching, routing
 
+**Offer**:
+A proposal to one courier to deliver one ready order; the courier accepts or declines within 30 seconds.
+_Avoid_: Request, ping, attempt
+
 **Reassignment**:
-Dispatching an order again because its courier declined, did not respond, or went offline before pickup.
+Dispatching an order again because the courier it was offered to declined or did not respond, or its courier went offline before pickup.
 _Avoid_: Redispatch, retry
 
 **Courier Status**:
