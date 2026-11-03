@@ -438,7 +438,7 @@ footer { padding: 40px 0 48px; color: var(--muted); font-size: 13px; }
 <!-- API -->
 <section id="api">
   <h2>API</h2>
-  <p class="lede">REST endpoints documented with springdoc (Swagger UI). Error format, versioning and pagination are open in <a href="https://github.com/Danie1Le/Dropoff/issues/8">API conventions: errors, versioning, pagination</a>. Endpoints for customers, merchant open/close and item availability are open in <a href="https://github.com/Danie1Le/Dropoff/issues/9">Missing endpoints</a>. Who may call the status endpoint is open in <a href="https://github.com/Danie1Le/Dropoff/issues/10">Who may change an order's status without auth?</a>; accept/decline endpoints for couriers are open in <a href="https://github.com/Danie1Le/Dropoff/issues/11">Courier offer lifecycle</a>.</p>
+  <p class="lede">REST endpoints documented with springdoc (Swagger UI). Every REST path sits under <code>/api/v1</code>; errors are RFC 9457 Problem Details with a <code>code</code> field, settled in <a href="https://github.com/Danie1Le/Dropoff/issues/8">API conventions: errors, versioning, pagination</a>. Endpoints for customers, merchant open/close and item availability are open in <a href="https://github.com/Danie1Le/Dropoff/issues/9">Missing endpoints</a>. Who may call the status endpoint is open in <a href="https://github.com/Danie1Le/Dropoff/issues/10">Who may change an order's status without auth?</a>; accept/decline endpoints for couriers are open in <a href="https://github.com/Danie1Le/Dropoff/issues/11">Courier offer lifecycle</a>.</p>
   <div class="card tw"><table class="list" id="apitable"><thead><tr><th>Method</th><th>Path</th><th>Does</th><th>Module</th><th>Milestone</th></tr></thead><tbody></tbody></table></div>
 </section>
 
@@ -490,8 +490,8 @@ const TICKETS = [
   { n: 4,  title: 'Repo visibility: go public now or stay private?', type: 'grilling', state: 'closed', gist: 'Public once the LICENSE + roadmap PRs merge. History rewritten to the no-reply email, MIT license, PR-required main ruleset and secret scanning at go-public.' },
   { n: 5,  title: 'Version matrix: Spring Boot 3.5 vs 4.x for this stack', type: 'research', state: 'closed', gist: 'Spring Boot 4.1.2 on Java 21; springdoc 3.2.0, Modulith 2.1.2, Gradle 9.8.2.' },
   { n: 6,  title: 'Free Docker images and licenses for Compose services', type: 'research', state: 'closed', gist: 'postgres 18.6, redis 8.10.3, apache/kafka 4.4.0 KRaft, Prometheus, Grafana, k6. No Bitnami.' },
-  { n: 7,  title: 'Coding standards for code review', type: 'grilling', state: 'open', blockedBy: [5], q: 'Records vs Lombok, nulls, test naming, formatter, static analysis, CI enforcement.' },
-  { n: 8,  title: 'API conventions: errors, versioning, pagination', type: 'grilling', state: 'open', q: 'Problem Details errors, /api/v1?, pagination, validation error shape, 409 vs 422.' },
+  { n: 7,  title: 'Coding standards for code review', type: 'grilling', state: 'closed', blockedBy: [5], gist: 'Palantir format via Spotless (CI-enforced), Error Prone + NullAway on @NullMarked packages, records not Lombok, XxxTest/XxxIT + AssertJ, JaCoCo without a gate.' },
+  { n: 8,  title: 'API conventions: errors, versioning, pagination', type: 'grilling', state: 'closed', gist: 'Problem Details with a code field, /api/v1 prefix, offset paging (max 100), 400 validation errors[], 404 path / 409 state / 422 content, 201 + Location, Idempotent-Replayed header.' },
   { n: 9,  title: 'Missing endpoints: customers, delivery address, merchant open/close, item availability', type: 'grilling', state: 'open', blockedBy: [8], q: 'Endpoints for customers and toggles; snapshot the delivery address?; order at a closed merchant?' },
   { n: 10, title: "Who may change an order's status without auth?", type: 'grilling', state: 'open', q: 'Separate endpoints per actor, an actor field, or path-scoped routes?' },
   { n: 11, title: 'Courier offer lifecycle: accept, decline, timeout endpoints', type: 'grilling', state: 'open', blockedBy: [10], q: 'Explicit accept or silence = accept? Offer states, endpoints, when courier_id is set.' },
@@ -619,15 +619,15 @@ const TABLES = [
 const FK = { menu_items: ['merchants'], orders: ['customers', 'merchants', 'couriers'], order_lines: ['orders', 'menu_items'], order_events: ['orders'], dispatch_attempts: ['orders', 'couriers'] };
 
 const API = [
-  ['POST', '/merchants', 'create merchant', 'merchant', 'M1'],
-  ['POST', '/merchants/{id}/items', 'add menu item', 'merchant', 'M1'],
-  ['GET', '/merchants/{id}/menu', 'get menu', 'merchant', 'M1'],
-  ['POST', '/orders', 'place order (Idempotency-Key header)', 'order', 'M2'],
-  ['GET', '/orders/{id}', 'get order + status', 'order', 'M2'],
-  ['PATCH', '/orders/{id}/status', 'advance status (merchant / courier)', 'order', 'M2'],
-  ['POST', '/couriers', 'register courier', 'dispatch', 'M3'],
-  ['PATCH', '/couriers/{id}/status', 'available / offline', 'dispatch', 'M3'],
-  ['PUT', '/couriers/{id}/location', 'update location', 'dispatch', 'M3'],
+  ['POST', '/api/v1/merchants', 'create merchant', 'merchant', 'M1'],
+  ['POST', '/api/v1/merchants/{id}/items', 'add menu item', 'merchant', 'M1'],
+  ['GET', '/api/v1/merchants/{id}/menu', 'get menu', 'merchant', 'M1'],
+  ['POST', '/api/v1/orders', 'place order (Idempotency-Key header)', 'order', 'M2'],
+  ['GET', '/api/v1/orders/{id}', 'get order + status', 'order', 'M2'],
+  ['PATCH', '/api/v1/orders/{id}/status', 'advance status (merchant / courier)', 'order', 'M2'],
+  ['POST', '/api/v1/couriers', 'register courier', 'dispatch', 'M3'],
+  ['PATCH', '/api/v1/couriers/{id}/status', 'available / offline', 'dispatch', 'M3'],
+  ['PUT', '/api/v1/couriers/{id}/location', 'update location', 'dispatch', 'M3'],
   ['WS', '/ws  →  /topic/orders/{id}', 'live order + courier updates (STOMP)', 'order', 'M4'],
 ];
 
