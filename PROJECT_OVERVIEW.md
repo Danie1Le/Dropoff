@@ -140,9 +140,9 @@ GET    /merchants/{id}/menu             get menu
 
 POST   /orders            (Idempotency-Key header)   place order
 GET    /orders/{id}                     get order + status
-POST   /merchants/{id}/orders/{oid}/accept  merchant step (also start-preparing, ready, cancel)
-POST   /couriers/{id}/orders/{oid}/pick-up  courier step (also deliver)
-POST   /customers/{id}/orders/{oid}/cancel  customer cancels
+POST   /merchants/{id}/orders/{orderId}/accept   merchant step (also start-preparing, ready, cancel)
+POST   /couriers/{id}/orders/{orderId}/pick-up   assigned courier step (also deliver)
+POST   /customers/{id}/orders/{orderId}/cancel   customer cancels
 
 POST   /couriers                        register courier
 PATCH  /couriers/{id}/status            available / offline

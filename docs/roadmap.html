@@ -529,12 +529,12 @@ const MILESTONES = [
     { t: 'Reject unavailable or wrong-merchant menu items; closed merchant → 422 MERCHANT_CLOSED' },
     { t: 'Customer endpoints (POST/GET/PATCH /api/v1/customers); lat/lng range-checked, no geocoder; delivery address snapshot on each order, no override in the request' },
     { t: 'Order lists (paginated): GET /api/v1/merchants/{id}/orders?status= and GET /api/v1/customers/{id}/orders (hand-written SQL, ADR-0002)' },
-    { t: 'Order status state machine; illegal jump → 409' },
+    { t: 'Order status state machine: wrong caller → 404, illegal jump → 409, repeated command → 200 no-op' },
     { t: 'Merchant commands: POST /api/v1/merchants/{id}/orders/{orderId}/accept, start-preparing, ready, cancel' },
-    { t: 'Customer cancel: POST /api/v1/customers/{id}/orders/{orderId}/cancel; wrong caller → 404, repeat → 200 no-op' },
+    { t: 'Customer cancel: POST /api/v1/customers/{id}/orders/{orderId}/cancel' },
     { t: 'Cancellation only from PLACED or ACCEPTED' },
     { t: 'Idempotency-Key: same key → same order; changed body → 422' },
-    { t: 'order_events row for every status change' },
+    { t: 'order_events row for every status change, with its actor (CHECK-guarded)' },
     { t: 'TDD unit tests for the state machine' },
   ]},
   { id: 'M3', name: 'Dispatch', gh: 4, needs: [11, 12, 13, 14], goal: 'Ready orders get the nearest available courier, with reassignment.', items: [
@@ -602,7 +602,7 @@ const OUT_OF_SCOPE = [
 
 const FLOW = [
   { h: 'Customer places an order', m: 'M2', p: 'POST /api/v1/orders with an Idempotency-Key header and only menu item ids + quantities. The order module checks every item belongs to the merchant and is available; a closed merchant is rejected with 422 MERCHANT_CLOSED. It copies the address of the customer onto the order as its delivery address, copies each price onto its order line (price snapshot), computes the total, and saves orders, order_lines and an order_events row. Same key again returns the original order.', tags: [['Postgres', 'acc'], ['OrderPlaced', 'warn'], ['PLACED', '']] },
-  { h: 'Merchant accepts and prepares', m: 'M2', p: 'The merchant calls accept, start-preparing and ready, each a POST scoped to its own id. Each step is checked by the state machine, written to orders, and logged as an order_events row with its actor. The customer or the merchant can still cancel while the order is PLACED or ACCEPTED.', tags: [['Postgres', 'acc'], ['ACCEPTED → PREPARING', '']] },
+  { h: 'Merchant accepts and prepares', m: 'M2', p: 'The merchant calls accept, start-preparing and ready, each a POST scoped to its own id. Each step is checked by the state machine, written to orders, and logged as an order_events row with its actor. The merchant or the customer can still cancel while the order is PLACED or ACCEPTED.', tags: [['Postgres', 'acc'], ['ACCEPTED → PREPARING', '']] },
   { h: 'Order is ready: dispatch starts', m: 'M3', p: 'READY publishes OrderReady. The dispatch module runs GEOSEARCH in Redis for AVAILABLE couriers within 5 km of the merchant (the dispatch radius), nearest first, skipping couriers who declined this order.', tags: [['OrderReady', 'warn'], ['Redis GEO', 'acc'], ['READY', '']] },
   { h: 'Claim the courier and send an offer', m: 'M3', p: 'An UPDATE couriers SET status = BUSY … WHERE status = AVAILABLE claims the courier; if two orders race, only one UPDATE wins. A dispatch_attempts row records the OFFERED offer, and the courier has 30 s to decline. Whether an explicit accept is needed, and when orders.courier_id is set, is open in "Courier offer lifecycle".', tags: [['Postgres', 'acc'], ['dispatch_attempts', '']] },
   { h: 'Decline, timeout or nobody nearby', m: 'M3', p: 'Decline or no answer → reassignment to the next nearest courier. No courier within the dispatch radius → a job tries dispatch again every 10 s. A courier going offline before pickup is reassigned automatically.', tags: [['@Scheduled jobs', ''], ['Reassignment', 'warn']] },
@@ -617,7 +617,7 @@ const TABLES = [
   { name: 'customers', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['name', ''], ['address', ''], ['lat, lng', 'coordinates']], note: 'Owned by the order module.' },
   { name: 'orders', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['customer_id', '→ customers', 'fk'], ['merchant_id', '→ merchants', 'fk'], ['courier_id', '→ couriers (nullable)', 'fk'], ['status', 'CHECK-guarded'], ['total_cents', 'BIGINT ≥ 0'], ['delivery_address', 'snapshot'], ['delivery_lat, delivery_lng', 'snapshot'], ['idempotency_key', '', 'uq'], ['request_hash', ''], ['created_at, updated_at', 'TIMESTAMPTZ']] },
   { name: 'order_lines', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['order_id', '→ orders', 'fk'], ['menu_item_id', '→ menu_items', 'fk'], ['quantity', ''], ['price_cents', 'price snapshot']], note: 'price_cents is copied on purpose (ADR-0004).' },
-  { name: 'order_events', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['order_id', '→ orders', 'fk'], ['from_status', ''], ['to_status', ''], ['actor', 'CUSTOMER / MERCHANT / COURIER / SYSTEM'], ['created_at', 'TIMESTAMPTZ']], note: 'Relation to the M5 outbox open in ticket 15.' },
+  { name: 'order_events', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['order_id', '→ orders', 'fk'], ['from_status', ''], ['to_status', ''], ['actor', 'CHECK: CUSTOMER / MERCHANT / COURIER / SYSTEM'], ['created_at', 'TIMESTAMPTZ']], note: 'Relation to the M5 outbox open in ticket 15.' },
   { name: 'couriers', mod: 'dispatch', ms: 'M3', cols: [['id', 'BIGINT', 'pk'], ['name', ''], ['status', 'OFFLINE / AVAILABLE / BUSY'], ['last_lat, last_lng', 'last known'], ['updated_at', 'TIMESTAMPTZ']], note: 'Live location of AVAILABLE couriers lives in Redis.' },
   { name: 'dispatch_attempts', mod: 'dispatch', ms: 'M3', cols: [['id', 'BIGINT', 'pk'], ['order_id', '→ orders', 'fk'], ['courier_id', '→ couriers', 'fk'], ['result', 'OFFERED / ACCEPTED / DECLINED / TIMED_OUT'], ['created_at', 'TIMESTAMPTZ']] },
   { name: 'processed_events', mod: 'common', ms: 'M5', cols: [['event_id', '', 'uq'], ['processed_at', 'TIMESTAMPTZ']], note: 'Consumer dedupe. The outbox table also lands at M5.' },
@@ -637,10 +637,13 @@ const API = [
   ['PATCH', '/api/v1/customers/{id}', 'name, address', 'order', 'M2'],
   ['POST', '/api/v1/orders', 'place order (Idempotency-Key header)', 'order', 'M2'],
   ['GET', '/api/v1/orders/{id}', 'get order + status', 'order', 'M2'],
-  ['POST', '/api/v1/merchants/{id}/orders/{orderId}/accept', 'merchant accepts (also start-preparing, ready)', 'order', 'M2'],
+  ['POST', '/api/v1/merchants/{id}/orders/{orderId}/accept', 'merchant accepts (PLACED → ACCEPTED)', 'order', 'M2'],
+  ['POST', '/api/v1/merchants/{id}/orders/{orderId}/start-preparing', 'merchant starts preparing (ACCEPTED → PREPARING)', 'order', 'M2'],
+  ['POST', '/api/v1/merchants/{id}/orders/{orderId}/ready', 'merchant marks ready; starts dispatch (PREPARING → READY)', 'order', 'M2'],
   ['POST', '/api/v1/merchants/{id}/orders/{orderId}/cancel', 'merchant cancels (PLACED / ACCEPTED)', 'order', 'M2'],
   ['POST', '/api/v1/customers/{id}/orders/{orderId}/cancel', 'customer cancels (PLACED / ACCEPTED)', 'order', 'M2'],
-  ['POST', '/api/v1/couriers/{id}/orders/{orderId}/pick-up', 'assigned courier picks up (also deliver)', 'order', 'M3'],
+  ['POST', '/api/v1/couriers/{id}/orders/{orderId}/pick-up', 'assigned courier picks up (READY → PICKED_UP); owned by order module', 'order', 'M3'],
+  ['POST', '/api/v1/couriers/{id}/orders/{orderId}/deliver', 'assigned courier delivers (PICKED_UP → DELIVERED)', 'order', 'M3'],
   ['GET', '/api/v1/merchants/{id}/orders', "merchant's orders, ?status= filter, oldest first (paginated)", 'order', 'M2'],
   ['GET', '/api/v1/customers/{id}/orders', 'order history, newest first (paginated)', 'order', 'M2'],
   ['POST', '/api/v1/couriers', 'register courier', 'dispatch', 'M3'],
@@ -671,7 +674,7 @@ const ADRS = [
   ['0002', 'Flyway owns the schema; JPA for CRUD, hand-written SQL for the rest', 'Hibernate runs with ddl-auto=validate. Joins, order history and courier claiming are hand-written SQL so they stay visible and reviewable.', 'docs/adr/0002-flyway-owns-schema-hybrid-jpa.md'],
   ['0003', 'Foreign keys across modules until the split', 'Postgres rejects orphaned rows while it is one app. Cross-module FKs are dropped deliberately at the split.', 'docs/adr/0003-foreign-keys-across-modules-until-split.md'],
   ['0004', 'Price snapshot on each order line', 'order_lines.price_cents copies the price at order time so receipts stay correct. A price-history table was rejected.', 'docs/adr/0004-price-snapshot-on-order-lines.md'],
-  ['0005', 'Path-scoped command endpoints for order status', 'One POST per step with the caller id in the path (accept, ready, pick-up, cancel). An actor field in the body was rejected: anyone can fill it, and one endpoint would carry every rule.', 'docs/adr/0005-path-scoped-order-commands.md'],
+  ['0005', 'Path-scoped command endpoints for order status', 'One POST command per status step, scoped to the caller id in the path; wrong caller 404, wrong status 409, repeat 200 no-op; order_events.actor records who. An actor field in the body was rejected: anyone can fill it, and one endpoint would carry every rule.', 'docs/adr/0005-path-scoped-order-commands.md'],
 ];
 
 const ROUNDS = [
