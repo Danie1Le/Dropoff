@@ -44,7 +44,7 @@ _Avoid_: Cached price, current price
 
 **Delivery Address**:
 Where an order is delivered: the customer's address copied onto the order when it is placed; never changes afterward.
-_Avoid_: Shipping address, drop-off
+_Avoid_: Shipping address, destination
 
 **Order Status**:
 Where an order is in its lifecycle: Placed, Accepted, Preparing, Ready, Picked Up, Delivered, or Cancelled.

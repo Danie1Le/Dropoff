@@ -121,6 +121,7 @@ menu_items(id, merchant_id, name, price_cents, is_available)
 customers(id, name, address, lat, lng)
 couriers(id, name, status, last_lat, last_lng, updated_at)
 orders(id, customer_id, merchant_id, courier_id, status, total_cents,
+       delivery_address, delivery_lat, delivery_lng,
        idempotency_key UNIQUE, request_hash, created_at, updated_at)
 order_lines(id, order_id, menu_item_id, quantity, price_cents)
 order_events(id, order_id, from_status, to_status, created_at)
@@ -134,7 +135,7 @@ processed_events(event_id UNIQUE, processed_at)
 
 ```
 POST   /merchants                       create merchant
-POST   /merchants/{id}/items            add menu item
+POST   /merchants/{id}/menu-items       add menu item
 GET    /merchants/{id}/menu             get menu
 
 POST   /orders            (Idempotency-Key header)   place order
