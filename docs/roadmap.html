@@ -475,7 +475,7 @@ footer { padding: 40px 0 48px; color: var(--muted); font-size: 13px; }
 </section>
 
 <footer>
-  Sources: <code>PROJECT_OVERVIEW.md</code>, <code>GLOSSARY.md</code>, <code>docs/adr/</code>, and the <a href="https://github.com/Danie1Le/Dropoff/issues/2">wayfinder map</a>. Data last synced 2026-11-01. Update the arrays at the bottom of this file when tickets close or tasks land.
+  Sources: <code>PROJECT_OVERVIEW.md</code>, <code>GLOSSARY.md</code>, <code>docs/adr/</code>, and the <a href="https://github.com/Danie1Le/Dropoff/issues/2">wayfinder map</a>. Data last synced 2026-11-03. Update the arrays at the bottom of this file when tickets close or tasks land.
 </footer>
 </div>
 
@@ -534,7 +534,7 @@ const MILESTONES = [
     { t: 'Customer cancel: POST /api/v1/customers/{id}/orders/{orderId}/cancel' },
     { t: 'Cancellation only from PLACED or ACCEPTED' },
     { t: 'Auto-cancel job every 30 s: PLACED for 10 min → CANCELLED, actor SYSTEM (limit is a config property)' },
-    { t: 'All scheduled jobs: FOR UPDATE SKIP LOCKED, one row per transaction, at most 50 rows per run' },
+    { t: 'Auto-cancel job safe on N instances: FOR UPDATE SKIP LOCKED, one row per transaction, at most 50 rows per run' },
     { t: 'Idempotency-Key: same key → same order; changed body → 422' },
     { t: 'order_events row for every status change, with its actor (CHECK-guarded)' },
     { t: 'TDD unit tests for the state machine' },
@@ -552,7 +552,8 @@ const MILESTONES = [
     { t: 'Timeout job every 5 s: TIMED_OUT, courier → OFFLINE, next courier; decline → courier AVAILABLE' },
     { t: 'CourierAssigned on accept sets orders.courier_id; CourierUnassigned on reassignment clears it' },
     { t: 'Each dispatch excludes couriers who had an offer for the order in the last 5 min' },
-    { t: 'Partial unique index one_open_offer_per_order (offers.order_id WHERE status = OFFERED)' },
+    { t: 'Timeout and dispatch retry jobs use the same SKIP LOCKED pattern (one row per transaction, max 50 per run)' },
+    { t: 'Partial unique index one_open_offer_per_order (offers.order_id WHERE status = OFFERED): a second open offer rolls back with its courier claim' },
     { t: 'Job tries dispatch again every 10 s when no courier is found; READY orders retry forever and are never cancelled' },
     { t: 'Courier offline before pickup → auto-reassign' },
     { t: 'Testcontainers integration tests (Postgres + Redis)' },
