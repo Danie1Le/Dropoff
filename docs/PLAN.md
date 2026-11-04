@@ -62,9 +62,9 @@ These apply across many PRs, and #42 is the source for all of them.
 
 **Error codes** (Problem Details `code` field):
 - 400: `VALIDATION_FAILED`, `MALFORMED_REQUEST`, `IDEMPOTENCY_KEY_REQUIRED`.
-- 404: `MERCHANT_NOT_FOUND`, `MENU_ITEM_NOT_FOUND`, `CUSTOMER_NOT_FOUND`, `ORDER_NOT_FOUND`, `COURIER_NOT_FOUND`, `OFFER_NOT_FOUND`.
-- 409: `INVALID_STATUS_TRANSITION`, `OFFER_CLOSED`, `COURIER_OFFLINE`, `COURIER_BUSY`, `COURIER_LOCATION_UNKNOWN`, `COURIER_HAS_ACTIVE_DELIVERY`.
-- 422: `MENU_ITEM_UNAVAILABLE`, `MENU_ITEM_WRONG_MERCHANT`, `MENU_ITEM_UNKNOWN`, `MERCHANT_CLOSED`, `IDEMPOTENCY_KEY_REUSED`.
+- 404 (resource in the URL path): `MERCHANT_NOT_FOUND`, `MENU_ITEM_NOT_FOUND`, `CUSTOMER_NOT_FOUND`, `ORDER_NOT_FOUND`, `COURIER_NOT_FOUND`, `OFFER_NOT_FOUND`.
+- 409: `INVALID_STATUS_TRANSITION`, `OFFER_CLOSED`, `COURIER_BUSY`, `COURIER_LOCATION_UNKNOWN`, `COURIER_HAS_ACTIVE_DELIVERY`.
+- 422 (an id or rule in the body): `CUSTOMER_UNKNOWN`, `MERCHANT_UNKNOWN`, `MENU_ITEM_UNKNOWN`, `MENU_ITEM_UNAVAILABLE`, `MENU_ITEM_WRONG_MERCHANT`, `MERCHANT_CLOSED`, `IDEMPOTENCY_KEY_REUSED`.
 - 500: `INTERNAL_ERROR`.
 
 **Order body** (from `GET /api/v1/orders/{id}` and every order command): `{id, customerId, merchantId, courierId|null, status, totalCents, deliveryAddress: {address, lat, lng}, lines: [{menuItemId, quantity, priceCents}], createdAt, updatedAt}`.
@@ -72,6 +72,10 @@ These apply across many PRs, and #42 is the source for all of them.
 **STOMP messages** on `/topic/orders/{id}`:
 - `{type: "STATUS", orderId, status, actor, at}`
 - `{type: "LOCATION", orderId, courierId, lat, lng, at}`
+
+**Offer body** (accept / decline, including a repeat): 200 `{offerId, orderId, status, respondedAt}`.
+
+**Redis writes** (`GEOADD` / `ZREM`) run in an after-commit hook, so a rolled-back transaction never changes Redis.
 
 **Outbox settings** (from M2):
 - JDBC event publication registry (`spring-modulith-starter-jdbc`).
@@ -149,7 +153,7 @@ Goal: merchants can list what they sell.
 **M1-3 Menu items and menu.**
 - Scope:
   - Migration `menu_items` (`price_cents BIGINT CHECK >= 0`, `is_available`).
-  - `POST /api/v1/merchants/{id}/menu-items`, `PATCH /api/v1/menu-items/{id}` (available, name, priceCents).
+  - `POST /api/v1/merchants/{id}/menu-items`, `GET /api/v1/menu-items/{id}`, `PATCH /api/v1/menu-items/{id}` (available, name, priceCents).
   - `GET /api/v1/merchants/{id}/menu` returns all items with an `available` flag.
   - No DELETE.
 - Tests: web-slice tests and repository ITs; price CHECK.
@@ -189,7 +193,7 @@ Goal: customers place orders that move through a safe lifecycle.
 - Scope:
   - `POST /api/v1/orders` (customerId, merchantId, lines of menuItemId + quantity).
   - The server computes the total and copies price snapshots and the customer's address.
-  - 422 errors: `MENU_ITEM_UNKNOWN`, `MENU_ITEM_UNAVAILABLE`, `MENU_ITEM_WRONG_MERCHANT`, `MERCHANT_CLOSED`.
+  - 422 errors: `CUSTOMER_UNKNOWN`, `MERCHANT_UNKNOWN`, `MENU_ITEM_UNKNOWN`, `MENU_ITEM_UNAVAILABLE`, `MENU_ITEM_WRONG_MERCHANT`, `MERCHANT_CLOSED`.
   - Publishes `OrderPlaced`.
 - Tests: an IT for each rule; total and snapshot tests; event published (Modulith `Scenario`).
 - Decisions: #3, #8, #9, #42.
@@ -234,11 +238,11 @@ Goal: ready orders get the nearest available courier, with reassignment. The dis
 
 **M3-1 Couriers and location.**
 - Scope:
-  - Migration `couriers`.
-  - `POST /api/v1/couriers {name}` creates the courier OFFLINE with no location.
+  - Migration `couriers`, plus the `orders.courier_id → couriers` FK (ADR-0003).
+  - `POST /api/v1/couriers {name}` creates the courier OFFLINE with no location. `GET /api/v1/couriers/{id}`.
   - `PATCH /api/v1/couriers/{id}/status {status: AVAILABLE|OFFLINE}`. BUSY returns 400; no location gives 409 `COURIER_LOCATION_UNKNOWN`; AVAILABLE while BUSY gives 409 `COURIER_BUSY`.
-  - `PUT /api/v1/couriers/{id}/location` writes Postgres every time. OFFLINE returns 409 `COURIER_OFFLINE`.
-  - Redis geo key `couriers:available`: `GEOADD` when becoming AVAILABLE and on each update while AVAILABLE; `ZREM` on OFFLINE.
+  - `PUT /api/v1/couriers/{id}/location` is allowed in any status and writes Postgres every time. A new courier's path is: create, send a location, then AVAILABLE.
+  - Redis geo key `couriers:available`: `GEOADD` when becoming AVAILABLE and on each update while AVAILABLE; `ZREM` on OFFLINE. Writes happen after commit.
 - Tests: ITs with Postgres + Redis containers for each rule.
 - Decisions: #3, #12, #42.
 
@@ -293,7 +297,7 @@ Goal: ready orders get the nearest available courier, with reassignment. The dis
   - `run` drives three kinds of bot:
     - Customer bots place 6 orders/min.
     - Merchant bots poll `GET /merchants/{id}/orders?status=PLACED` every 3 s, then step through after 5–20 s.
-    - Courier bots poll offers every 2 s and answer 80/15/5 accept/decline/ignore. They travel at about 30 km/h in a straight line and send a location every 3 s.
+    - Courier bots poll offers every 2 s and answer 80/15/5 accept/decline/ignore. They travel at about 30 km/h in a straight line and send a location every 3 s. After a timeout sets a bot OFFLINE, it goes AVAILABLE again 30 s later.
   - A fixed random seed.
 - Tests: unit tests for the movement and decision logic; a manual end-to-end run documented in the PR.
 - Decisions: #33, #42.
@@ -358,7 +362,8 @@ Goal: three services talking through durable events. Each PR leaves a working sy
 - Scope:
   - The merchant module publishes `MerchantChanged` and `MenuItemChanged` to the compacted topics.
   - The order module fills `merchant_copies` (merchant_id, name, address, open, lat, lng) and `menu_item_copies` (menu_item_id, merchant_id, name, price_cents, available) from them, rebuilding by replay from offset 0 when empty.
-  - Order validation and `OrderReady` fields now come from the copies.
+  - Order validation and `OrderReady` fields now come from the copies (`MERCHANT_UNKNOWN` = not in `merchant_copies`).
+  - Local databases are reset and reseeded (`docker compose down -v`, then `seed`), so every merchant and item emits its first event. There is no backfill job.
   - Still one app.
 - Tests: ITs for copy rebuild and validation from the copies.
 - Decisions: #16, #42, ADR-0007.
@@ -367,9 +372,9 @@ Goal: three services talking through durable events. Each PR leaves a working sy
 - Scope:
   - `services/dispatch` on port 8083 with `dispatch_db`, owning `couriers`, `offers`, `dispatch_orders`, its own `event_publication` / `processed_events`, and Redis.
   - A Postgres init script creates the three databases and users.
-  - Drop the FKs from dispatch tables to order tables.
-  - The simulator gets a base URL per service.
-- Tests: service ITs; `ops/smoke/full-flow.sh` (5 orders delivered within 5 min) run manually.
+  - Drop the FKs between dispatch and order tables, both directions (including `orders.courier_id`).
+  - The simulator gets a base URL per service, and a `smoke --orders 5 --timeout 5m` mode (exits non-zero unless all are DELIVERED), wrapped by `ops/smoke/full-flow.sh`.
+- Tests: service ITs; the smoke script, run manually.
 - Decisions: #16, #31, #42, ADR-0003, ADR-0007.
 
 **M5-5 Extract merchant-service.**
