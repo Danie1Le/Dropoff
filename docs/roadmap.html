@@ -501,12 +501,12 @@ const TICKETS = [
   { n: 15, title: 'order_events vs outbox: keep both?', type: 'grilling', state: 'closed', gist: 'Keep both (permanent audit log vs temporary delivery queue); outbox = Modulith event_publication registry, externalized to Kafka at M5 (ADR-0006); events carry eventId + occurredAt; location updates bypass the outbox.' },
   { n: 16, title: 'Service split: data ownership and cross-service price lookup', type: 'grilling', state: 'closed', blockedBy: [12, 14, 15], gist: 'One Postgres, one database per service; order-service keeps merchant_copies + menu_item_copies fed by two compacted topics, one per entity (ADR-0007); OrderReady carries pickup lat/lng; WebSocket in order-service; no gateway; fresh databases, no migration.' },
   { n: 31, title: 'Gradle layout after the split: build shape and shared event contracts', type: 'grilling', state: 'closed', gist: 'Multi-project from M0 (build-logic conventions, version catalog, app/); M5 adds services/*, contracts (event records only) and libs/web-common; root package io.github.danie1le.dropoff.' },
-  { n: 32, title: 'Kafka topics: names, partitions, retention, compaction, DLT and replay', type: 'grilling', state: 'open', q: 'Topic list, partitions, retention and cleanup policy, DLT naming, replay procedure, who creates topics.' },
-  { n: 33, title: 'Demo data and courier simulator', type: 'grilling', state: 'open', q: 'Seeding merchants, menus, customers and couriers; a simulator that polls offers and moves couriers.' },
-  { n: 34, title: 'Metrics and Grafana dashboard: names, panels, alerts', type: 'grilling', state: 'open', q: 'Custom Micrometer metrics, Grafana panels, alert rules, dashboard as code.' },
-  { n: 35, title: 'M7 performance method: baseline, candidates, how to pick', type: 'grilling', state: 'open', blockedBy: [33, 34], q: 'k6 scenarios, baseline numbers, candidate list, the rule for picking, write-up format.' },
-  { n: 36, title: 'Image publishing: GHCR tags, CI trigger, size targets', type: 'grilling', state: 'open', blockedBy: [31], q: 'Base image, tag scheme, when CI publishes, size target.' },
-  { n: 37, title: 'README and demo content', type: 'grilling', state: 'open', blockedBy: [33, 34, 35], q: 'README sections, diagram source, demo GIF, screenshots, AI-usage notes.' },
+  { n: 32, title: 'Kafka topics: names, partitions, retention, compaction, DLT and replay', type: 'grilling', state: 'closed', gist: '5 topics (order/courier events and locations keyed by orderId; compacted merchants, menu-items); 3 partitions, RF 1; NewTopic beans, no auto-create; 3 retries then <topic>.DLT; replay script (delegated).' },
+  { n: 33, title: 'Demo data and courier simulator', type: 'grilling', state: 'closed', gist: 'Seed via the public API (Austin, 10 merchants / 50 customers / 30 couriers); tools/simulator Java CLI with customer/merchant/courier bots and watch; lands M3–M5 (delegated).' },
+  { n: 34, title: 'Metrics and Grafana dashboard: names, panels, alerts', type: 'grilling', state: 'closed', gist: 'dropoff_* counters/timer/gauges (no id tags); 9 panels; 3 Grafana alerts shown in UI only; provisioned as code at M6 (delegated).' },
+  { n: 35, title: 'M7 performance method: baseline, candidates, how to pick', type: 'grilling', state: 'closed', blockedBy: [33, 34], gist: 'k6 scenarios place-orders / browse / order-history on a 200k-order seed; 3-run median baseline; pick 1–2 by pg_stat_statements + EXPLAIN; docs/perf/README.md (delegated).' },
+  { n: 36, title: 'Image publishing: GHCR tags, CI trigger, size targets', type: 'grilling', state: 'closed', blockedBy: [31], gist: 'Dockerfile per service on eclipse-temurin:21-jre-alpine, layered, non-root, <300 MB; sha-*/main on main, semver/latest on v*; PRs build only; amd64 (delegated).' },
+  { n: 37, title: 'README and demo content', type: 'grilling', state: 'closed', blockedBy: [33, 34, 35], gist: '15-section README with Mermaid diagram; <30 s GIF via simulator watch + Grafana; screenshots; docs/ai-usage.md (delegated).' },
   { n: 38, title: 'Write docs/PLAN.md', type: 'task', state: 'open', blockedBy: [31, 32, 33, 34, 35, 36, 37], q: 'Milestones M0 to M8 as small PRs with scope, tests and decision links; then the final wayfinder verify pass.' },
 ];
 
@@ -549,7 +549,7 @@ const MILESTONES = [
     { t: 'order_events row for every status change, with its actor (CHECK-guarded)' },
     { t: 'TDD unit tests for the state machine' },
   ]},
-  { id: 'M3', name: 'Dispatch', gh: 4, needs: [11, 12, 13, 14], goal: 'Ready orders get the nearest available courier, with reassignment.', items: [
+  { id: 'M3', name: 'Dispatch', gh: 4, needs: [11, 12, 13, 14, 33], goal: 'Ready orders get the nearest available courier, with reassignment.', items: [
     { t: 'Migrations: couriers, offers' },
     { t: 'POST /api/v1/couriers, PATCH /api/v1/couriers/{id}/status, PUT /api/v1/couriers/{id}/location' },
     { t: 'Courier commands: POST /api/v1/couriers/{id}/orders/{orderId}/pick-up and deliver' },
@@ -567,13 +567,15 @@ const MILESTONES = [
     { t: 'Job tries dispatch again every 10 s when no courier is found; READY orders retry forever and are never cancelled' },
     { t: 'Courier offline before pickup → auto-reassign' },
     { t: 'Testcontainers integration tests (Postgres + Redis)' },
+    { t: 'tools/simulator: seed via the public API (Austin; 10 merchants × 8 items, 50 customers, 30 couriers) and run with customer, merchant and courier bots' },
   ]},
-  { id: 'M4', name: 'Live tracking', gh: 5, needs: [12], goal: 'Customers watch their order and courier move live.', items: [
+  { id: 'M4', name: 'Live tracking', gh: 5, needs: [12, 33], goal: 'Customers watch their order and courier move live.', items: [
     { t: 'STOMP over WebSocket at /ws' },
     { t: 'Push status changes to /topic/orders/{id}' },
     { t: 'Dispatch publishes CourierLocationUpdated for couriers with an accepted, not-yet-delivered offer, at most every 5 s (Redis SET courier:{id}:loc-pub 1 NX EX 5); extra updates are dropped, Postgres still saves every one' },
     { t: 'Order module pushes CourierLocationUpdated to /topic/orders/{id}' },
     { t: 'Integration test with a STOMP client' },
+    { t: 'Simulator watch <orderId>: prints live updates from /topic/orders/{id}' },
   ]},
   { id: 'M5', name: 'Kafka & service split', gh: 6, needs: [15, 16, 31, 32], goal: 'Three services talking through durable events.', items: [
     { t: 'CourierLocationUpdated becomes a Kafka event keyed by orderId' },
@@ -581,7 +583,9 @@ const MILESTONES = [
     { t: 'Add spring-modulith-events-kafka: externalize event_publication via @Externalized("<topic>::#{orderId()}"), key = orderId (ADR-0006)' },
     { t: 'CourierLocationUpdated sent directly with KafkaTemplate (no outbox)' },
     { t: 'Consumers dedupe via processed_events' },
-    { t: '3 retries with backoff, then dead-letter topic' },
+    { t: 'Topics as NewTopic beans (auto-create off): order-events, courier-events, courier-locations (key orderId), compacted merchants and menu-items; 3 partitions, RF 1; JSON with logical type names' },
+    { t: '3 retries with backoff (1 s, 2 s, 4 s), then <topic>.DLT (14 days); ops/kafka/replay-dlt.sh' },
+    { t: 'Simulator base URLs for three services' },
     { t: 'Split into services/merchant, services/order, services/dispatch on ports 8081 / 8082 / 8083; no gateway; app/ removed' },
     { t: 'Move events from module base packages into contracts (records only, no Spring, additive changes only); libs/web-common (DomainException, Problem Details advice, paging limits) used by every service' },
     { t: 'Each service keeps its ApplicationModules.verify() test; contracts and libs/* have no Modulith dependency' },
@@ -592,24 +596,26 @@ const MILESTONES = [
     { t: 'Drop cross-module foreign keys (ADR-0003)' },
   ]},
   { id: 'M6', name: 'Ops', gh: 7, needs: [34, 36], goal: 'Containers, published images and dashboards.', items: [
-    { t: 'Metrics: orders waiting for a courier (Grafana alert after 15 min) and orders stuck in ACCEPTED/PREPARING (no automatic action)' },
-    { t: 'Dockerfile per service' },
-    { t: 'CI publishes images to GHCR' },
-    { t: 'Actuator + Micrometer + Prometheus v3.13.5' },
-    { t: 'Grafana 13.3.0 dashboard provisioned in Compose' },
+    { t: 'Actuator + Micrometer + Prometheus v3.13.5 scraping /actuator/prometheus every 15 s' },
+    { t: 'Custom dropoff_* metrics: orders placed/cancelled/delivered, dispatch duration, offer outcomes, waiting and in-preparation gauges, couriers by status' },
+    { t: 'Grafana 13.3.0 provisioned as code: datasource, dashboard JSON (9 panels), 3 alert rules (waiting > 15 min, DLT messages, p95 > 500 ms)' },
+    { t: 'Dockerfile per service: layered jar on eclipse-temurin:21-jre-alpine, non-root, < 300 MB' },
+    { t: 'CI publishes to ghcr.io/danie1le/dropoff-<service>: sha-* and main on main, version and latest on v* tags; PRs build only' },
   ]},
   { id: 'M7', name: 'Performance', gh: 8, needs: [33, 35], goal: 'Measured load and one or two measured wins.', items: [
-    { t: 'k6 2.3.0 load scripts' },
-    { t: 'Baseline: throughput and p95 latency' },
-    { t: 'One or two optimizations, measured before and after' },
-    { t: 'Results written up in the README' },
+    { t: 'k6 2.3.0 scripts in ops/k6 (Compose profile load): place-orders, browse, order-history; p95 < 300 ms, errors < 1%' },
+    { t: 'ops/perf/seed-history.sql (~200k orders) and pg_stat_statements' },
+    { t: 'Baseline: median of 3 runs; throughput, p50/p95/p99, errors, dispatch p95, top queries' },
+    { t: 'Pick 1–2 optimizations by pg_stat_statements + EXPLAIN; one PR each with before/after numbers' },
+    { t: 'Write-up in docs/perf/README.md, summary table in the README' },
   ]},
   { id: 'M8', name: 'Polish', gh: 9, needs: [37], goal: 'A repo a reviewer can understand at a glance.', items: [
-    { t: 'README: architecture diagram, setup steps, screenshots' },
+    { t: 'README: 15 sections, Mermaid architecture diagram, quick start with ports and URLs' },
     { t: 'Swagger docs complete' },
-    { t: 'Demo GIF or short video' },
-    { t: 'Notes on how AI tools were used and checked' },
-    { t: 'Known gap noted: no auth' },
+    { t: 'Demo GIF (< 30 s): simulator watch + Grafana, recorded with ScreenToGif' },
+    { t: 'Screenshots: Swagger UI, Grafana dashboard, k6 summary (docs/media)' },
+    { t: 'docs/ai-usage.md: tools, how output was checked, mistakes caught' },
+    { t: 'Known gaps noted: no auth, no payments' },
   ]},
 ];
 
@@ -622,6 +628,7 @@ const OUT_OF_SCOPE = [
   ['Widening the dispatch radius', 'READY orders with no courier retry forever instead.'],
   ['Maximum delivery distance check', 'no limit in v1; demo data stays in one city.'],
   ['API gateway', 'clients call each service on its own port (8081 merchant, 8082 order, 8083 dispatch).'],
+  ['Image vulnerability scanning', 'not in CI for v1.'],
   ['Stretch goals', 'ETA estimation, multi-order batching, surge pricing, Kotlin service, React/Leaflet map, hosted deploy, broadcast offers, road-distance routing.'],
 ];
 
