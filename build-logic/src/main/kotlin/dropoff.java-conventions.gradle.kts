@@ -11,15 +11,12 @@ plugins {
     id("net.ltgt.errorprone")
 }
 
+// Precompiled script plugins cannot use the generated `libs` accessor, so look the catalog up by name.
 val libs = the<VersionCatalogsExtension>().named("libs")
 fun version(alias: String): String = libs.findVersion(alias).get().requiredVersion
 fun library(alias: String) = libs.findLibrary(alias).get()
 
 group = "io.github.danie1le.dropoff"
-
-repositories {
-    mavenCentral()
-}
 
 java {
     toolchain {

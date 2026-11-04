@@ -1,7 +1,7 @@
-# Gradle
+# Gradle and Kotlin DSL caches
 .gradle/
+.kotlin/
 build/
-!gradle/wrapper/gradle-wrapper.jar
 
 # IDEs
 .idea/
