@@ -129,8 +129,8 @@ offers(id, order_id, courier_id, status, offered_at, expires_at, responded_at)
 processed_events(event_id UNIQUE, processed_at)
 event_publication(id, listener_id, event_type, serialized_event,
        publication_date, completion_date)   -- Spring Modulith outbox
-menu_item_copies(menu_item_id, merchant_id, name, price_cents, available,
-       merchant_open, merchant_lat, merchant_lng)   -- order-service, from M5
+merchant_copies(merchant_id, open, lat, lng)                          -- order-service, from M5
+menu_item_copies(menu_item_id, merchant_id, name, price_cents, available)  -- order-service, from M5
 ```
 
 ---
