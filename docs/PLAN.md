@@ -107,7 +107,7 @@ Goal: an empty app that builds, tests and runs locally against Postgres and Redi
 
 **M0-2 Spring Boot app and modules.**
 - Scope:
-  - Spring Boot 4.1.2 in `app/` (webmvc, data-jpa, validation, actuator).
+  - Spring Boot 4.1.2 in `app/` (webmvc, validation, actuator). `data-jpa` arrives in M0-3 with the database, so the context loads without one here.
   - Root package `io.github.danie1le.dropoff`, with packages `merchant`, `order`, `dispatch` and `common`, each `@NullMarked`.
   - Spring Modulith 2.1.2.
 - Tests: `ApplicationModules.verify()`; context loads.
@@ -116,7 +116,7 @@ Goal: an empty app that builds, tests and runs locally against Postgres and Redi
 **M0-3 Local infrastructure and database baseline.**
 - Scope:
   - `compose.yaml` with `postgres:18.6-alpine` and `redis:8.10.3-alpine`.
-  - Flyway `V1__baseline.sql`.
+  - `spring-boot-starter-data-jpa` and `spring-boot-starter-flyway`; Flyway `V1__baseline.sql`.
   - `ddl-auto=validate`.
   - The app runs with `./gradlew :app:bootRun`.
 - Tests: a Testcontainers 2 smoke IT (Flyway runs, context starts).
