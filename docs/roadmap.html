@@ -497,7 +497,7 @@ const TICKETS = [
   { n: 11, title: 'Courier offer lifecycle: accept, decline, timeout endpoints', type: 'grilling', state: 'closed', blockedBy: [10], gist: 'Explicit accept (silence = TIMED_OUT); term Offer, table offers; courier BUSY while offered; courier_id set on accept via CourierAssigned listener; offers/current + accept/decline; late accept 409 via conditional UPDATE; timeout → OFFLINE; CourierUnassigned on reassignment.' },
   { n: 12, title: "Where a busy courier's location lives", type: 'grilling', state: 'closed', gist: 'One PUT location for all statuses (geo set only when AVAILABLE, 409 when OFFLINE); Postgres write per update; dispatch publishes CourierLocationUpdated, order module pushes to STOMP; 5 s limit at publisher via Redis SET NX EX.' },
   { n: 13, title: 'Stuck orders: merchant never accepts, no courier ever found', type: 'grilling', state: 'closed', blockedBy: [11], gist: 'PLACED > 10 min → SYSTEM cancel (job every 30 s); no action on slow prep; READY retries forever with a 5 min exclusion window; waiting-for-courier metric + 15 min Grafana alert; no email/SMS.' },
-  { n: 14, title: 'Background jobs with multiple app instances', type: 'grilling', state: 'open', q: 'SKIP LOCKED, ShedLock, or a single-instance rule for @Scheduled jobs?' },
+  { n: 14, title: 'Background jobs with multiple app instances', type: 'grilling', state: 'closed', gist: 'All 3 jobs use FOR UPDATE SKIP LOCKED, one row per transaction, max 50 per run; partial unique index allows one OFFERED offer per order (also covers the listener-vs-job race).' },
   { n: 15, title: 'order_events vs outbox: keep both?', type: 'grilling', state: 'open', q: 'Both tables, one feeding the other, or the outbox replaces order_events?' },
   { n: 16, title: 'Service split: data ownership and cross-service price lookup', type: 'grilling', state: 'open', blockedBy: [12, 14, 15], q: 'DB vs schema per service; price lookup via REST or local copy; where WebSocket lives.' },
 ];
@@ -534,6 +534,7 @@ const MILESTONES = [
     { t: 'Customer cancel: POST /api/v1/customers/{id}/orders/{orderId}/cancel' },
     { t: 'Cancellation only from PLACED or ACCEPTED' },
     { t: 'Auto-cancel job every 30 s: PLACED for 10 min → CANCELLED, actor SYSTEM (limit is a config property)' },
+    { t: 'All scheduled jobs: FOR UPDATE SKIP LOCKED, one row per transaction, at most 50 rows per run' },
     { t: 'Idempotency-Key: same key → same order; changed body → 422' },
     { t: 'order_events row for every status change, with its actor (CHECK-guarded)' },
     { t: 'TDD unit tests for the state machine' },
@@ -551,6 +552,7 @@ const MILESTONES = [
     { t: 'Timeout job every 5 s: TIMED_OUT, courier → OFFLINE, next courier; decline → courier AVAILABLE' },
     { t: 'CourierAssigned on accept sets orders.courier_id; CourierUnassigned on reassignment clears it' },
     { t: 'Each dispatch excludes couriers who had an offer for the order in the last 5 min' },
+    { t: 'Partial unique index one_open_offer_per_order (offers.order_id WHERE status = OFFERED)' },
     { t: 'Job tries dispatch again every 10 s when no courier is found; READY orders retry forever and are never cancelled' },
     { t: 'Courier offline before pickup → auto-reassign' },
     { t: 'Testcontainers integration tests (Postgres + Redis)' },
@@ -629,7 +631,7 @@ const TABLES = [
   { name: 'order_lines', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['order_id', '→ orders', 'fk'], ['menu_item_id', '→ menu_items', 'fk'], ['quantity', ''], ['price_cents', 'price snapshot']], note: 'price_cents is copied on purpose (ADR-0004).' },
   { name: 'order_events', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['order_id', '→ orders', 'fk'], ['from_status', ''], ['to_status', ''], ['actor', 'CHECK: CUSTOMER / MERCHANT / COURIER / SYSTEM'], ['created_at', 'TIMESTAMPTZ']], note: 'Relation to the M5 outbox open in ticket 15.' },
   { name: 'couriers', mod: 'dispatch', ms: 'M3', cols: [['id', 'BIGINT', 'pk'], ['name', ''], ['status', 'OFFLINE / AVAILABLE / BUSY'], ['last_lat, last_lng', 'last known'], ['updated_at', 'TIMESTAMPTZ']], note: 'Every location update is written here. AVAILABLE couriers are also in the Redis geo set.' },
-  { name: 'offers', mod: 'dispatch', ms: 'M3', cols: [['id', 'BIGINT', 'pk'], ['order_id', '→ orders', 'fk'], ['courier_id', '→ couriers', 'fk'], ['status', 'OFFERED / ACCEPTED / DECLINED / TIMED_OUT'], ['offered_at, expires_at, responded_at', 'TIMESTAMPTZ']] },
+  { name: 'offers', mod: 'dispatch', ms: 'M3', cols: [['id', 'BIGINT', 'pk'], ['order_id', '→ orders', 'fk'], ['courier_id', '→ couriers', 'fk'], ['status', 'OFFERED / ACCEPTED / DECLINED / TIMED_OUT'], ['offered_at, expires_at, responded_at', 'TIMESTAMPTZ']], note: 'Partial unique index: at most one OFFERED offer per order.' },
   { name: 'processed_events', mod: 'common', ms: 'M5', cols: [['event_id', '', 'uq'], ['processed_at', 'TIMESTAMPTZ']], note: 'Consumer dedupe. The outbox table also lands at M5.' },
 ];
 const FK = { menu_items: ['merchants'], orders: ['customers', 'merchants', 'couriers'], order_lines: ['orders', 'menu_items'], order_events: ['orders'], offers: ['orders', 'couriers'] };
