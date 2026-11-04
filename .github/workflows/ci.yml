@@ -1,0 +1,46 @@
+# Builds and tests every push to main and every pull request (PLAN M0-4).
+# The `build` job is a required check on main (ruleset "protect-main").
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v5
+
+      # Spotless, Error Prone + NullAway and unit tests (*Test).
+      - name: Format, static checks and unit tests
+        run: ./gradlew build -x integrationTest
+
+      # Integration tests (*IT) use Testcontainers on the runner's Docker.
+      - name: Integration tests (Testcontainers)
+        run: ./gradlew integrationTest
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: test-reports
+          path: "**/build/reports/tests/"
