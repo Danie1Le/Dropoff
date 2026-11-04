@@ -7,5 +7,5 @@ import org.springframework.boot.test.context.SpringBootTest;
 class DropoffApplicationIT {
 
     @Test
-    void contextLoads() {}
+    void startsApplicationContext() {}
 }

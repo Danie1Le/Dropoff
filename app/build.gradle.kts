@@ -12,8 +12,6 @@ dependencies {
     implementation(libs.spring.boot.starter.actuator)
     implementation(libs.spring.modulith.starter.core)
 
-    testImplementation(platform(libs.spring.boot.bom))
-    testImplementation(platform(libs.spring.modulith.bom))
     testImplementation(libs.spring.boot.starter.test)
     testImplementation(libs.spring.modulith.starter.test)
     testRuntimeOnly(libs.junit.platform.launcher)
