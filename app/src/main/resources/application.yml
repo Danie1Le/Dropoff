@@ -2,10 +2,10 @@ spring:
   application:
     name: dropoff
   datasource:
-    # Matches compose.yaml; local development only, not a secret.
-    url: jdbc:postgresql://localhost:5432/dropoff
-    username: dropoff
-    password: dropoff
+    # Defaults match compose.yaml for local development; containers override them with DB_URL, DB_USERNAME and DB_PASSWORD.
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/dropoff}
+    username: ${DB_USERNAME:dropoff}
+    password: ${DB_PASSWORD:dropoff}
   jpa:
     # Flyway owns the schema; Hibernate only checks entities match it (ADR-0002).
     hibernate:

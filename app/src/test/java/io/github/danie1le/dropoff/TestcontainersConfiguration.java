@@ -12,6 +12,7 @@ public class TestcontainersConfiguration {
     @Bean
     @ServiceConnection
     PostgreSQLContainer postgres() {
+        // Same image as compose.yaml; keep the two in sync.
         return new PostgreSQLContainer("postgres:18.6-alpine");
     }
 }
