@@ -127,6 +127,8 @@ order_lines(id, order_id, menu_item_id, quantity, price_cents)
 order_events(id, order_id, from_status, to_status, actor, created_at)
 offers(id, order_id, courier_id, status, offered_at, expires_at, responded_at)
 processed_events(event_id UNIQUE, processed_at)
+event_publication(id, listener_id, event_type, serialized_event,
+       publication_date, completion_date)   -- Spring Modulith outbox
 ```
 
 ---

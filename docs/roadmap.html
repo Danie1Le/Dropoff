@@ -390,7 +390,7 @@ footer { padding: 40px 0 48px; color: var(--muted); font-size: 13px; }
 
       <rect class="bus" x="20" y="320" width="760" height="62" rx="10"/>
       <text class="t" x="400" y="346" text-anchor="middle">Kafka 4.4 (KRaft, single broker) · topics keyed by orderId</text>
-      <text class="s" x="400" y="368" text-anchor="middle">transactional outbox → topic · consumers dedupe via processed_events · 3 retries with backoff → dead-letter topic</text>
+      <text class="s" x="400" y="368" text-anchor="middle">outbox (Modulith event_publication) → topic · consumers dedupe via processed_events · 3 retries with backoff → dead-letter topic</text>
 
       <rect class="box" x="20" y="405" width="760" height="44" rx="10" style="stroke-dasharray:5 4"/>
       <text class="s" x="400" y="432" text-anchor="middle">Prometheus scrapes every service (Actuator + Micrometer) → Grafana dashboard: latency, orders/min, dispatch time (M6)</text>
@@ -498,7 +498,7 @@ const TICKETS = [
   { n: 12, title: "Where a busy courier's location lives", type: 'grilling', state: 'closed', gist: 'One PUT location for all statuses (geo set only when AVAILABLE, 409 when OFFLINE); Postgres write per update; dispatch publishes CourierLocationUpdated, order module pushes to STOMP; 5 s limit at publisher via Redis SET NX EX.' },
   { n: 13, title: 'Stuck orders: merchant never accepts, no courier ever found', type: 'grilling', state: 'closed', blockedBy: [11], gist: 'PLACED > 10 min → SYSTEM cancel (job every 30 s); no action on slow prep; READY retries forever with a 5 min exclusion window; waiting-for-courier metric + 15 min Grafana alert; no email/SMS.' },
   { n: 14, title: 'Background jobs with multiple app instances', type: 'grilling', state: 'closed', gist: 'All 3 jobs use FOR UPDATE SKIP LOCKED, one row per transaction, max 50 per run; partial unique index allows one OFFERED offer per order (also covers the listener-vs-job race).' },
-  { n: 15, title: 'order_events vs outbox: keep both?', type: 'grilling', state: 'open', q: 'Both tables, one feeding the other, or the outbox replaces order_events?' },
+  { n: 15, title: 'order_events vs outbox: keep both?', type: 'grilling', state: 'closed', gist: 'Keep both (permanent audit log vs temporary delivery queue); outbox = Modulith event_publication registry, externalized to Kafka at M5 (ADR-0006); events carry eventId + occurredAt; location updates bypass the outbox.' },
   { n: 16, title: 'Service split: data ownership and cross-service price lookup', type: 'grilling', state: 'open', blockedBy: [12, 14, 15], q: 'DB vs schema per service; price lookup via REST or local copy; where WebSocket lives.' },
 ];
 
@@ -524,7 +524,8 @@ const MILESTONES = [
     { t: 'Tests: web slice + Testcontainers repository tests' },
   ]},
   { id: 'M2', name: 'Orders', gh: 3, needs: [8, 9, 10, 13, 15], goal: 'Customers place orders that move through a safe lifecycle.', items: [
-    { t: 'Migrations: customers, orders, order_lines, order_events' },
+    { t: 'Migrations: customers, orders, order_lines, order_events, event_publication (Modulith registry)' },
+    { t: 'Events are records with eventId (UUID) + occurredAt; module listeners use @ApplicationModuleListener' },
     { t: 'POST /api/v1/orders: server computes total, price snapshot per order line' },
     { t: 'Reject unavailable or wrong-merchant menu items; closed merchant → 422 MERCHANT_CLOSED' },
     { t: 'Customer endpoints (POST/GET/PATCH /api/v1/customers); lat/lng range-checked, no geocoder; delivery address snapshot on each order, no override in the request' },
@@ -568,7 +569,7 @@ const MILESTONES = [
   { id: 'M5', name: 'Kafka & service split', gh: 6, needs: [15, 16], goal: 'Three services talking through durable events.', items: [
     { t: 'CourierLocationUpdated becomes a Kafka event keyed by orderId' },
     { t: 'apache/kafka:4.4.0 (KRaft) in Compose' },
-    { t: 'Transactional outbox → Kafka, key = orderId' },
+    { t: 'Outbox: Modulith event_publication externalized to Kafka via @Externalized, key = orderId (ADR-0006)' },
     { t: 'Consumers dedupe via processed_events' },
     { t: '3 retries with backoff, then dead-letter topic' },
     { t: 'Split into merchant / order / dispatch services' },
@@ -621,7 +622,7 @@ const FLOW = [
   { h: 'Decline, timeout or nobody nearby', m: 'M3', p: 'A decline sends the courier back to AVAILABLE; a timeout (job every 5 s) marks the offer TIMED_OUT and sets the courier OFFLINE. Either way the next nearest courier gets an offer. Going offline with an open offer declines it at once. No courier within the dispatch radius → a job tries dispatch again every 10 s, forever; the order is never cancelled. A courier going offline after accepting but before pickup triggers CourierUnassigned and a new dispatch.', tags: [['@Scheduled jobs', ''], ['Reassignment', 'warn']] },
   { h: 'Courier dispatched: live tracking begins', m: 'M4', p: 'Once CourierAssigned has fired, live tracking starts. Status changes are pushed over STOMP to /topic/orders/{id}. Dispatch publishes CourierLocationUpdated at most every 5 s per courier, and the order module pushes it to the same topic.', tags: [['CourierAssigned', 'warn'], ['WebSocket', 'acc']] },
   { h: 'Pickup and delivery', m: 'M3', p: 'The assigned courier calls pick-up, then deliver; any other courier gets 404. The courier goes back to AVAILABLE and is re-added to the Redis geo index, ready for the next order.', tags: [['OrderPickedUp', 'warn'], ['OrderDelivered', 'warn'], ['DELIVERED', 'ok']] },
-  { h: 'At M5 the same flow runs on Kafka', m: 'M5', p: 'Each event is written to an outbox table in the same transaction as the change, then relayed to Kafka keyed by orderId. Consumers skip duplicates using processed_events; failures retry 3 times, then go to a dead-letter topic.', tags: [['Kafka', 'acc'], ['Outbox', ''], ['DLT', 'blk']] },
+  { h: 'At M5 the same flow runs on Kafka', m: 'M5', p: 'Each event is written to the Modulith event_publication table (the outbox) in the same transaction as the change, then relayed to Kafka keyed by orderId; delivered rows are deleted. CourierLocationUpdated skips the outbox and goes straight to Kafka. Consumers skip duplicates using processed_events; failures retry 3 times, then go to a dead-letter topic.', tags: [['Kafka', 'acc'], ['Outbox', ''], ['DLT', 'blk']] },
 ];
 
 const TABLES = [
@@ -630,10 +631,11 @@ const TABLES = [
   { name: 'customers', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['name', ''], ['address', ''], ['lat, lng', 'coordinates']], note: 'Owned by the order module.' },
   { name: 'orders', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['customer_id', '→ customers', 'fk'], ['merchant_id', '→ merchants', 'fk'], ['courier_id', '→ couriers (nullable)', 'fk'], ['status', 'CHECK-guarded'], ['total_cents', 'BIGINT ≥ 0'], ['delivery_address', 'snapshot'], ['delivery_lat, delivery_lng', 'snapshot'], ['idempotency_key', '', 'uq'], ['request_hash', ''], ['created_at, updated_at', 'TIMESTAMPTZ']] },
   { name: 'order_lines', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['order_id', '→ orders', 'fk'], ['menu_item_id', '→ menu_items', 'fk'], ['quantity', ''], ['price_cents', 'price snapshot']], note: 'price_cents is copied on purpose (ADR-0004).' },
-  { name: 'order_events', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['order_id', '→ orders', 'fk'], ['from_status', ''], ['to_status', ''], ['actor', 'CHECK: CUSTOMER / MERCHANT / COURIER / SYSTEM'], ['created_at', 'TIMESTAMPTZ']], note: 'Relation to the M5 outbox open in ticket 15.' },
+  { name: 'order_events', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['order_id', '→ orders', 'fk'], ['from_status', ''], ['to_status', ''], ['actor', 'CHECK: CUSTOMER / MERCHANT / COURIER / SYSTEM'], ['created_at', 'TIMESTAMPTZ']], note: 'Permanent audit history. Separate from the outbox (ADR-0006).' },
   { name: 'couriers', mod: 'dispatch', ms: 'M3', cols: [['id', 'BIGINT', 'pk'], ['name', ''], ['status', 'OFFLINE / AVAILABLE / BUSY'], ['last_lat, last_lng', 'last known'], ['updated_at', 'TIMESTAMPTZ']], note: 'Every location update is written here. AVAILABLE couriers are also in the Redis geo set.' },
   { name: 'offers', mod: 'dispatch', ms: 'M3', cols: [['id', 'BIGINT', 'pk'], ['order_id', '→ orders', 'fk'], ['courier_id', '→ couriers', 'fk'], ['status', 'OFFERED / ACCEPTED / DECLINED / TIMED_OUT'], ['offered_at, expires_at, responded_at', 'TIMESTAMPTZ']], note: 'Partial unique index: at most one OFFERED offer per order.' },
-  { name: 'processed_events', mod: 'common', ms: 'M5', cols: [['event_id', '', 'uq'], ['processed_at', 'TIMESTAMPTZ']], note: 'Consumer dedupe. The outbox table also lands at M5.' },
+  { name: 'processed_events', mod: 'common', ms: 'M5', cols: [['event_id', '', 'uq'], ['processed_at', 'TIMESTAMPTZ']], note: 'Consumer dedupe by eventId.' },
+  { name: 'event_publication', mod: 'common', ms: 'M2', cols: [['id', 'UUID', 'pk'], ['listener_id', ''], ['event_type', ''], ['serialized_event', 'JSON'], ['publication_date, completion_date', 'TIMESTAMPTZ']], note: 'Spring Modulith registry = the outbox (ADR-0006). Rows are deleted once delivered.' },
 ];
 const FK = { menu_items: ['merchants'], orders: ['customers', 'merchants', 'couriers'], order_lines: ['orders', 'menu_items'], order_events: ['orders'], offers: ['orders', 'couriers'] };
 
@@ -691,6 +693,7 @@ const ADRS = [
   ['0003', 'Foreign keys across modules until the split', 'Postgres rejects orphaned rows while it is one app. Cross-module FKs are dropped deliberately at the split.', 'docs/adr/0003-foreign-keys-across-modules-until-split.md'],
   ['0004', 'Price snapshot on each order line', 'order_lines.price_cents copies the price at order time so receipts stay correct. A price-history table was rejected.', 'docs/adr/0004-price-snapshot-on-order-lines.md'],
   ['0005', 'Path-scoped command endpoints for order status', 'One POST command per status step, scoped to the caller id in the path; wrong caller 404, wrong status 409, repeat 200 no-op; order_events.actor records who. An actor field in the body was rejected: anyone can fill it, and one endpoint would carry every rule.', 'docs/adr/0005-path-scoped-order-commands.md'],
+  ['0006', 'Spring Modulith event publication registry is the outbox', 'event_publication stores each event in the same transaction and is relayed to Kafka at M5 via @Externalized. A hand-written outbox table and relay job was rejected. order_events stays a separate audit history.', 'docs/adr/0006-modulith-registry-as-outbox.md'],
 ];
 
 const ROUNDS = [
