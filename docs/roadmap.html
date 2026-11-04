@@ -329,7 +329,7 @@ footer { padding: 40px 0 48px; color: var(--muted); font-size: 13px; }
       <line class="ln" x1="650" y1="207" x2="650" y2="223" marker-start="url(#ah)" marker-end="url(#ah)"/>
       <rect class="bus" x="40" y="225" width="720" height="58" rx="10"/>
       <text class="t" x="400" y="249" text-anchor="middle">In-app Spring events (Kafka takes over at M5)</text>
-      <text class="s" x="400" y="270" text-anchor="middle">OrderPlaced · OrderCancelled · OrderReady · CourierAssigned · CourierUnassigned · OrderPickedUp · OrderDelivered</text>
+      <text class="s" x="400" y="270" text-anchor="middle">OrderPlaced · OrderCancelled · OrderReady · CourierAssigned · CourierUnassigned · CourierLocationUpdated · OrderPickedUp · OrderDelivered</text>
 
       <line class="ln" x1="255" y1="300" x2="255" y2="338" marker-end="url(#ah)"/>
       <text class="s" x="263" y="324">JPA + hand-written SQL</text>
@@ -495,7 +495,7 @@ const TICKETS = [
   { n: 9,  title: 'Missing endpoints: customers, delivery address, merchant open/close, item availability', type: 'grilling', state: 'closed', blockedBy: [8], gist: 'Delivery address snapshot on orders, customer endpoints in the order module, PATCH per resource for open/available, /menu-items with no DELETE, 422 MERCHANT_CLOSED, merchant + customer order lists.' },
   { n: 10, title: "Who may change an order's status without auth?", type: 'grilling', state: 'closed', gist: 'Path-scoped POST commands per actor (accept, start-preparing, ready, pick-up, deliver, cancel) replace PATCH status; wrong caller 404, wrong state 409, repeat 200 no-op; order_events.actor.' },
   { n: 11, title: 'Courier offer lifecycle: accept, decline, timeout endpoints', type: 'grilling', state: 'closed', blockedBy: [10], gist: 'Explicit accept (silence = TIMED_OUT); term Offer, table offers; courier BUSY while offered; courier_id set on accept via CourierAssigned listener; offers/current + accept/decline; late accept 409 via conditional UPDATE; timeout → OFFLINE; CourierUnassigned on reassignment.' },
-  { n: 12, title: "Where a busy courier's location lives", type: 'grilling', state: 'open', q: 'Pings from a BUSY courier: which Redis key, which module pushes them to WebSocket.' },
+  { n: 12, title: "Where a busy courier's location lives", type: 'grilling', state: 'closed', gist: 'One PUT location for all statuses (geo set only when AVAILABLE, 409 when OFFLINE); Postgres write per update; dispatch publishes CourierLocationUpdated, order module pushes to STOMP; 5 s limit at publisher via Redis SET NX EX.' },
   { n: 13, title: 'Stuck orders: merchant never accepts, no courier ever found', type: 'grilling', state: 'open', blockedBy: [11], q: 'Auto-cancel after N minutes, widen the radius, alert? Who is notified?' },
   { n: 14, title: 'Background jobs with multiple app instances', type: 'grilling', state: 'open', q: 'SKIP LOCKED, ShedLock, or a single-instance rule for @Scheduled jobs?' },
   { n: 15, title: 'order_events vs outbox: keep both?', type: 'grilling', state: 'open', q: 'Both tables, one feeding the other, or the outbox replaces order_events?' },
@@ -557,10 +557,12 @@ const MILESTONES = [
   { id: 'M4', name: 'Live tracking', gh: 5, needs: [12], goal: 'Customers watch their order and courier move live.', items: [
     { t: 'STOMP over WebSocket at /ws' },
     { t: 'Push status changes to /topic/orders/{id}' },
-    { t: 'Push courier location at most every 5 s once a courier is dispatched' },
+    { t: 'Dispatch publishes CourierLocationUpdated for couriers with an accepted, not-yet-delivered offer, at most every 5 s (Redis SET courier:{id}:loc-pub 1 NX EX 5); extra updates are dropped, Postgres still saves every one' },
+    { t: 'Order module pushes CourierLocationUpdated to /topic/orders/{id}' },
     { t: 'Integration test with a STOMP client' },
   ]},
   { id: 'M5', name: 'Kafka & service split', gh: 6, needs: [15, 16], goal: 'Three services talking through durable events.', items: [
+    { t: 'CourierLocationUpdated becomes a Kafka event keyed by orderId' },
     { t: 'apache/kafka:4.4.0 (KRaft) in Compose' },
     { t: 'Transactional outbox → Kafka, key = orderId' },
     { t: 'Consumers dedupe via processed_events' },
@@ -590,7 +592,7 @@ const MILESTONES = [
 ];
 
 const FOG = [
-  ['Performance target for M7', 'pick the optimization after a k6 baseline shows the bottleneck.'],
+  ['Performance target for M7', 'pick the optimization after a k6 baseline shows the bottleneck (index, cache, batching, keyset paging, courier location writes moved to Redis).'],
   ['Metrics and Grafana dashboard', 'metric names, panels, alert thresholds.'],
   ['Demo data and courier simulator', 'seeding merchants/customers, fake moving couriers.'],
   ['Gradle layout after the split', 'multi-project shape, shared event-contract module or not.'],
@@ -611,7 +613,7 @@ const FLOW = [
   { h: 'Order is ready: dispatch starts', m: 'M3', p: 'READY publishes OrderReady. The dispatch module runs GEOSEARCH in Redis for AVAILABLE couriers within 5 km of the merchant (the dispatch radius), nearest first, skipping every courier who already had an offer for this order.', tags: [['OrderReady', 'warn'], ['Redis GEO', 'acc'], ['READY', '']] },
   { h: 'Claim the courier and send an offer', m: 'M3', p: 'An UPDATE couriers SET status = BUSY … WHERE status = AVAILABLE claims the courier; if two orders race, only one UPDATE wins. An offers row records the OFFERED offer with expires_at 30 s ahead. The courier polls offers/current and must accept explicitly; the accept UPDATE also checks expires_at, so a late tap gets 409 OFFER_CLOSED. On accept, dispatch publishes CourierAssigned and an order-module listener sets orders.courier_id after the commit.', tags: [['Postgres', 'acc'], ['offers', '']] },
   { h: 'Decline, timeout or nobody nearby', m: 'M3', p: 'A decline sends the courier back to AVAILABLE; a timeout (job every 5 s) marks the offer TIMED_OUT and sets the courier OFFLINE. Either way the next nearest courier gets an offer. Going offline with an open offer declines it at once. No courier within the dispatch radius → a job tries dispatch again every 10 s. A courier going offline after accepting but before pickup triggers CourierUnassigned and a new dispatch.', tags: [['@Scheduled jobs', ''], ['Reassignment', 'warn']] },
-  { h: 'Courier dispatched: live tracking begins', m: 'M4', p: 'Once CourierAssigned has fired, live tracking starts. Status changes and the courier’s location (at most every 5 s) are pushed over STOMP to /topic/orders/{id}.', tags: [['CourierAssigned', 'warn'], ['WebSocket', 'acc']] },
+  { h: 'Courier dispatched: live tracking begins', m: 'M4', p: 'Once CourierAssigned has fired, live tracking starts. Status changes are pushed over STOMP to /topic/orders/{id}. Dispatch publishes CourierLocationUpdated at most every 5 s per courier, and the order module pushes it to the same topic.', tags: [['CourierAssigned', 'warn'], ['WebSocket', 'acc']] },
   { h: 'Pickup and delivery', m: 'M3', p: 'The assigned courier calls pick-up, then deliver; any other courier gets 404. The courier goes back to AVAILABLE and is re-added to the Redis geo index, ready for the next order.', tags: [['OrderPickedUp', 'warn'], ['OrderDelivered', 'warn'], ['DELIVERED', 'ok']] },
   { h: 'At M5 the same flow runs on Kafka', m: 'M5', p: 'Each event is written to an outbox table in the same transaction as the change, then relayed to Kafka keyed by orderId. Consumers skip duplicates using processed_events; failures retry 3 times, then go to a dead-letter topic.', tags: [['Kafka', 'acc'], ['Outbox', ''], ['DLT', 'blk']] },
 ];
@@ -623,7 +625,7 @@ const TABLES = [
   { name: 'orders', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['customer_id', '→ customers', 'fk'], ['merchant_id', '→ merchants', 'fk'], ['courier_id', '→ couriers (nullable)', 'fk'], ['status', 'CHECK-guarded'], ['total_cents', 'BIGINT ≥ 0'], ['delivery_address', 'snapshot'], ['delivery_lat, delivery_lng', 'snapshot'], ['idempotency_key', '', 'uq'], ['request_hash', ''], ['created_at, updated_at', 'TIMESTAMPTZ']] },
   { name: 'order_lines', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['order_id', '→ orders', 'fk'], ['menu_item_id', '→ menu_items', 'fk'], ['quantity', ''], ['price_cents', 'price snapshot']], note: 'price_cents is copied on purpose (ADR-0004).' },
   { name: 'order_events', mod: 'order', ms: 'M2', cols: [['id', 'BIGINT', 'pk'], ['order_id', '→ orders', 'fk'], ['from_status', ''], ['to_status', ''], ['actor', 'CHECK: CUSTOMER / MERCHANT / COURIER / SYSTEM'], ['created_at', 'TIMESTAMPTZ']], note: 'Relation to the M5 outbox open in ticket 15.' },
-  { name: 'couriers', mod: 'dispatch', ms: 'M3', cols: [['id', 'BIGINT', 'pk'], ['name', ''], ['status', 'OFFLINE / AVAILABLE / BUSY'], ['last_lat, last_lng', 'last known'], ['updated_at', 'TIMESTAMPTZ']], note: 'Live location of AVAILABLE couriers lives in Redis.' },
+  { name: 'couriers', mod: 'dispatch', ms: 'M3', cols: [['id', 'BIGINT', 'pk'], ['name', ''], ['status', 'OFFLINE / AVAILABLE / BUSY'], ['last_lat, last_lng', 'last known'], ['updated_at', 'TIMESTAMPTZ']], note: 'Every location update is written here. AVAILABLE couriers are also in the Redis geo set.' },
   { name: 'offers', mod: 'dispatch', ms: 'M3', cols: [['id', 'BIGINT', 'pk'], ['order_id', '→ orders', 'fk'], ['courier_id', '→ couriers', 'fk'], ['status', 'OFFERED / ACCEPTED / DECLINED / TIMED_OUT'], ['offered_at, expires_at, responded_at', 'TIMESTAMPTZ']] },
   { name: 'processed_events', mod: 'common', ms: 'M5', cols: [['event_id', '', 'uq'], ['processed_at', 'TIMESTAMPTZ']], note: 'Consumer dedupe. The outbox table also lands at M5.' },
 ];
@@ -653,7 +655,7 @@ const API = [
   ['GET', '/api/v1/customers/{id}/orders', 'order history, newest first (paginated)', 'order', 'M2'],
   ['POST', '/api/v1/couriers', 'register courier', 'dispatch', 'M3'],
   ['PATCH', '/api/v1/couriers/{id}/status', 'available / offline', 'dispatch', 'M3'],
-  ['PUT', '/api/v1/couriers/{id}/location', 'update location', 'dispatch', 'M3'],
+  ['PUT', '/api/v1/couriers/{id}/location', 'update location (any status; OFFLINE → 409 COURIER_OFFLINE)', 'dispatch', 'M3'],
   ['GET', '/api/v1/couriers/{id}/offers/current', 'open offer (200) or none (204); courier polls', 'dispatch', 'M3'],
   ['POST', '/api/v1/couriers/{id}/offers/{offerId}/accept', 'accept within 30 s; late → 409 OFFER_CLOSED', 'dispatch', 'M3'],
   ['POST', '/api/v1/couriers/{id}/offers/{offerId}/decline', 'decline; courier back to AVAILABLE', 'dispatch', 'M3'],
