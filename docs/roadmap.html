@@ -395,7 +395,7 @@ footer { padding: 40px 0 48px; color: var(--muted); font-size: 13px; }
       <rect class="box" x="20" y="405" width="760" height="44" rx="10" style="stroke-dasharray:5 4"/>
       <text class="s" x="400" y="432" text-anchor="middle">Prometheus scrapes every service (Actuator + Micrometer) → Grafana dashboard: latency, orders/min, dispatch time (M6)</text>
     </svg>
-    <p class="small muted" style="margin:8px 4px 0">* One database or one schema per service, where the WebSocket endpoint lives, and how order-service gets menu prices are open in <a href="https://github.com/Danie1Le/Dropoff/issues/16">Service split: data ownership and cross-service price lookup</a>. Cross-module foreign keys get dropped at the split (ADR-0003).</p>
+    <p class="small muted" style="margin:8px 4px 0">* One Postgres container with one database per service (merchant_db, order_db, dispatch_db). order-service owns the WebSocket and prices orders from a local menu copy fed by a compacted merchant topic. Cross-module foreign keys are dropped at the split (ADR-0003, ADR-0007, <a href="https://github.com/Danie1Le/Dropoff/issues/16">Service split: data ownership and cross-service price lookup</a>).</p>
   </div>
 </section>
 
@@ -499,7 +499,15 @@ const TICKETS = [
   { n: 13, title: 'Stuck orders: merchant never accepts, no courier ever found', type: 'grilling', state: 'closed', blockedBy: [11], gist: 'PLACED > 10 min → SYSTEM cancel (job every 30 s); no action on slow prep; READY retries forever with a 5 min exclusion window; waiting-for-courier metric + 15 min Grafana alert; no email/SMS.' },
   { n: 14, title: 'Background jobs with multiple app instances', type: 'grilling', state: 'closed', gist: 'All 3 jobs use FOR UPDATE SKIP LOCKED, one row per transaction, max 50 per run; partial unique index allows one OFFERED offer per order (also covers the listener-vs-job race).' },
   { n: 15, title: 'order_events vs outbox: keep both?', type: 'grilling', state: 'closed', gist: 'Keep both (permanent audit log vs temporary delivery queue); outbox = Modulith event_publication registry, externalized to Kafka at M5 (ADR-0006); events carry eventId + occurredAt; location updates bypass the outbox.' },
-  { n: 16, title: 'Service split: data ownership and cross-service price lookup', type: 'grilling', state: 'open', blockedBy: [12, 14, 15], q: 'DB vs schema per service; price lookup via REST or local copy; where WebSocket lives.' },
+  { n: 16, title: 'Service split: data ownership and cross-service price lookup', type: 'grilling', state: 'closed', blockedBy: [12, 14, 15], gist: 'One Postgres, one database per service; order-service keeps menu_item_copies fed by a compacted merchant topic (ADR-0007); OrderReady carries pickup lat/lng; WebSocket in order-service; no gateway; fresh databases, no migration.' },
+  { n: 31, title: 'Gradle layout after the split: build shape and shared event contracts', type: 'grilling', state: 'open', q: 'Multi-project shape, shared contracts module for event records or not, Modulith checks after the split.' },
+  { n: 32, title: 'Kafka topics: names, partitions, retention, compaction, DLT and replay', type: 'grilling', state: 'open', q: 'Topic list, partitions, retention and cleanup policy, DLT naming, replay procedure, who creates topics.' },
+  { n: 33, title: 'Demo data and courier simulator', type: 'grilling', state: 'open', q: 'Seeding merchants, menus, customers and couriers; a simulator that polls offers and moves couriers.' },
+  { n: 34, title: 'Metrics and Grafana dashboard: names, panels, alerts', type: 'grilling', state: 'open', q: 'Custom Micrometer metrics, Grafana panels, alert rules, dashboard as code.' },
+  { n: 35, title: 'M7 performance method: baseline, candidates, how to pick', type: 'grilling', state: 'open', blockedBy: [33, 34], q: 'k6 scenarios, baseline numbers, candidate list, the rule for picking, write-up format.' },
+  { n: 36, title: 'Image publishing: GHCR tags, CI trigger, size targets', type: 'grilling', state: 'open', blockedBy: [31], q: 'Base image, tag scheme, when CI publishes, size target.' },
+  { n: 37, title: 'README and demo content', type: 'grilling', state: 'open', blockedBy: [33, 34, 35], q: 'README sections, diagram source, demo GIF, screenshots, AI-usage notes.' },
+  { n: 38, title: 'Write docs/PLAN.md', type: 'task', state: 'open', blockedBy: [31, 32, 33, 34, 35, 36, 37], q: 'Milestones M0 to M8 as small PRs with scope, tests and decision links; then the final wayfinder verify pass.' },
 ];
 
 // Build milestones. GitHub milestone numbers are in `gh`. Set done: true as tasks land.
@@ -566,30 +574,33 @@ const MILESTONES = [
     { t: 'Order module pushes CourierLocationUpdated to /topic/orders/{id}' },
     { t: 'Integration test with a STOMP client' },
   ]},
-  { id: 'M5', name: 'Kafka & service split', gh: 6, needs: [15, 16], goal: 'Three services talking through durable events.', items: [
+  { id: 'M5', name: 'Kafka & service split', gh: 6, needs: [15, 16, 31, 32], goal: 'Three services talking through durable events.', items: [
     { t: 'CourierLocationUpdated becomes a Kafka event keyed by orderId' },
     { t: 'apache/kafka:4.4.0 (KRaft) in Compose' },
     { t: 'Add spring-modulith-events-kafka: externalize event_publication via @Externalized("<topic>::#{orderId()}"), key = orderId (ADR-0006)' },
     { t: 'CourierLocationUpdated sent directly with KafkaTemplate (no outbox)' },
     { t: 'Consumers dedupe via processed_events' },
     { t: '3 retries with backoff, then dead-letter topic' },
-    { t: 'Split into merchant / order / dispatch services' },
+    { t: 'Split into merchant / order / dispatch services on ports 8081 / 8082 / 8083; no gateway' },
+    { t: 'One Postgres container, one database per service (merchant_db, order_db, dispatch_db), fresh and seeded (ADR-0007)' },
+    { t: 'order-service keeps menu_item_copies from MenuItemChanged / MerchantChanged on a compacted topic; rebuilds by replay' },
+    { t: 'OrderReady carries merchantLat / merchantLng for dispatch' },
     { t: 'Drop cross-module foreign keys (ADR-0003)' },
   ]},
-  { id: 'M6', name: 'Ops', gh: 7, needs: [], goal: 'Containers, published images and dashboards.', items: [
+  { id: 'M6', name: 'Ops', gh: 7, needs: [34, 36], goal: 'Containers, published images and dashboards.', items: [
     { t: 'Metrics: orders waiting for a courier (Grafana alert after 15 min) and orders stuck in ACCEPTED/PREPARING (no automatic action)' },
     { t: 'Dockerfile per service' },
     { t: 'CI publishes images to GHCR' },
     { t: 'Actuator + Micrometer + Prometheus v3.13.5' },
     { t: 'Grafana 13.3.0 dashboard provisioned in Compose' },
   ]},
-  { id: 'M7', name: 'Performance', gh: 8, needs: [], goal: 'Measured load and one or two measured wins.', items: [
+  { id: 'M7', name: 'Performance', gh: 8, needs: [33, 35], goal: 'Measured load and one or two measured wins.', items: [
     { t: 'k6 2.3.0 load scripts' },
     { t: 'Baseline: throughput and p95 latency' },
     { t: 'One or two optimizations, measured before and after' },
     { t: 'Results written up in the README' },
   ]},
-  { id: 'M8', name: 'Polish', gh: 9, needs: [], goal: 'A repo a reviewer can understand at a glance.', items: [
+  { id: 'M8', name: 'Polish', gh: 9, needs: [37, 38], goal: 'A repo a reviewer can understand at a glance.', items: [
     { t: 'README: architecture diagram, setup steps, screenshots' },
     { t: 'Swagger docs complete' },
     { t: 'Demo GIF or short video' },
@@ -599,19 +610,14 @@ const MILESTONES = [
 ];
 
 const FOG = [
-  ['Performance target for M7', 'pick the optimization after a k6 baseline shows the bottleneck (index, cache, batching, keyset paging, courier location writes moved to Redis).'],
-  ['Metrics and Grafana dashboard', 'metric names, panels, alert thresholds (known: orders waiting for a courier, alert after 15 min; orders stuck in ACCEPTED/PREPARING).'],
-  ['Demo data and courier simulator', 'seeding merchants/customers, fake moving couriers.'],
-  ['Gradle layout after the split', 'multi-project shape, shared event-contract module or not.'],
-  ['Kafka topic settings', 'partitions, retention, DLT naming, replay procedure.'],
-  ['Image publishing details', 'GHCR tags, when CI publishes, image size targets.'],
-  ['README and demo content', 'screenshots, diagram source, AI-usage notes format.'],
+  // All fog graduated into tickets 31–38 on 2026-11-03.
 ];
 const OUT_OF_SCOPE = [
   ['Authentication / authorization', 'deliberate known gap, noted in README.'],
   ['Payments and refunds', ''],
   ['Widening the dispatch radius', 'READY orders with no courier retry forever instead.'],
   ['Maximum delivery distance check', 'no limit in v1; demo data stays in one city.'],
+  ['API gateway', 'clients call each service on its own port (8081 merchant, 8082 order, 8083 dispatch).'],
   ['Stretch goals', 'ETA estimation, multi-order batching, surge pricing, Kotlin service, React/Leaflet map, hosted deploy, broadcast offers, road-distance routing.'],
 ];
 
@@ -636,6 +642,7 @@ const TABLES = [
   { name: 'couriers', mod: 'dispatch', ms: 'M3', cols: [['id', 'BIGINT', 'pk'], ['name', ''], ['status', 'OFFLINE / AVAILABLE / BUSY'], ['last_lat, last_lng', 'last known'], ['updated_at', 'TIMESTAMPTZ']], note: 'Every location update is written here. AVAILABLE couriers are also in the Redis geo set.' },
   { name: 'offers', mod: 'dispatch', ms: 'M3', cols: [['id', 'BIGINT', 'pk'], ['order_id', '→ orders', 'fk'], ['courier_id', '→ couriers', 'fk'], ['status', 'OFFERED / ACCEPTED / DECLINED / TIMED_OUT'], ['offered_at, expires_at, responded_at', 'TIMESTAMPTZ']], note: 'Partial unique index: at most one OFFERED offer per order.' },
   { name: 'processed_events', mod: 'common', ms: 'M5', cols: [['event_id', '', 'uq'], ['processed_at', 'TIMESTAMPTZ']], note: 'Consumer dedupe by eventId.' },
+  { name: 'menu_item_copies', mod: 'order', ms: 'M5', cols: [['menu_item_id', 'BIGINT', 'pk'], ['merchant_id', ''], ['name', ''], ['price_cents', 'BIGINT ≥ 0'], ['available', 'BOOLEAN'], ['merchant_open', 'BOOLEAN'], ['merchant_lat, merchant_lng', 'pickup location']], note: 'Local copy fed by merchant events on a compacted topic (ADR-0007). No foreign keys.' },
   { name: 'event_publication', mod: 'common', ms: 'M2', cols: [['id', 'UUID', 'pk'], ['listener_id', ''], ['event_type', ''], ['serialized_event', 'event as JSON text'], ['publication_date, completion_date', 'TIMESTAMPTZ']], note: 'Spring Modulith registry = the outbox (ADR-0006). Rows are deleted once delivered.' },
 ];
 const FK = { menu_items: ['merchants'], orders: ['customers', 'merchants', 'couriers'], order_lines: ['orders', 'menu_items'], order_events: ['orders'], offers: ['orders', 'couriers'] };
@@ -695,6 +702,7 @@ const ADRS = [
   ['0004', 'Price snapshot on each order line', 'order_lines.price_cents copies the price at order time so receipts stay correct. A price-history table was rejected.', 'docs/adr/0004-price-snapshot-on-order-lines.md'],
   ['0005', 'Path-scoped command endpoints for order status', 'One POST command per status step, scoped to the caller id in the path; wrong caller 404, wrong status 409, repeat 200 no-op; order_events.actor records who. An actor field in the body was rejected: anyone can fill it, and one endpoint would carry every rule.', 'docs/adr/0005-path-scoped-order-commands.md'],
   ['0006', 'Spring Modulith event publication registry is the outbox', 'event_publication stores each event in the same transaction and is relayed to Kafka at M5 via @Externalized. A hand-written outbox table and relay job was rejected. order_events stays a separate audit history.', 'docs/adr/0006-modulith-registry-as-outbox.md'],
+  ['0007', 'Service split: a database per service and a local menu copy', 'One Postgres container, one database per service. order-service prices orders from menu_item_copies fed by a compacted merchant topic. Synchronous REST per order was rejected: ordering would stop when merchant-service is down.', 'docs/adr/0007-service-split-local-menu-copy.md'],
 ];
 
 const ROUNDS = [
@@ -734,7 +742,7 @@ const GLOSSARY = [
 const SCOPE = [
   ['Core (MVP)', 'ok', ['Merchants, menus, item availability', 'Orders with a status lifecycle', 'Couriers: status and location', 'Dispatch to nearest available courier (Redis geo)', 'REST APIs with OpenAPI', 'Validation and consistent errors']],
   ['Stand-out', 'acc', ['Kafka event-driven flow', 'Live tracking over WebSocket', 'Idempotent order creation', 'Reassignment, retries, dead-letter topic', 'k6 load tests', 'Before/after performance write-up', 'Prometheus + Grafana monitoring']],
-  ['Out of scope', 'blk', ['Auth (documented gap)', 'Payments and refunds', 'Max delivery distance', 'Radius widening', 'ETA, batching, surge pricing', 'Kotlin service, React/Leaflet map', 'Hosted deploy', 'Road-distance routing']],
+  ['Out of scope', 'blk', ['Auth (documented gap)', 'Payments and refunds', 'Max delivery distance', 'Radius widening', 'API gateway', 'ETA, batching, surge pricing', 'Kotlin service, React/Leaflet map', 'Hosted deploy', 'Road-distance routing']],
 ];
 
 /* ---------- RENDERING ---------- */
