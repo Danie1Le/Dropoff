@@ -475,7 +475,7 @@ footer { padding: 40px 0 48px; color: var(--muted); font-size: 13px; }
 </section>
 
 <footer>
-  Sources: <code>PROJECT_OVERVIEW.md</code>, <code>GLOSSARY.md</code>, <code>docs/adr/</code>, and the <a href="https://github.com/Danie1Le/Dropoff/issues/2">wayfinder map</a>. Data last synced 2026-11-03. Update the arrays at the bottom of this file when tickets close or tasks land.
+  Sources: <code>PROJECT_OVERVIEW.md</code>, <code>GLOSSARY.md</code>, <code>docs/adr/</code>, and the <a href="https://github.com/Danie1Le/Dropoff/issues/2">wayfinder map</a>. Data last synced 2026-11-04. Update the arrays at the bottom of this file when tickets close or tasks land.
 </footer>
 </div>
 
@@ -514,8 +514,8 @@ const TICKETS = [
 // Build milestones. GitHub milestone numbers are in `gh`. Set done: true as tasks land.
 const MILESTONES = [
   { id: 'M0', name: 'Project setup', gh: 1, needs: [4, 7, 31, 38], goal: 'An empty app that builds, tests and runs locally against Postgres and Redis in Docker, with CI on every push.', items: [
-    { t: 'Gradle 9.8.2 wrapper, Kotlin DSL, Java 21 toolchain' },
-    { t: 'Multi-project: build-logic convention plugin dropoff.java-conventions (Spotless, Error Prone, NullAway, JaCoCo, Java 21 toolchain), gradle/libs.versions.toml, app/ subproject; build rules unchanged at the split' },
+    { t: 'Gradle 9.8.2 wrapper, Kotlin DSL, Java 21 toolchain', done: true },
+    { t: 'Multi-project: build-logic convention plugin dropoff.java-conventions (Spotless, Error Prone, NullAway, JaCoCo, Java 21 toolchain), gradle/libs.versions.toml, app/ subproject; build rules unchanged at the split', done: true },
     { t: 'Spring Boot 4.1.2 skeleton (webmvc, data-jpa, validation, actuator)' },
     { t: 'Spring Modulith 2.1.2: merchant · order · dispatch · common under io.github.danie1le.dropoff, boundary test' },
     { t: 'Docker Compose: postgres:18.6-alpine + redis:8.10.3-alpine' },
