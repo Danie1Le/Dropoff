@@ -1,0 +1,33 @@
+# Local infrastructure for development (ticket #6 picks the images).
+# Start with `docker compose up -d`; the app runs with `./gradlew :app:bootRun`.
+services:
+  postgres:
+    # Keep in sync with TestcontainersConfiguration (integration tests use the same image).
+    image: postgres:18.6-alpine
+    environment:
+      POSTGRES_DB: dropoff
+      POSTGRES_USER: dropoff
+      POSTGRES_PASSWORD: dropoff
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      # Postgres 18 images keep data under /var/lib/postgresql (not .../data).
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dropoff -d dropoff"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:8.10.3-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:
