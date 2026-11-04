@@ -1,0 +1,16 @@
+# Gradle and Kotlin DSL caches
+.gradle/
+.kotlin/
+build/
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+
+# Simulator state (ticket #42)
+.simulator/
+
+# OS
+.DS_Store
+Thumbs.db
