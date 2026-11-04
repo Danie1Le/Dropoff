@@ -77,6 +77,12 @@ These apply across many PRs, and #42 is the source for all of them.
 
 **Redis writes** (`GEOADD` / `ZREM`) run in an after-commit hook, so a rolled-back transaction never changes Redis.
 
+**Event listeners update with conditions**, so out-of-order events can't corrupt state:
+- `CourierAssigned` sets `orders.courier_id` only `WHERE status = 'READY'`.
+- `CourierUnassigned` clears it only `WHERE courier_id = :courierId AND status = 'READY'`.
+- Dispatch's `OrderPickedUp` / `OrderDelivered` update `dispatch_orders` only `WHERE courier_id = :courierId`.
+- A guard matching 0 rows is logged and skipped.
+
 **Outbox settings** (from M2):
 - JDBC event publication registry (`spring-modulith-starter-jdbc`).
 - `spring.modulith.events.completion-mode=delete`.
@@ -298,7 +304,7 @@ Goal: ready orders get the nearest available courier, with reassignment. The dis
     - Customer bots place 6 orders/min.
     - Merchant bots poll `GET /merchants/{id}/orders?status=PLACED` every 3 s, then step through after 5–20 s.
     - Courier bots poll offers every 2 s and answer 80/15/5 accept/decline/ignore. They travel at about 30 km/h in a straight line and send a location every 3 s. After a timeout sets a bot OFFLINE, it goes AVAILABLE again 30 s later.
-  - A fixed random seed.
+  - A fixed random seed. `seed` writes the created ids to `.simulator/state.json`, and `run` reads them.
 - Tests: unit tests for the movement and decision logic; a manual end-to-end run documented in the PR.
 - Decisions: #33, #42.
 
@@ -308,7 +314,7 @@ Goal: customers watch their order and courier move live.
 
 **M4-1 STOMP status updates.**
 - Scope:
-  - STOMP over WebSocket at `/ws` (order module).
+  - STOMP over raw WebSocket at `/ws` (order module; no SockJS).
   - Every status change, including SYSTEM cancels, is sent as a `STATUS` message to `/topic/orders/{id}`.
 - Tests: an IT with a STOMP client receiving each status.
 - Decisions: #3, #13, #42.
@@ -322,7 +328,7 @@ Goal: customers watch their order and courier move live.
 - Decisions: #12, #15, #42.
 
 **M4-3 Simulator watch.**
-- Scope: `simulator watch <orderId>` prints the `STATUS` and `LOCATION` messages.
+- Scope: `simulator watch <orderId>` prints the `STATUS` and `LOCATION` messages, using a small STOMP client over `java.net.http.WebSocket`.
 - Tests: a manual check documented in the PR.
 - Decisions: #33, #42.
 
@@ -371,9 +377,10 @@ Goal: three services talking through durable events. Each PR leaves a working sy
 **M5-4 Extract dispatch-service.**
 - Scope:
   - `services/dispatch` on port 8083 with `dispatch_db`, owning `couriers`, `offers`, `dispatch_orders`, its own `event_publication` / `processed_events`, and Redis.
-  - A Postgres init script creates the three databases and users.
+  - A Postgres init script creates the three databases and users. Run `docker compose down -v` and reseed, because the script runs only on an empty volume.
+  - Each service has its own Flyway baseline in its own database. The remaining app keeps its current database until M5-6.
   - Drop the FKs between dispatch and order tables, both directions (including `orders.courier_id`).
-  - The simulator gets a base URL per service, and a `smoke --orders 5 --timeout 5m` mode (exits non-zero unless all are DELIVERED), wrapped by `ops/smoke/full-flow.sh`.
+  - The simulator gets a base URL per service, and a `smoke --orders 5 --timeout 5m` mode: it seeds if there's no state file, runs its own merchant and courier bots, and exits non-zero unless all orders are DELIVERED, wrapped by `ops/smoke/full-flow.sh`.
 - Tests: service ITs; the smoke script, run manually.
 - Decisions: #16, #31, #42, ADR-0003, ADR-0007.
 
@@ -399,7 +406,7 @@ Goal: containers, published images and dashboards.
 **M6-1 Metrics.**
 - Scope:
   - Actuator `/actuator/prometheus` and Prometheus v3.13.5 in Compose (15 s scrape).
-  - All `dropoff_*` metrics from #34. Gauges come from one SQL query cached 15 s. `dropoff_dispatch_duration_seconds` is accept time minus `ready_at`.
+  - All `dropoff_*` metrics from #34. Each service computes its own gauges with one SQL query cached 15 s (dispatch: waiting orders and couriers; order: in-preparation orders). `dropoff_dispatch_duration_seconds` is accept time minus `ready_at`.
   - `dropoff_dlt_messages_total{topic}`, incremented by each dead-letter recoverer.
   - Percentile histograms on `http_server_requests_seconds`.
 - Tests: ITs asserting the metric names exist and the counters move.
@@ -419,7 +426,7 @@ Goal: containers, published images and dashboards.
 - Scope:
   - One Dockerfile per service: layered jar extract on `eclipse-temurin:21-jre-alpine`, non-root user.
   - A Dockerfile for the simulator.
-  - Compose runs the images; profile `demo` adds the simulator.
+  - Compose runs the images; profile `demo` adds the simulator, which seeds if there's no state file and then runs.
 - Tests: CI builds each image and checks it is under 300 MB.
 - Decisions: #33, #36, #42.
 
