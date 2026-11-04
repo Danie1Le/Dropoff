@@ -146,7 +146,7 @@ POST   /customers/{id}/orders/{orderId}/cancel   customer cancels
 
 POST   /couriers                        register courier
 PATCH  /couriers/{id}/status            available / offline
-PUT    /couriers/{id}/location          update location (409 if offline)
+PUT    /couriers/{id}/location          update location (AVAILABLE: also GEOADD; OFFLINE: 409 COURIER_OFFLINE)
 GET    /couriers/{id}/offers/current    open offer (204 if none)
 POST   /couriers/{id}/offers/{offerId}/accept    accept within 30 s
 POST   /couriers/{id}/offers/{offerId}/decline   decline

@@ -557,11 +557,12 @@ const MILESTONES = [
   { id: 'M4', name: 'Live tracking', gh: 5, needs: [12], goal: 'Customers watch their order and courier move live.', items: [
     { t: 'STOMP over WebSocket at /ws' },
     { t: 'Push status changes to /topic/orders/{id}' },
-    { t: 'Dispatch publishes CourierLocationUpdated for couriers with an accepted offer, at most every 5 s (Redis SET courier:{id}:loc-pub NX EX 5)' },
+    { t: 'Dispatch publishes CourierLocationUpdated for couriers with an accepted, not-yet-delivered offer, at most every 5 s (Redis SET courier:{id}:loc-pub 1 NX EX 5); extra updates are dropped, Postgres still saves every one' },
     { t: 'Order module pushes CourierLocationUpdated to /topic/orders/{id}' },
     { t: 'Integration test with a STOMP client' },
   ]},
   { id: 'M5', name: 'Kafka & service split', gh: 6, needs: [15, 16], goal: 'Three services talking through durable events.', items: [
+    { t: 'CourierLocationUpdated becomes a Kafka event keyed by orderId' },
     { t: 'apache/kafka:4.4.0 (KRaft) in Compose' },
     { t: 'Transactional outbox → Kafka, key = orderId' },
     { t: 'Consumers dedupe via processed_events' },
