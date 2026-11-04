@@ -126,10 +126,12 @@ orders(id, customer_id, merchant_id, courier_id, status, total_cents,
 order_lines(id, order_id, menu_item_id, quantity, price_cents)
 order_events(id, order_id, from_status, to_status, actor, created_at)
 offers(id, order_id, courier_id, status, offered_at, expires_at, responded_at)
-processed_events(event_id UNIQUE, processed_at)
+dispatch_orders(order_id, merchant_name, merchant_address, pickup_lat, pickup_lng,
+       delivery_address, delivery_lat, delivery_lng, ready_at, courier_id, status)
+processed_events(consumer_group, event_id, processed_at)   -- PK (consumer_group, event_id)
 event_publication(id, listener_id, event_type, serialized_event,
        publication_date, completion_date)   -- Spring Modulith outbox
-merchant_copies(merchant_id, open, lat, lng)                          -- order-service, from M5
+merchant_copies(merchant_id, name, address, open, lat, lng)           -- order-service, from M5
 menu_item_copies(menu_item_id, merchant_id, name, price_cents, available)  -- order-service, from M5
 ```
 
@@ -150,7 +152,7 @@ POST   /customers/{id}/orders/{orderId}/cancel   customer cancels
 
 POST   /couriers                        register courier
 PATCH  /couriers/{id}/status            available / offline
-PUT    /couriers/{id}/location          update location (AVAILABLE: also GEOADD; OFFLINE: 409 COURIER_OFFLINE)
+PUT    /couriers/{id}/location          update location (any status; GEOADD only while AVAILABLE)
 GET    /couriers/{id}/offers/current    open offer (204 if none)
 POST   /couriers/{id}/offers/{offerId}/accept    accept within 30 s
 POST   /couriers/{id}/offers/{offerId}/decline   decline
