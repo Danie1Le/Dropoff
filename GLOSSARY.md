@@ -51,7 +51,7 @@ Where an order is in its lifecycle: Placed, Accepted, Preparing, Ready, Picked U
 _Avoid_: State, stage, phase
 
 **Cancellation**:
-Ending an order before the merchant starts preparing it.
+Ending an order before the merchant starts preparing it, by the customer, the merchant, or automatically when the merchant does not accept in time.
 _Avoid_: Refund, void, rejection
 
 ## Dispatch
