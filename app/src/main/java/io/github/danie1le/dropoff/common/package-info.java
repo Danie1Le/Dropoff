@@ -1,4 +1,4 @@
-/** Shared building blocks used by every module. This base package is the module's public API; sub-packages are internal. */
+/** Shared building blocks used by every module. */
 @NullMarked
 package io.github.danie1le.dropoff.common;
 

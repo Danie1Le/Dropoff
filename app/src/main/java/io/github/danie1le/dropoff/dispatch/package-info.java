@@ -1,4 +1,4 @@
-/** Couriers, offers and choosing a courier for a ready order. This base package is the module's public API; sub-packages are internal. */
+/** Couriers, offers and choosing a courier for a ready order. */
 @NullMarked
 package io.github.danie1le.dropoff.dispatch;
 

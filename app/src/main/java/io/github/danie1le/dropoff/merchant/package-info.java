@@ -1,4 +1,4 @@
-/** Merchants, their menus and menu items. This base package is the module's public API; sub-packages are internal. */
+/** Merchants, their menus and menu items. */
 @NullMarked
 package io.github.danie1le.dropoff.merchant;
 
