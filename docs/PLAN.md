@@ -8,7 +8,7 @@ Tickets marked _(delegated)_ on the map (#32–#37, #42) were decided by Claude 
 
 1. Branch from `main` (`feat/…`, `chore/…`, `docs/…`). Use Conventional Commits, and add no AI attribution lines.
 2. Write domain rules test-first (the order status rules, dispatch candidate selection). Plumbing gets tests after.
-3. Before opening the PR, run the `code-review` skill (Standards + Spec) and fix its findings.
+3. Before handing the PR over, run the `code-review` skill (Standards + Spec). Post each finding as a line comment on the PR, fix the findings (subagents may do the fixing), then reply to every comment, saying either fixed (with the commit) or kept (with the reason), and resolve it. The PR stays in draft until every comment is resolved.
 4. CI is green: Spotless, Error Prone + NullAway, unit tests (`*Test`), integration tests (`*IT`, Testcontainers).
 5. In `docs/roadmap.html`, set `done: true` on finished tasks and bump the "Data last synced" date.
 6. The user reviews the PR and gets a short quiz on what it taught.

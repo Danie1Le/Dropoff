@@ -15,7 +15,7 @@ How code in Dropoff is written and reviewed. Decided in [Coding standards for co
   _Why:_ it catches real bug patterns at compile time with no extra tool to tune.
 - **(review)** WARNING-level Error Prone findings print but don't fail the build. Any new warning is a code-review finding.
   _Why:_ warnings that nobody reads pile up and hide the next real bug.
-- **(tool)** NullAway checks every `@NullMarked` (JSpecify) package at error level, in standard mode (`OnlyNullMarked=true`). JSpecify mode is not used: it is still experimental and doesn't support Oracle JDK 21.
+- **(tool)** NullAway checks every `@NullMarked` (JSpecify) package at error level, in standard mode (`OnlyNullMarked=true`), and honours Spring's `@Contract` annotations (`CustomContractAnnotations=org.springframework.lang.Contract`); test code is not checked (NullAway is disabled for `compileTestJava`). JSpecify mode is not used: it is still experimental and doesn't support Oracle JDK 21.
   _Why:_ null bugs become compile errors instead of production errors.
 - **(review)** Every package has a `package-info.java` marked `@NullMarked`.
   _Why:_ NullAway skips unmarked packages, so a missing marker silently turns the check off.
@@ -64,7 +64,7 @@ How code in Dropoff is written and reviewed. Decided in [Coding standards for co
 
 - **(tool)** Java 21 through the Gradle toolchain with the foojay resolver, so a machine without JDK 21 downloads one. CI uses Temurin 21.
   _Why:_ every machine and CI build with the same JDK.
-- Every subproject applies `dropoff.java-conventions` from `build-logic/`. Versions live only in `gradle/libs.versions.toml`.
+- Every subproject applies `dropoff.java-conventions` from `build-logic/`. Versions live only in `gradle/libs.versions.toml`, except the foojay toolchain resolver plugin, which is pinned in `settings.gradle.kts` because settings plugins are resolved before the version catalog exists.
   _Why:_ one place to change a rule or a version.
 
 ## Git and review
@@ -75,7 +75,7 @@ The PR workflow details below (one plan step per PR, posting and answering revie
   _Why:_ history reads as a changelog, and authorship stays with the human.
 - Small PRs, one plan step each (see `docs/PLAN.md`).
   _Why:_ small diffs get real review and are easy to revert.
-- Before a PR is handed over for review, run the `code-review` skill. Post its findings on the PR, fix them, and reply to each one.
+- Before a PR is handed over for review, run the `code-review` skill, post its findings as PR comments, fix or answer each one, resolve them all, then mark the PR ready.
   _Why:_ mechanical findings are fixed before a human spends time on the PR.
 - CI must be green before merging.
   _Why:_ `main` always builds.
