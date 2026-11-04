@@ -507,7 +507,7 @@ const TICKETS = [
   { n: 35, title: 'M7 performance method: baseline, candidates, how to pick', type: 'grilling', state: 'closed', blockedBy: [33, 34], gist: 'k6 scenarios place-orders / browse / order-history on 200k-order seed; 3-run median baseline; pick 1–2 by pg_stat_statements + EXPLAIN; docs/perf/README.md (delegated).' },
   { n: 36, title: 'Image publishing: GHCR tags, CI trigger, size targets', type: 'grilling', state: 'closed', blockedBy: [31], gist: 'Dockerfile per service on eclipse-temurin:21-jre-alpine, layered, non-root, <300 MB; sha-*/main on main, semver/latest on v*; PRs build only; amd64 (delegated).' },
   { n: 37, title: 'README and demo content', type: 'grilling', state: 'closed', blockedBy: [33, 34, 35], gist: '15-section README with Mermaid diagram; <30 s GIF via simulator watch + Grafana; screenshots; docs/ai-usage.md (delegated).' },
-  { n: 38, title: 'Write docs/PLAN.md', type: 'task', state: 'open', blockedBy: [31, 32, 33, 34, 35, 36, 37], q: 'Milestones M0 to M8 as small PRs with scope, tests and decision links; then the final wayfinder verify pass.' },
+  { n: 38, title: 'Write docs/PLAN.md', type: 'task', state: 'closed', blockedBy: [31, 32, 33, 34, 35, 36, 37], gist: 'docs/PLAN.md written: M0–M8 as about 42 PRs with scope, tests and decisions; three gate passes, the last with no blocking holes.' },
   { n: 42, title: 'Gate findings: holes in the first PLAN.md draft', type: 'grilling', state: 'closed', gist: 'Dispatch-owned dispatch_orders; OrderPickedUp reaches dispatch; M5 in 6 working steps; all event payloads, error codes, response and STOMP shapes, courier rules and outbox settings defined (delegated).' },
 ];
 
