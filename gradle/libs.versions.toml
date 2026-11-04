@@ -20,10 +20,17 @@ spring-modulith-bom = { module = "org.springframework.modulith:spring-modulith-b
 spring-boot-starter-webmvc = { module = "org.springframework.boot:spring-boot-starter-webmvc" }
 spring-boot-starter-validation = { module = "org.springframework.boot:spring-boot-starter-validation" }
 spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator" }
+spring-boot-starter-data-jpa = { module = "org.springframework.boot:spring-boot-starter-data-jpa" }
+spring-boot-starter-flyway = { module = "org.springframework.boot:spring-boot-starter-flyway" }
+flyway-database-postgresql = { module = "org.flywaydb:flyway-database-postgresql" }
+postgresql = { module = "org.postgresql:postgresql" }
 spring-modulith-starter-core = { module = "org.springframework.modulith:spring-modulith-starter-core" }
 spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
 spring-modulith-starter-test = { module = "org.springframework.modulith:spring-modulith-starter-test" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+spring-boot-testcontainers = { module = "org.springframework.boot:spring-boot-testcontainers" }
+testcontainers-junit-jupiter = { module = "org.testcontainers:testcontainers-junit-jupiter" }
+testcontainers-postgresql = { module = "org.testcontainers:testcontainers-postgresql" }
 
 # Plugins used by build-logic, declared as libraries so the convention plugin can apply them
 spotless-gradle = { module = "com.diffplug.spotless:spotless-plugin-gradle", version.ref = "spotless" }
