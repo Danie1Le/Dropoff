@@ -237,6 +237,21 @@ class MerchantApiIT {
     }
 
     @Test
+    void rejectsAControlCharacterOnlyNameOnUpdate() {
+        long id = createdId(create(TACO_SHOP));
+
+        MvcTestResult result = patch(id, "{\"name\":\"\\u0001\"}");
+
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("VALIDATION_FAILED");
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.errors[*].field")
+                .asArray()
+                .containsExactly("name");
+    }
+
+    @Test
     void acceptsANameWithALineBreakOnUpdateLikeOnCreate() {
         long id = createdId(create(TACO_SHOP));
 

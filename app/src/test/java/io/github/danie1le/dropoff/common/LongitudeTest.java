@@ -34,9 +34,9 @@ class LongitudeTest {
     void rejectsValuesBeyondTheAntimeridian() {
         assertThat(VALIDATOR.validate(new Point(-180.01)))
                 .extracting(ConstraintViolation::getMessage)
-                .containsExactly("must be greater than or equal to -180");
+                .containsExactly("must be between -180 and 180");
         assertThat(VALIDATOR.validate(new Point(180.01)))
                 .extracting(ConstraintViolation::getMessage)
-                .containsExactly("must be less than or equal to 180");
+                .containsExactly("must be between -180 and 180");
     }
 }

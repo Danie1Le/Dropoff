@@ -34,9 +34,9 @@ class LatitudeTest {
     void rejectsValuesBeyondThePoles() {
         assertThat(VALIDATOR.validate(new Point(-90.01)))
                 .extracting(ConstraintViolation::getMessage)
-                .containsExactly("must be greater than or equal to -90");
+                .containsExactly("must be between -90 and 90");
         assertThat(VALIDATOR.validate(new Point(90.01)))
                 .extracting(ConstraintViolation::getMessage)
-                .containsExactly("must be less than or equal to 90");
+                .containsExactly("must be between -90 and 90");
     }
 }

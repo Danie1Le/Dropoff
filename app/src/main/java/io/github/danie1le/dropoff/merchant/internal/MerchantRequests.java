@@ -27,7 +27,11 @@ final class MerchantRequests {
             @NotNull @Latitude Double lat,
             @NotNull @Longitude Double lng) {
 
+        /** The location. {@code @Valid} rejects a missing lat or lng before this is called. */
         Location location() {
+            if (lat == null || lng == null) {
+                throw new IllegalStateException("lat and lng are required; validate with @Valid first");
+            }
             return new Location(address, lat, lng);
         }
     }
@@ -41,14 +45,23 @@ final class MerchantRequests {
             @Nullable @Latitude Double lat,
             @Nullable @Longitude Double lng) {
 
+        /** True when address, lat and lng are all given or all absent. {@link AddressChangedTogether} checks this. */
+        boolean locationIsCompleteOrAbsent() {
+            boolean hasAddress = address != null;
+            boolean hasLat = lat != null;
+            boolean hasLng = lng != null;
+            return hasAddress == hasLat && hasLat == hasLng;
+        }
+
         /** The new location, or null when it doesn't change. {@link AddressChangedTogether} rejects a partial one. */
         @Nullable
         Location location() {
-            if (address == null && lat == null && lng == null) {
-                return null;
+            if (!locationIsCompleteOrAbsent()) {
+                throw new IllegalStateException("location is incomplete; validate with @AddressChangedTogether first");
             }
             if (address == null || lat == null || lng == null) {
-                throw new IllegalStateException("address, lat and lng must be given together");
+                // Complete or absent, so one missing field means all are absent.
+                return null;
             }
             return new Location(address, lat, lng);
         }
@@ -84,15 +97,12 @@ final class MerchantRequests {
 
         @Override
         public boolean isValid(@Nullable UpdateMerchant request, ConstraintValidatorContext context) {
-            if (request == null) {
+            if (request == null || request.locationIsCompleteOrAbsent()) {
                 return true;
             }
             boolean hasAddress = request.address() != null;
             boolean hasLat = request.lat() != null;
             boolean hasLng = request.lng() != null;
-            if (hasAddress == hasLat && hasLat == hasLng) {
-                return true;
-            }
             context.disableDefaultConstraintViolation();
             if (!hasAddress) {
                 reportMissing(context, "address");

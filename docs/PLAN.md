@@ -72,7 +72,7 @@ These apply across many PRs, and #42 is the source for all of them.
 
 **Merchant body** (from `POST /api/v1/merchants`, `GET` and `PATCH /api/v1/merchants/{id}`, and each item of the list): `{id, name, address, lat, lng, open}`.
 
-PATCH bodies: an absent or null field means unchanged; to change a location send address, lat and lng together.
+PATCH bodies: an absent or null field means unchanged; to change a location send address, lat and lng together. Text fields (names, addresses) are trimmed of leading and trailing whitespace before they are stored; a value that is empty after trimming is rejected as blank.
 
 **STOMP messages** on `/topic/orders/{id}`:
 - `{type: "STATUS", orderId, status, actor, at}`

@@ -43,4 +43,11 @@ class NotBlankIfPresentTest {
                 .extracting(ConstraintViolation::getMessage)
                 .containsExactly("must not be blank");
     }
+
+    @Test
+    void rejectsAControlCharacterOnlyValue() {
+        assertThat(VALIDATOR.validate(new Named("\u0001")))
+                .extracting(ConstraintViolation::getMessage)
+                .containsExactly("must not be blank");
+    }
 }
