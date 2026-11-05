@@ -33,6 +33,16 @@ class MerchantRequestsTest {
     }
 
     @Test
+    void missingLocationFieldsNamesEachAbsentFieldOfAPartialLocation() {
+        assertThat(new UpdateMerchant(null, null, null, 30.0, null).missingLocationFields())
+                .containsExactly("address", "lng");
+        assertThat(new UpdateMerchant(null, null, null, null, null).missingLocationFields())
+                .isEmpty();
+        assertThat(new UpdateMerchant(null, null, "500 Lamar Blvd", 30.27, -97.75).missingLocationFields())
+                .isEmpty();
+    }
+
+    @Test
     void createWithoutALatitudeThrows() {
         CreateMerchant request = new CreateMerchant("Taco Shop", "100 Congress Ave", null, -97.7431);
 

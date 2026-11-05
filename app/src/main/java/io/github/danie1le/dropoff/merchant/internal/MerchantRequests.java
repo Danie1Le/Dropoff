@@ -14,6 +14,8 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.util.ArrayList;
+import java.util.List;
 import org.jspecify.annotations.Nullable;
 
 /** Request and response bodies of the merchant endpoints (ticket #9). */
@@ -47,10 +49,28 @@ final class MerchantRequests {
 
         /** True when address, lat and lng are all given or all absent. {@link AddressChangedTogether} checks this. */
         boolean locationIsCompleteOrAbsent() {
-            boolean hasAddress = address != null;
-            boolean hasLat = lat != null;
-            boolean hasLng = lng != null;
-            return hasAddress == hasLat && hasLat == hasLng;
+            return missingLocationFields().isEmpty();
+        }
+
+        /**
+         * The names of the absent location fields, in the order address, lat, lng. Empty when all three are given or
+         * all three are absent.
+         */
+        List<String> missingLocationFields() {
+            if (address == null && lat == null && lng == null) {
+                return List.of();
+            }
+            List<String> missing = new ArrayList<>();
+            if (address == null) {
+                missing.add("address");
+            }
+            if (lat == null) {
+                missing.add("lat");
+            }
+            if (lng == null) {
+                missing.add("lng");
+            }
+            return List.copyOf(missing);
         }
 
         /** The new location, or null when it doesn't change. {@link AddressChangedTogether} rejects a partial one. */
@@ -97,21 +117,16 @@ final class MerchantRequests {
 
         @Override
         public boolean isValid(@Nullable UpdateMerchant request, ConstraintValidatorContext context) {
-            if (request == null || request.locationIsCompleteOrAbsent()) {
+            if (request == null) {
                 return true;
             }
-            boolean hasAddress = request.address() != null;
-            boolean hasLat = request.lat() != null;
-            boolean hasLng = request.lng() != null;
+            List<String> missing = request.missingLocationFields();
+            if (missing.isEmpty()) {
+                return true;
+            }
             context.disableDefaultConstraintViolation();
-            if (!hasAddress) {
-                reportMissing(context, "address");
-            }
-            if (!hasLat) {
-                reportMissing(context, "lat");
-            }
-            if (!hasLng) {
-                reportMissing(context, "lng");
+            for (String field : missing) {
+                reportMissing(context, field);
             }
             return false;
         }
