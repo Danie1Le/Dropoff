@@ -61,6 +61,23 @@ class OrderCommandService {
         return OrderResponse.of(apply(orderId, c -> c == customerId, command, Actor.CUSTOMER));
     }
 
+    /**
+     * Cancels, as {@link Actor#SYSTEM}, the oldest order still PLACED before {@code cutoff} (decisions #13, #14). The
+     * row is locked with {@code SKIP LOCKED}, so concurrent runs each take a different order.
+     *
+     * @return whether an order was cancelled; {@code false} means none is left to cancel
+     */
+    @Transactional
+    boolean cancelOldestPlacedBefore(Instant cutoff) {
+        Optional<Long> id = jdbc.sql("SELECT id FROM orders WHERE status = 'PLACED' AND created_at < :cutoff"
+                        + " ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED")
+                .param("cutoff", Timestamp.from(cutoff))
+                .query(Long.class)
+                .optional();
+        id.ifPresent(orderId -> apply(orderId, owner -> true, OrderCommand.CANCEL, Actor.SYSTEM));
+        return id.isPresent();
+    }
+
     private Order apply(long orderId, LongPredicate owns, OrderCommand command, Actor actor) {
         Order order = orders.findById(orderId).orElseThrow(() -> notFound(orderId));
         long owner = actor == Actor.MERCHANT ? order.merchantId() : order.customerId();
