@@ -100,6 +100,10 @@ class Order {
         return Objects.requireNonNull(id, "order is not saved yet");
     }
 
+    String requestHash() {
+        return requestHash;
+    }
+
     long customerId() {
         return customerId;
     }

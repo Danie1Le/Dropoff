@@ -546,7 +546,7 @@ const MILESTONES = [
     { t: 'Cancellation only from PLACED or ACCEPTED', done: true },
     { t: 'Auto-cancel job every 30 s: PLACED for 10 min → CANCELLED, actor SYSTEM (limit is a config property)' },
     { t: 'Auto-cancel job safe on N instances: FOR UPDATE SKIP LOCKED, one row per transaction, at most 50 rows per run' },
-    { t: 'Idempotency-Key: same key → same order; changed body → 422' },
+    { t: 'Idempotency-Key: same key → same order; changed body → 422', done: true },
     { t: 'order_events row for every status change, with its actor (CHECK-guarded)' },
     { t: 'TDD unit tests for the state machine', done: true },
   ]},
