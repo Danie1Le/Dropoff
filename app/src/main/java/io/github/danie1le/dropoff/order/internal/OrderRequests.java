@@ -31,17 +31,14 @@ final class OrderRequests {
             @Nullable Long courierId,
             OrderStatus status,
             long totalCents,
-            DeliveryAddress deliveryAddress,
+            Location deliveryAddress,
             List<LineResponse> lines,
             Instant createdAt,
             Instant updatedAt) {
 
-        record DeliveryAddress(String address, double lat, double lng) {}
-
         record LineResponse(long menuItemId, int quantity, long priceCents) {}
 
         static OrderResponse of(Order order) {
-            Location to = order.deliveryAddress();
             return new OrderResponse(
                     order.id(),
                     order.customerId(),
@@ -49,7 +46,7 @@ final class OrderRequests {
                     order.courierId(),
                     order.status(),
                     order.totalCents(),
-                    new DeliveryAddress(to.address(), to.lat(), to.lng()),
+                    order.deliveryAddress(),
                     order.lines().stream()
                             .map(l -> new LineResponse(l.menuItemId(), l.quantity(), l.priceCents()))
                             .toList(),

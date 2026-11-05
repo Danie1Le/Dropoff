@@ -1,5 +1,6 @@
 package io.github.danie1le.dropoff.order.internal;
 
+import io.github.danie1le.dropoff.order.Actor;
 import java.util.EnumSet;
 import java.util.Set;
 

@@ -47,7 +47,7 @@ class OrderCommandEventsIT {
                 .matching(e -> e.orderId() == f.orderId())
                 .toArriveAndVerify(e -> {
                     assertThat(e.merchantId()).isEqualTo(f.merchantId());
-                    assertThat(e.actor()).isEqualTo("CUSTOMER");
+                    assertThat(e.actor()).isEqualTo(Actor.CUSTOMER);
                     assertThat(e.eventId()).isNotNull();
                     assertThat(e.occurredAt()).isNotNull();
                 });

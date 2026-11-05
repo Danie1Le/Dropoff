@@ -4,13 +4,14 @@ import io.github.danie1le.dropoff.common.DomainException;
 import io.github.danie1le.dropoff.merchant.MerchantCatalog;
 import io.github.danie1le.dropoff.merchant.MerchantCatalog.MenuItemView;
 import io.github.danie1le.dropoff.merchant.MerchantCatalog.MerchantView;
+import io.github.danie1le.dropoff.order.Actor;
 import io.github.danie1le.dropoff.order.OrderPlaced;
 import io.github.danie1le.dropoff.order.internal.OrderRequests.OrderResponse;
 import io.github.danie1le.dropoff.order.internal.OrderRequests.PlaceOrder;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.sql.Timestamp;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -36,18 +37,21 @@ class OrderService {
     private final MerchantCatalog catalog;
     private final JdbcClient jdbc;
     private final ApplicationEventPublisher events;
+    private final Clock clock;
 
     OrderService(
             OrderRepository orders,
             CustomerRepository customers,
             MerchantCatalog catalog,
             JdbcClient jdbc,
-            ApplicationEventPublisher events) {
+            ApplicationEventPublisher events,
+            Clock clock) {
         this.orders = orders;
         this.customers = customers;
         this.catalog = catalog;
         this.jdbc = jdbc;
         this.events = events;
+        this.clock = clock;
     }
 
     /** The outcome of a place-order request: the order, and whether it was an earlier order replayed. */
@@ -101,19 +105,10 @@ class OrderService {
         });
 
         // Postgres keeps microseconds; truncate so the response matches what a replay reads back.
-        Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
-        Order order = orders.save(new Order(
-                customerId,
-                merchantId,
-                new Location(customer.address(), customer.lat(), customer.lng()),
-                lines,
-                idempotencyKey,
-                requestHash,
-                now));
-        jdbc.sql("INSERT INTO order_events (order_id, from_status, to_status, actor, created_at)"
-                        + " VALUES (?, NULL, ?, ?, ?)")
-                .params(order.id(), OrderStatus.PLACED.name(), Actor.CUSTOMER.name(), Timestamp.from(now))
-                .update();
+        Instant now = clock.instant().truncatedTo(ChronoUnit.MICROS);
+        Order order = orders.save(
+                new Order(customerId, merchantId, customer.location(), lines, idempotencyKey, requestHash, now));
+        OrderEventLog.record(jdbc, order.id(), null, OrderStatus.PLACED, Actor.CUSTOMER, now);
         events.publishEvent(
                 new OrderPlaced(UUID.randomUUID(), order.id(), customerId, merchantId, order.totalCents(), now));
         return new Placement(order.id(), OrderResponse.of(order), false);

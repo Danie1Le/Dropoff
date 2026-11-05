@@ -43,7 +43,7 @@ class CustomerService {
         return new Location(location.address().trim(), location.lat(), location.lng());
     }
 
-    private static DomainException notFound(long id) {
+    static DomainException notFound(long id) {
         return new DomainException(
                 DomainException.Category.NOT_FOUND, "CUSTOMER_NOT_FOUND", "Customer " + id + " does not exist.");
     }

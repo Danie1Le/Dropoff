@@ -49,16 +49,8 @@ class Customer {
         return name;
     }
 
-    String address() {
-        return address;
-    }
-
-    double lat() {
-        return lat;
-    }
-
-    double lng() {
-        return lng;
+    Location location() {
+        return new Location(address, lat, lng);
     }
 
     void rename(String newName) {

@@ -3,12 +3,15 @@ package io.github.danie1le.dropoff.order.internal;
 import io.github.danie1le.dropoff.common.DomainException;
 import io.github.danie1le.dropoff.merchant.MerchantCatalog;
 import io.github.danie1le.dropoff.merchant.MerchantCatalog.MerchantView;
+import io.github.danie1le.dropoff.order.Actor;
 import io.github.danie1le.dropoff.order.OrderCancelled;
 import io.github.danie1le.dropoff.order.OrderReady;
 import io.github.danie1le.dropoff.order.internal.OrderRequests.OrderResponse;
 import jakarta.persistence.EntityManager;
 import java.sql.Timestamp;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.LongPredicate;
@@ -30,18 +33,21 @@ class OrderCommandService {
     private final JdbcClient jdbc;
     private final EntityManager entityManager;
     private final ApplicationEventPublisher events;
+    private final Clock clock;
 
     OrderCommandService(
             OrderRepository orders,
             MerchantCatalog catalog,
             JdbcClient jdbc,
             EntityManager entityManager,
-            ApplicationEventPublisher events) {
+            ApplicationEventPublisher events,
+            Clock clock) {
         this.orders = orders;
         this.catalog = catalog;
         this.jdbc = jdbc;
         this.entityManager = entityManager;
         this.events = events;
+        this.clock = clock;
     }
 
     @Transactional(readOnly = true)
@@ -80,14 +86,20 @@ class OrderCommandService {
 
     private Order apply(long orderId, LongPredicate owns, OrderCommand command, Actor actor) {
         Order order = orders.findById(orderId).orElseThrow(() -> notFound(orderId));
-        long owner = actor == Actor.MERCHANT ? order.merchantId() : order.customerId();
-        if (!owns.test(owner)) {
+        boolean owned = switch (actor) {
+            case MERCHANT -> owns.test(order.merchantId());
+            case CUSTOMER -> owns.test(order.customerId());
+            case SYSTEM -> true;
+            case COURIER -> throw new IllegalStateException("courier commands are not built yet (M3)");
+        };
+        if (!owned) {
             throw notFound(orderId);
         }
         if (OrderStatusRules.decide(order.status(), command, actor) instanceof StatusDecision.NoOp) {
             return order;
         }
-        Instant now = Instant.now();
+        // Postgres keeps microseconds; truncate so events match what is stored.
+        Instant now = clock.instant().truncatedTo(ChronoUnit.MICROS);
         // Conditional update: the FOR UPDATE sub-select waits for a racing command and re-reads the row, so only the
         // first command moves the order, and RETURNING gives the status it really left.
         Optional<String> from = jdbc.sql("UPDATE orders o SET status = :to, updated_at = :now"
@@ -105,14 +117,7 @@ class OrderCommandService {
             OrderStatusRules.decide(order.status(), command, actor);
             return order;
         }
-        jdbc.sql("INSERT INTO order_events (order_id, from_status, to_status, actor, created_at)"
-                        + " VALUES (:id, :from, :to, :actor, :now)")
-                .param("id", orderId)
-                .param("from", from.get())
-                .param("to", command.target().name())
-                .param("actor", actor.name())
-                .param("now", Timestamp.from(now))
-                .update();
+        OrderEventLog.record(jdbc, orderId, from.get(), command.target(), actor, now);
         publish(order, command, actor, now);
         return order;
     }
@@ -120,12 +125,11 @@ class OrderCommandService {
     private void publish(Order order, OrderCommand command, Actor actor, Instant now) {
         switch (command) {
             case CANCEL ->
-                events.publishEvent(
-                        new OrderCancelled(UUID.randomUUID(), order.id(), order.merchantId(), actor.name(), now));
+                events.publishEvent(new OrderCancelled(UUID.randomUUID(), order.id(), order.merchantId(), actor, now));
             case MARK_READY -> {
                 MerchantView merchant = catalog.findMerchant(order.merchantId())
                         .orElseThrow(() -> new IllegalStateException("order's merchant is gone"));
-                Location to = order.deliveryAddress();
+                Location delivery = order.deliveryAddress();
                 events.publishEvent(new OrderReady(
                         UUID.randomUUID(),
                         order.id(),
@@ -134,9 +138,9 @@ class OrderCommandService {
                         merchant.address(),
                         merchant.lat(),
                         merchant.lng(),
-                        to.address(),
-                        to.lat(),
-                        to.lng(),
+                        delivery.address(),
+                        delivery.lat(),
+                        delivery.lng(),
                         now,
                         now));
             }

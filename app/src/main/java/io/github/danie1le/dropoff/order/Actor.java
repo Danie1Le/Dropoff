@@ -1,7 +1,7 @@
-package io.github.danie1le.dropoff.order.internal;
+package io.github.danie1le.dropoff.order;
 
 /** Who changed an order's status (ticket #10). Names match the {@code order_events.actor} CHECK. */
-enum Actor {
+public enum Actor {
     CUSTOMER,
     MERCHANT,
     COURIER,

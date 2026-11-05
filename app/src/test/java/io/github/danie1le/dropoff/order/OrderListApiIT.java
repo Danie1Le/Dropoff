@@ -95,4 +95,33 @@ class OrderListApiIT {
 
         assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
     }
+
+    @Test
+    void unknownMerchantIsNotFound() {
+        var result = mvc.get().uri("/api/v1/merchants/999999999/orders").exchange();
+
+        assertThat(result).hasStatus(HttpStatus.NOT_FOUND);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("MERCHANT_NOT_FOUND");
+    }
+
+    @Test
+    void unknownCustomerIsNotFound() {
+        var result = mvc.get().uri("/api/v1/customers/999999999/orders").exchange();
+
+        assertThat(result).hasStatus(HttpStatus.NOT_FOUND);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("CUSTOMER_NOT_FOUND");
+    }
+
+    @Test
+    void invalidStatusIsAValidationProblem() {
+        long m = PlaceOrderApiIT.merchant(jdbc, true);
+
+        var result =
+                mvc.get().uri("/api/v1/merchants/{id}/orders?status=BOGUS", m).exchange();
+
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(result).hasContentType("application/problem+json");
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("VALIDATION_FAILED");
+        assertThat(result).bodyJson().extractingPath("$.errors[0].field").isEqualTo("status");
+    }
 }

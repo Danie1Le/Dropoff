@@ -1,6 +1,7 @@
 package io.github.danie1le.dropoff.order.internal;
 
 import io.github.danie1le.dropoff.common.DomainException;
+import io.github.danie1le.dropoff.order.Actor;
 
 /**
  * The order status rules in pure Java (tickets #3, #10, #13). PLACED → ACCEPTED → PREPARING → READY → PICKED_UP →
@@ -32,6 +33,6 @@ final class OrderStatusRules {
                     "INVALID_STATUS_TRANSITION",
                     "The order's current status does not allow this step.");
         }
-        return new StatusDecision.Move(current, command.target());
+        return new StatusDecision.Move();
     }
 }

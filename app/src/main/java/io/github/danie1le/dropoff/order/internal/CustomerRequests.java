@@ -83,8 +83,9 @@ final class CustomerRequests {
     record CustomerResponse(long id, String name, String address, double lat, double lng) {
 
         static CustomerResponse of(Customer customer) {
+            Location location = customer.location();
             return new CustomerResponse(
-                    customer.id(), customer.name(), customer.address(), customer.lat(), customer.lng());
+                    customer.id(), customer.name(), location.address(), location.lat(), location.lng());
         }
     }
 
