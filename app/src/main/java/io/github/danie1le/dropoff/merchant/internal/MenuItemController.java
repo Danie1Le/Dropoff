@@ -4,6 +4,7 @@ import io.github.danie1le.dropoff.merchant.internal.MenuItemRequests.CreateMenuI
 import io.github.danie1le.dropoff.merchant.internal.MenuItemRequests.MenuItemResponse;
 import jakarta.validation.Valid;
 import java.net.URI;
+import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -30,6 +31,11 @@ class MenuItemController {
                 .buildAndExpand(item.id())
                 .toUri();
         return ResponseEntity.created(location).body(MenuItemResponse.of(item));
+    }
+
+    @GetMapping("/merchants/{id}/menu")
+    List<MenuItemResponse> menu(@PathVariable long id) {
+        return service.menu(id).stream().map(MenuItemResponse::of).toList();
     }
 
     @GetMapping("/menu-items/{id}")

@@ -192,6 +192,65 @@ class MenuItemApiIT {
     }
 
     @Test
+    void readsAMerchantsWholeMenuInIdOrderIncludingUnavailableItems() {
+        long merchantId = merchant();
+        long first = idFromLocation(addItem(merchantId, """
+                {"name":"Horchata","priceCents":250}
+                """));
+        // Inserted directly: the API cannot yet mark an item unavailable (#61).
+        long second = jdbc.queryForObject(
+                "INSERT INTO menu_items (merchant_id, name, price_cents, is_available)"
+                        + " VALUES (?, 'Salsa', 0, FALSE) RETURNING id",
+                Long.class,
+                merchantId);
+        addItem(merchant(), """
+                {"name":"Other Shop Taco","priceCents":100}
+                """);
+
+        MvcTestResult result =
+                mvc.get().uri("/api/v1/merchants/{id}/menu", merchantId).exchange();
+
+        assertThat(result).hasStatusOk();
+        assertThat(result).bodyJson().isStrictlyEqualTo("""
+                [{"id":%d,"merchantId":%d,"name":"Horchata","priceCents":250,"available":true},
+                 {"id":%d,"merchantId":%d,"name":"Salsa","priceCents":0,"available":false}]
+                """.formatted(first, merchantId, second, merchantId));
+    }
+
+    @Test
+    void readsAnEmptyMenu() {
+        MvcTestResult result =
+                mvc.get().uri("/api/v1/merchants/{id}/menu", merchant()).exchange();
+
+        assertThat(result).hasStatusOk();
+        assertThat(result).bodyJson().isStrictlyEqualTo("[]");
+    }
+
+    @Test
+    void readsAClosedMerchantsMenu() {
+        long merchantId = merchant();
+        addItem(merchantId, """
+                {"name":"Horchata","priceCents":250}
+                """);
+        jdbc.update("UPDATE merchants SET is_open = FALSE WHERE id = ?", merchantId);
+
+        MvcTestResult result =
+                mvc.get().uri("/api/v1/merchants/{id}/menu", merchantId).exchange();
+
+        assertThat(result).hasStatusOk();
+        assertThat(result).bodyJson().extractingPath("$[*].name").asArray().containsExactly("Horchata");
+    }
+
+    @Test
+    void reportsAnUnknownMerchantsMenuAsNotFound() {
+        MvcTestResult result =
+                mvc.get().uri("/api/v1/merchants/{id}/menu", 999_999).exchange();
+
+        assertThat(result).hasStatus(HttpStatus.NOT_FOUND);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("MERCHANT_NOT_FOUND");
+    }
+
+    @Test
     void databaseRejectsANegativePrice() {
         long merchantId = merchant();
 

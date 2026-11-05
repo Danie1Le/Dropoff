@@ -2,6 +2,7 @@ package io.github.danie1le.dropoff.merchant.internal;
 
 import io.github.danie1le.dropoff.common.DomainException;
 import io.github.danie1le.dropoff.merchant.internal.MenuItemRequests.CreateMenuItem;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +27,13 @@ class MenuItemService {
     @Transactional(readOnly = true)
     MenuItem get(long id) {
         return items.findById(id).orElseThrow(() -> notFound(id));
+    }
+
+    /** The whole menu, available or not, ordered by id. A closed merchant's menu is still readable. */
+    @Transactional(readOnly = true)
+    List<MenuItem> menu(long merchantId) {
+        Merchant merchant = merchants.get(merchantId);
+        return items.findByMerchantIdOrderById(merchant.id());
     }
 
     private static DomainException notFound(long id) {
