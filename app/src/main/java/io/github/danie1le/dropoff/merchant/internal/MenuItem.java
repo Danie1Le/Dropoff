@@ -60,4 +60,16 @@ class MenuItem {
     boolean isAvailable() {
         return available;
     }
+
+    void rename(String name) {
+        this.name = name;
+    }
+
+    void reprice(long priceCents) {
+        this.priceCents = priceCents;
+    }
+
+    void setAvailable(boolean available) {
+        this.available = available;
+    }
 }
