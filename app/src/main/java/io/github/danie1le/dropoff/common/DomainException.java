@@ -2,7 +2,9 @@ package io.github.danie1le.dropoff.common;
 
 /**
  * A broken business rule. Domain code throws it without knowing about HTTP; the web layer maps the {@link Category}
- * to a status code and puts {@link #code()} in the error body so clients can branch on it (ticket #8).
+ * to a status code and puts {@link #code()} in the error body so clients can branch on it (ticket #8). The message is
+ * shown to API clients as {@code detail}, so it must be a fixed, human-readable sentence and never include secrets,
+ * stack details or raw input.
  */
 public class DomainException extends RuntimeException {
 

@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import java.util.List;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PagedModel;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -50,7 +51,7 @@ class ProbeController {
 
     @GetMapping("/page")
     PagedModel<String> page(@Valid PageParams params) {
-        var pageable = params.toPageable();
+        Pageable pageable = params.toPageable();
         return new PagedModel<>(new PageImpl<>(List.of("a", "b"), pageable, 2));
     }
 }

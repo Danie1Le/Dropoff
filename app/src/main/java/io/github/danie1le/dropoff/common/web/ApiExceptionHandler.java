@@ -17,6 +17,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.validation.method.ParameterErrors;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
@@ -35,6 +36,7 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final String CODE = "code";
     private static final String ERRORS = "errors";
+    private static final String TYPE_MISMATCH = "typeMismatch";
 
     /** One invalid input: which field or parameter, and why. */
     record FieldViolation(String field, String message) {}
@@ -73,7 +75,8 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                     if (result instanceof ParameterErrors errors) {
                         return errors.getFieldErrors().stream().map(ApiExceptionHandler::violation);
                     }
-                    String name = String.valueOf(result.getMethodParameter().getParameterName());
+                    String parameterName = result.getMethodParameter().getParameterName();
+                    String name = parameterName == null ? "parameter" : parameterName;
                     return result.getResolvableErrors().stream().map(error -> new FieldViolation(name, message(error)));
                 })
                 .toList();
@@ -83,21 +86,26 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @Override
     protected ResponseEntity<Object> handleTypeMismatch(
             TypeMismatchException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        String propertyName = ex.getPropertyName();
         String name = ex instanceof MethodArgumentTypeMismatchException mismatch
                 ? mismatch.getName()
-                : String.valueOf(ex.getPropertyName());
-        Class<?> requiredType = ex.getRequiredType();
-        String expected = requiredType == null ? "value" : requiredType.getSimpleName();
-        return validationFailed(List.of(new FieldViolation(name, "must be a valid " + expected)), headers);
+                : propertyName == null ? "value" : propertyName;
+        return validationFailed(List.of(new FieldViolation(name, mustBeValid(ex.getRequiredType()))), headers);
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleMissingServletRequestParameter(
+            MissingServletRequestParameterException ex,
+            HttpHeaders headers,
+            HttpStatusCode status,
+            WebRequest request) {
+        return validationFailed(List.of(new FieldViolation(ex.getParameterName(), "is required")), headers);
     }
 
     @Override
     protected ResponseEntity<Object> handleHttpMessageNotReadable(
             HttpMessageNotReadableException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
-        HttpStatus badRequest = HttpStatus.BAD_REQUEST;
-        return ResponseEntity.status(badRequest)
-                .headers(headers)
-                .body(problem(badRequest, "MALFORMED_REQUEST", "The request body could not be read."));
+        return badRequest("MALFORMED_REQUEST", "The request body could not be read.", headers, null);
     }
 
     /**
@@ -115,11 +123,18 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return response;
     }
 
-    private ResponseEntity<Object> validationFailed(List<FieldViolation> violations, HttpHeaders headers) {
+    private static ResponseEntity<Object> validationFailed(List<FieldViolation> violations, HttpHeaders headers) {
+        return badRequest("VALIDATION_FAILED", "The request has invalid fields.", headers, violations);
+    }
+
+    private static ResponseEntity<Object> badRequest(
+            String code, String detail, HttpHeaders headers, @Nullable List<FieldViolation> errors) {
         HttpStatus badRequest = HttpStatus.BAD_REQUEST;
-        ProblemDetail detail = problem(badRequest, "VALIDATION_FAILED", "The request has invalid fields.");
-        detail.setProperty(ERRORS, violations);
-        return ResponseEntity.status(badRequest).headers(headers).body(detail);
+        ProblemDetail problem = problem(badRequest, code, detail);
+        if (errors != null) {
+            problem.setProperty(ERRORS, errors);
+        }
+        return ResponseEntity.status(badRequest).headers(headers).body(problem);
     }
 
     private static ProblemDetail problem(HttpStatus status, String code, @Nullable String detail) {
@@ -135,7 +150,17 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     private static FieldViolation violation(FieldError error) {
+        if (TYPE_MISMATCH.equals(error.getCode())) {
+            Class<?> requiredType = error.contains(TypeMismatchException.class)
+                    ? error.unwrap(TypeMismatchException.class).getRequiredType()
+                    : null;
+            return new FieldViolation(error.getField(), mustBeValid(requiredType));
+        }
         return new FieldViolation(error.getField(), message(error));
+    }
+
+    private static String mustBeValid(@Nullable Class<?> requiredType) {
+        return "must be a valid " + (requiredType == null ? "value" : requiredType.getSimpleName());
     }
 
     private static String message(MessageSourceResolvable error) {

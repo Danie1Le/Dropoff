@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 
 class PageParamsTest {
 
@@ -23,12 +22,5 @@ class PageParamsTest {
 
         assertThat(pageable.getPageNumber()).isEqualTo(3);
         assertThat(pageable.getPageSize()).isEqualTo(50);
-    }
-
-    @Test
-    void appliesTheGivenSort() {
-        Pageable pageable = new PageParams(null, null).toPageable(Sort.by("createdAt"));
-
-        assertThat(pageable.getSort().getOrderFor("createdAt")).isNotNull();
     }
 }

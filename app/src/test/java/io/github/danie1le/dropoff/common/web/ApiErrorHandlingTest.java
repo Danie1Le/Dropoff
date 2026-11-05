@@ -8,6 +8,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
+import org.springframework.test.web.servlet.assertj.MvcTestResult;
 
 @WebMvcTest(ProbeController.class)
 class ApiErrorHandlingTest {
@@ -26,7 +27,7 @@ class ApiErrorHandlingTest {
 
     @Test
     void mapsNotFoundDomainErrorsTo404WithTheirCode() {
-        var result = mvc.get().uri("/api/v1/probe/domain/NOT_FOUND");
+        MvcTestResult result = mvc.get().uri("/api/v1/probe/domain/NOT_FOUND").exchange();
 
         assertThat(result).hasStatus(HttpStatus.NOT_FOUND).hasContentType(MediaType.APPLICATION_PROBLEM_JSON);
         assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("PROBE_NOT_FOUND");
@@ -35,7 +36,7 @@ class ApiErrorHandlingTest {
 
     @Test
     void mapsConflictDomainErrorsTo409() {
-        var result = mvc.get().uri("/api/v1/probe/domain/CONFLICT");
+        MvcTestResult result = mvc.get().uri("/api/v1/probe/domain/CONFLICT").exchange();
 
         assertThat(result).hasStatus(HttpStatus.CONFLICT);
         assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("PROBE_CONFLICT");
@@ -43,7 +44,8 @@ class ApiErrorHandlingTest {
 
     @Test
     void mapsUnprocessableDomainErrorsTo422() {
-        var result = mvc.get().uri("/api/v1/probe/domain/UNPROCESSABLE");
+        MvcTestResult result =
+                mvc.get().uri("/api/v1/probe/domain/UNPROCESSABLE").exchange();
 
         assertThat(result).hasStatus(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("PROBE_UNPROCESSABLE");
@@ -51,20 +53,21 @@ class ApiErrorHandlingTest {
 
     @Test
     void reportsInvalidBodyFieldsAsValidationFailed() {
-        var result = mvc.post()
+        MvcTestResult result = mvc.post()
                 .uri("/api/v1/probe/body")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"\"}");
+                .content("{\"name\":\"\"}")
+                .exchange();
 
         assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
         assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("VALIDATION_FAILED");
         assertThat(result).bodyJson().extractingPath("$.errors[0].field").isEqualTo("name");
-        assertThat(result).bodyJson().extractingPath("$.errors[0].message").isNotNull();
+        assertThat(result).bodyJson().extractingPath("$.errors[0].message").isEqualTo("must not be blank");
     }
 
     @Test
     void reportsInvalidRequestParametersAsValidationFailed() {
-        var result = mvc.get().uri("/api/v1/probe/param?count=0");
+        MvcTestResult result = mvc.get().uri("/api/v1/probe/param?count=0").exchange();
 
         assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
         assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("VALIDATION_FAILED");
@@ -72,11 +75,22 @@ class ApiErrorHandlingTest {
     }
 
     @Test
+    void reportsMissingRequiredParameterAsValidationFailed() {
+        MvcTestResult result = mvc.get().uri("/api/v1/probe/param").exchange();
+
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("VALIDATION_FAILED");
+        assertThat(result).bodyJson().extractingPath("$.errors[0].field").isEqualTo("count");
+        assertThat(result).bodyJson().extractingPath("$.errors[0].message").isEqualTo("is required");
+    }
+
+    @Test
     void reportsUnreadableJsonAsMalformedRequestWithoutErrorsList() {
-        var result = mvc.post()
+        MvcTestResult result = mvc.post()
                 .uri("/api/v1/probe/body")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{not json");
+                .content("{not json")
+                .exchange();
 
         assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
         assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("MALFORMED_REQUEST");
@@ -85,7 +99,7 @@ class ApiErrorHandlingTest {
 
     @Test
     void reportsPathVariableTypeMismatchAsValidationFailed() {
-        var result = mvc.get().uri("/api/v1/probe/items/abc");
+        MvcTestResult result = mvc.get().uri("/api/v1/probe/items/abc").exchange();
 
         assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
         assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("VALIDATION_FAILED");
@@ -94,7 +108,7 @@ class ApiErrorHandlingTest {
 
     @Test
     void hidesInternalDetailsOfUnexpectedErrors() {
-        var result = mvc.get().uri("/api/v1/probe/boom");
+        MvcTestResult result = mvc.get().uri("/api/v1/probe/boom").exchange();
 
         assertThat(result).hasStatus(HttpStatus.INTERNAL_SERVER_ERROR);
         assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("INTERNAL_ERROR");
@@ -103,7 +117,7 @@ class ApiErrorHandlingTest {
 
     @Test
     void givesUnknownRoutesANotFoundCode() {
-        var result = mvc.get().uri("/api/v1/no-such-route");
+        MvcTestResult result = mvc.get().uri("/api/v1/no-such-route").exchange();
 
         assertThat(result).hasStatus(HttpStatus.NOT_FOUND).hasContentType(MediaType.APPLICATION_PROBLEM_JSON);
         assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("NOT_FOUND");
@@ -111,7 +125,7 @@ class ApiErrorHandlingTest {
 
     @Test
     void givesUnsupportedMethodsAMethodNotAllowedCode() {
-        var result = mvc.delete().uri("/api/v1/probe/items/7");
+        MvcTestResult result = mvc.delete().uri("/api/v1/probe/items/7").exchange();
 
         assertThat(result).hasStatus(HttpStatus.METHOD_NOT_ALLOWED);
         assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("METHOD_NOT_ALLOWED");
@@ -119,7 +133,7 @@ class ApiErrorHandlingTest {
 
     @Test
     void returnsPagesWithDefaultSizeAndPagedModelShape() {
-        var result = mvc.get().uri("/api/v1/probe/page");
+        MvcTestResult result = mvc.get().uri("/api/v1/probe/page").exchange();
 
         assertThat(result).hasStatusOk();
         assertThat(result).bodyJson().extractingPath("$.page.size").isEqualTo(20);
@@ -134,7 +148,7 @@ class ApiErrorHandlingTest {
 
     @Test
     void rejectsPageSizesAboveTheLimit() {
-        var result = mvc.get().uri("/api/v1/probe/page?size=101");
+        MvcTestResult result = mvc.get().uri("/api/v1/probe/page?size=101").exchange();
 
         assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
         assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("VALIDATION_FAILED");
@@ -142,8 +156,18 @@ class ApiErrorHandlingTest {
     }
 
     @Test
+    void rejectsNonNumericPageSizeAsValidationFailed() {
+        MvcTestResult result = mvc.get().uri("/api/v1/probe/page?size=abc").exchange();
+
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("VALIDATION_FAILED");
+        assertThat(result).bodyJson().extractingPath("$.errors[0].field").isEqualTo("size");
+        assertThat(result).bodyJson().extractingPath("$.errors[0].message").isEqualTo("must be a valid Integer");
+    }
+
+    @Test
     void rejectsNegativePageNumbers() {
-        var result = mvc.get().uri("/api/v1/probe/page?page=-1");
+        MvcTestResult result = mvc.get().uri("/api/v1/probe/page?page=-1").exchange();
 
         assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
         assertThat(result).bodyJson().extractingPath("$.errors[0].field").isEqualTo("page");
