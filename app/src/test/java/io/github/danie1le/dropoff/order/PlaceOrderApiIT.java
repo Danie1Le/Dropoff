@@ -1,0 +1,221 @@
+package io.github.danie1le.dropoff.order;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import io.github.danie1le.dropoff.TestcontainersConfiguration;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.test.web.servlet.assertj.MockMvcTester;
+import org.springframework.test.web.servlet.assertj.MvcTestResult;
+import org.springframework.transaction.annotation.Transactional;
+
+/** Placing an order end to end, against a real Postgres. Each test rolls back. */
+@SpringBootTest
+@AutoConfigureMockMvc
+@Import(TestcontainersConfiguration.class)
+@Transactional
+class PlaceOrderApiIT {
+
+    private final MockMvcTester mvc;
+    private final JdbcClient jdbc;
+
+    PlaceOrderApiIT(@Autowired MockMvcTester mvc, @Autowired JdbcClient jdbc) {
+        this.mvc = mvc;
+        this.jdbc = jdbc;
+    }
+
+    static long customer(JdbcClient jdbc) {
+        return jdbc.sql("INSERT INTO customers (name, address, lat, lng) VALUES ('Alice', '200 Lavaca St', 30.2669,"
+                        + " -97.7466) RETURNING id")
+                .query(Long.class)
+                .single();
+    }
+
+    static long merchant(JdbcClient jdbc, boolean open) {
+        return jdbc.sql("INSERT INTO merchants (name, address, lat, lng, is_open) VALUES ('Taco Shop', '100 Congress"
+                        + " Ave', 30.2672, -97.7431, ?) RETURNING id")
+                .param(open)
+                .query(Long.class)
+                .single();
+    }
+
+    static long item(JdbcClient jdbc, long merchantId, long priceCents, boolean available) {
+        return jdbc.sql("INSERT INTO menu_items (merchant_id, name, price_cents, is_available) VALUES (?, 'Taco', ?, ?)"
+                        + " RETURNING id")
+                .params(merchantId, priceCents, available)
+                .query(Long.class)
+                .single();
+    }
+
+    private MvcTestResult place(long customerId, long merchantId, String lines) {
+        return mvc.post()
+                .uri("/api/v1/orders")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"customerId\":%d,\"merchantId\":%d,\"lines\":%s}".formatted(customerId, merchantId, lines))
+                .exchange();
+    }
+
+    private static String line(long menuItemId, int quantity) {
+        return "{\"menuItemId\":%d,\"quantity\":%d}".formatted(menuItemId, quantity);
+    }
+
+    private static void assertRejected(MvcTestResult result, String code) {
+        assertThat(result).hasStatus(HttpStatus.UNPROCESSABLE_CONTENT);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo(code);
+    }
+
+    @Test
+    void placesAnOrderWithServerComputedTotalAndSnapshots() {
+        long customerId = customer(jdbc);
+        long merchantId = merchant(jdbc, true);
+        long taco = item(jdbc, merchantId, 399, true);
+        long soda = item(jdbc, merchantId, 150, true);
+
+        MvcTestResult result = place(customerId, merchantId, "[" + line(taco, 2) + "," + line(soda, 1) + "]");
+
+        assertThat(result).hasStatus(HttpStatus.CREATED);
+        assertThat(result.getResponse().getHeader(HttpHeaders.LOCATION)).matches(".*/api/v1/orders/\\d+");
+        assertThat(result).bodyJson().extractingPath("$.status").isEqualTo("PLACED");
+        assertThat(result).bodyJson().extractingPath("$.totalCents").isEqualTo(948);
+        assertThat(result).bodyJson().extractingPath("$.courierId").isNull();
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.deliveryAddress.address")
+                .isEqualTo("200 Lavaca St");
+        assertThat(result).bodyJson().extractingPath("$.deliveryAddress.lat").isEqualTo(30.2669);
+        assertThat(result).bodyJson().extractingPath("$.deliveryAddress.lng").isEqualTo(-97.7466);
+        assertThat(result).bodyJson().extractingPath("$.lines[0].menuItemId").isEqualTo((int) taco);
+        assertThat(result).bodyJson().extractingPath("$.lines[0].quantity").isEqualTo(2);
+        assertThat(result).bodyJson().extractingPath("$.lines[0].priceCents").isEqualTo(399);
+        assertThat(result).bodyJson().extractingPath("$.lines[1].priceCents").isEqualTo(150);
+    }
+
+    @Test
+    void mergesRepeatedMenuItemsIntoOneLine() {
+        long customerId = customer(jdbc);
+        long merchantId = merchant(jdbc, true);
+        long taco = item(jdbc, merchantId, 399, true);
+
+        MvcTestResult result = place(customerId, merchantId, "[" + line(taco, 1) + "," + line(taco, 2) + "]");
+
+        assertThat(result).hasStatus(HttpStatus.CREATED);
+        assertThat(result).bodyJson().extractingPath("$.lines.length()").isEqualTo(1);
+        assertThat(result).bodyJson().extractingPath("$.lines[0].quantity").isEqualTo(3);
+        assertThat(result).bodyJson().extractingPath("$.totalCents").isEqualTo(1197);
+    }
+
+    @Test
+    void keepsSnapshotsWhenPricesAndAddressChangeLater() {
+        long customerId = customer(jdbc);
+        long merchantId = merchant(jdbc, true);
+        long taco = item(jdbc, merchantId, 399, true);
+        MvcTestResult placed = place(customerId, merchantId, "[" + line(taco, 1) + "]");
+        assertThat(placed).hasStatus(HttpStatus.CREATED);
+
+        jdbc.sql("UPDATE menu_items SET price_cents = 999 WHERE id = ?")
+                .param(taco)
+                .update();
+        jdbc.sql("UPDATE customers SET address = 'Elsewhere' WHERE id = ?")
+                .param(customerId)
+                .update();
+
+        var row = jdbc.sql("SELECT o.total_cents, o.delivery_address, l.price_cents FROM orders o JOIN order_lines l ON"
+                        + " l.order_id = o.id WHERE o.customer_id = ?")
+                .param(customerId)
+                .query()
+                .singleRow();
+        assertThat(row).containsEntry("total_cents", 399L);
+        assertThat(row).containsEntry("delivery_address", "200 Lavaca St");
+        assertThat(row).containsEntry("price_cents", 399L);
+    }
+
+    @Test
+    void recordsThePlacementInTheStatusHistory() {
+        long customerId = customer(jdbc);
+        long merchantId = merchant(jdbc, true);
+        long taco = item(jdbc, merchantId, 399, true);
+
+        assertThat(place(customerId, merchantId, "[" + line(taco, 1) + "]")).hasStatus(HttpStatus.CREATED);
+
+        var row = jdbc.sql("SELECT e.from_status, e.to_status, e.actor FROM order_events e JOIN orders o ON o.id ="
+                        + " e.order_id WHERE o.customer_id = ?")
+                .param(customerId)
+                .query()
+                .singleRow();
+        assertThat(row.get("from_status")).isNull();
+        assertThat(row).containsEntry("to_status", "PLACED").containsEntry("actor", "CUSTOMER");
+    }
+
+    @Test
+    void rejectsAnUnknownCustomer() {
+        long merchantId = merchant(jdbc, true);
+        long taco = item(jdbc, merchantId, 399, true);
+
+        assertRejected(place(999_999, merchantId, "[" + line(taco, 1) + "]"), "CUSTOMER_UNKNOWN");
+    }
+
+    @Test
+    void rejectsAnUnknownMerchant() {
+        long customerId = customer(jdbc);
+        long merchantId = merchant(jdbc, true);
+        long taco = item(jdbc, merchantId, 399, true);
+
+        assertRejected(place(customerId, 999_999, "[" + line(taco, 1) + "]"), "MERCHANT_UNKNOWN");
+    }
+
+    @Test
+    void rejectsAnUnknownMenuItem() {
+        long customerId = customer(jdbc);
+        long merchantId = merchant(jdbc, true);
+
+        assertRejected(place(customerId, merchantId, "[" + line(999_999, 1) + "]"), "MENU_ITEM_UNKNOWN");
+    }
+
+    @Test
+    void rejectsAnUnavailableMenuItem() {
+        long customerId = customer(jdbc);
+        long merchantId = merchant(jdbc, true);
+        long taco = item(jdbc, merchantId, 399, false);
+
+        assertRejected(place(customerId, merchantId, "[" + line(taco, 1) + "]"), "MENU_ITEM_UNAVAILABLE");
+    }
+
+    @Test
+    void rejectsAMenuItemFromAnotherMerchant() {
+        long customerId = customer(jdbc);
+        long merchantId = merchant(jdbc, true);
+        long otherTaco = item(jdbc, merchant(jdbc, true), 399, true);
+
+        assertRejected(place(customerId, merchantId, "[" + line(otherTaco, 1) + "]"), "MENU_ITEM_WRONG_MERCHANT");
+    }
+
+    @Test
+    void rejectsAClosedMerchant() {
+        long customerId = customer(jdbc);
+        long merchantId = merchant(jdbc, false);
+        long taco = item(jdbc, merchantId, 399, true);
+
+        assertRejected(place(customerId, merchantId, "[" + line(taco, 1) + "]"), "MERCHANT_CLOSED");
+    }
+
+    @Test
+    void rejectsEmptyLinesAndNonPositiveQuantities() {
+        long customerId = customer(jdbc);
+        long merchantId = merchant(jdbc, true);
+
+        MvcTestResult empty = place(customerId, merchantId, "[]");
+        MvcTestResult zero = place(customerId, merchantId, "[" + line(1, 0) + "]");
+
+        assertThat(empty).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(empty).bodyJson().extractingPath("$.errors[0].field").isEqualTo("lines");
+        assertThat(zero).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(zero).bodyJson().extractingPath("$.errors[0].field").isEqualTo("lines[0].quantity");
+    }
+}
