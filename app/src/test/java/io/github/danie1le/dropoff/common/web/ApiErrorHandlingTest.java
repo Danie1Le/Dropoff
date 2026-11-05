@@ -66,6 +66,20 @@ class ApiErrorHandlingTest {
     }
 
     @Test
+    void reportsClassLevelViolationsWithTheObjectName() {
+        MvcTestResult result = mvc.post()
+                .uri("/api/v1/probe/range")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"min\":5,\"max\":1}")
+                .exchange();
+
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("VALIDATION_FAILED");
+        assertThat(result).bodyJson().extractingPath("$.errors").asArray().isNotEmpty();
+        assertThat(result).bodyJson().extractingPath("$.errors[0].message").isEqualTo("min must not exceed max");
+    }
+
+    @Test
     void reportsInvalidRequestParametersAsValidationFailed() {
         MvcTestResult result = mvc.get().uri("/api/v1/probe/param?count=0").exchange();
 
@@ -163,6 +177,15 @@ class ApiErrorHandlingTest {
         assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("VALIDATION_FAILED");
         assertThat(result).bodyJson().extractingPath("$.errors[0].field").isEqualTo("size");
         assertThat(result).bodyJson().extractingPath("$.errors[0].message").isEqualTo("must be a valid Integer");
+    }
+
+    @Test
+    void reportsTypeMismatchInUnvalidatedQueryObjectAsValidationFailed() {
+        MvcTestResult result = mvc.get().uri("/api/v1/probe/raw-page?size=abc").exchange();
+
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("VALIDATION_FAILED");
+        assertThat(result).bodyJson().extractingPath("$.errors[0].field").isEqualTo("size");
     }
 
     @Test

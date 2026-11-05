@@ -15,6 +15,7 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
+import org.springframework.validation.ObjectError;
 import org.springframework.validation.method.ParameterErrors;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -61,7 +62,7 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(
             MethodArgumentNotValidException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
-        List<FieldViolation> violations = ex.getBindingResult().getFieldErrors().stream()
+        List<FieldViolation> violations = ex.getBindingResult().getAllErrors().stream()
                 .map(ApiExceptionHandler::violation)
                 .toList();
         return validationFailed(violations, headers);
@@ -73,7 +74,7 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         List<FieldViolation> violations = ex.getParameterValidationResults().stream()
                 .flatMap(result -> {
                     if (result instanceof ParameterErrors errors) {
-                        return errors.getFieldErrors().stream().map(ApiExceptionHandler::violation);
+                        return errors.getAllErrors().stream().map(ApiExceptionHandler::violation);
                     }
                     String parameterName = result.getMethodParameter().getParameterName();
                     String name = parameterName == null ? "parameter" : parameterName;
@@ -149,8 +150,16 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return properties != null && properties.containsKey(CODE);
     }
 
+    /** A {@link FieldError} keeps its field; a class-level {@link ObjectError} is reported under its object name. */
+    private static FieldViolation violation(ObjectError error) {
+        return error instanceof FieldError fieldError
+                ? violation(fieldError)
+                : new FieldViolation(error.getObjectName(), message(error));
+    }
+
     private static FieldViolation violation(FieldError error) {
         if (TYPE_MISMATCH.equals(error.getCode())) {
+            @Nullable
             Class<?> requiredType = error.contains(TypeMismatchException.class)
                     ? error.unwrap(TypeMismatchException.class).getRequiredType()
                     : null;
