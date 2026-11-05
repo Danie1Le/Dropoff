@@ -12,9 +12,11 @@ import java.lang.annotation.Target;
 import org.jspecify.annotations.Nullable;
 
 /**
- * For optional text, such as a PATCH field: null is valid, otherwise the text must not be empty after
- * {@link String#trim()}. That is the same rule as {@code @NotBlank} and as the trimming done before storage, so a
- * value that passes is never stored empty. Line breaks inside the text are allowed.
+ * The project's blank check for text: null is valid, otherwise the text must not be empty after
+ * {@link String#trim()}. That is the same rule as the trimming done before storage, so a value that passes is never
+ * stored empty. Line breaks inside the text are allowed. Use it alone on optional text, such as a PATCH field, and
+ * with {@code @NotNull} on required text. Don't use Jakarta {@code @NotBlank}: its whitespace rule differs from
+ * {@code trim()}.
  */
 @Documented
 @Constraint(validatedBy = NotBlankIfPresent.Validator.class)

@@ -7,7 +7,6 @@ import jakarta.validation.Constraint;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 import jakarta.validation.Payload;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.lang.annotation.ElementType;
@@ -24,8 +23,8 @@ final class MerchantRequests {
     private MerchantRequests() {}
 
     record CreateMerchant(
-            @NotBlank @Size(max = 200) String name,
-            @NotBlank @Size(max = 500) String address,
+            @NotNull @NotBlankIfPresent @Size(max = 200) String name,
+            @NotNull @NotBlankIfPresent @Size(max = 500) String address,
             @NotNull @Latitude Double lat,
             @NotNull @Longitude Double lng) {
 

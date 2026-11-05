@@ -102,6 +102,17 @@ class MerchantApiIT {
     }
 
     @Test
+    void rejectsAControlCharacterOnlyNameOnCreate() {
+        MvcTestResult result = create("""
+                {"name":"\\u0001","address":"100 Congress Ave","lat":30.2672,"lng":-97.7431}
+                """);
+
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("VALIDATION_FAILED");
+        assertThat(result).bodyJson().extractingPath("$.errors[0].field").isEqualTo("name");
+    }
+
+    @Test
     void listsMerchantsOnePageAtATime() {
         create(TACO_SHOP);
         create(TACO_SHOP.replace("Taco Shop", "Noodle Bar"));

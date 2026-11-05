@@ -21,6 +21,8 @@ How code in Dropoff is written and reviewed. Decided in [Coding standards for co
   _Why:_ NullAway skips unmarked packages, so a missing marker silently turns the check off.
 - **(review)** Mark `@Nullable` only where null is allowed. Use `Optional` only as a return type. Return empty collections, never null.
   _Why:_ callers can trust a signature without reading the body.
+- **(tool: BlankCheckRuleTest)** Text fields use `@NotBlankIfPresent` (with `@NotNull` when required), never Jakarta `@NotBlank`.
+  _Why:_ the check must match the `trim()` applied before storing.
 
 ## Types and modules
 
