@@ -1,14 +1,14 @@
 package io.github.danie1le.dropoff.merchant.internal;
 
+import io.github.danie1le.dropoff.common.Latitude;
+import io.github.danie1le.dropoff.common.Longitude;
+import io.github.danie1le.dropoff.common.NotBlankIfPresent;
 import jakarta.validation.Constraint;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 import jakarta.validation.Payload;
-import jakarta.validation.constraints.DecimalMax;
-import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -19,29 +19,40 @@ import org.jspecify.annotations.Nullable;
 /** Request and response bodies of the merchant endpoints (ticket #9). */
 final class MerchantRequests {
 
-    private static final String NOT_BLANK = ".*\\S.*";
-
     private MerchantRequests() {}
 
     record CreateMerchant(
             @NotBlank @Size(max = 200) String name,
             @NotBlank @Size(max = 500) String address,
-            @NotNull @DecimalMin("-90") @DecimalMax("90") Double lat,
-            @NotNull @DecimalMin("-180") @DecimalMax("180") Double lng) {}
+            @NotNull @Latitude Double lat,
+            @NotNull @Longitude Double lng) {
 
-    /** Partial update: only the given fields change. Address, lat and lng move together (ticket #42). */
+        Location location() {
+            return new Location(address, lat, lng);
+        }
+    }
+
+    /** Partial update: an absent or null field means unchanged. Address, lat and lng move together (ticket #42). */
     @AddressChangedTogether
     record UpdateMerchant(
-            @Nullable @Pattern(regexp = NOT_BLANK, message = "must not be blank") @Size(max = 200)
-            String name,
-
+            @Nullable @NotBlankIfPresent @Size(max = 200) String name,
             @Nullable Boolean open,
+            @Nullable @NotBlankIfPresent @Size(max = 500) String address,
+            @Nullable @Latitude Double lat,
+            @Nullable @Longitude Double lng) {
 
-            @Nullable @Pattern(regexp = NOT_BLANK, message = "must not be blank") @Size(max = 500)
-            String address,
-
-            @Nullable @DecimalMin("-90") @DecimalMax("90") Double lat,
-            @Nullable @DecimalMin("-180") @DecimalMax("180") Double lng) {}
+        /** The new location, or null when it doesn't change. {@link AddressChangedTogether} rejects a partial one. */
+        @Nullable
+        Location location() {
+            if (address == null && lat == null && lng == null) {
+                return null;
+            }
+            if (address == null || lat == null || lng == null) {
+                throw new IllegalStateException("address, lat and lng must be given together");
+            }
+            return new Location(address, lat, lng);
+        }
+    }
 
     record MerchantResponse(long id, String name, String address, double lat, double lng, boolean open) {
 
@@ -56,12 +67,12 @@ final class MerchantRequests {
         }
     }
 
-    /** Address, lat and lng are given all together or not at all; reported on the {@code address} field. */
+    /** Address, lat and lng are given all together or not at all; each missing one is reported on its own field. */
     @Target(ElementType.TYPE)
     @Retention(RetentionPolicy.RUNTIME)
     @Constraint(validatedBy = AddressChangedTogetherValidator.class)
     @interface AddressChangedTogether {
-        String message() default "address, lat and lng must be changed together";
+        String message() default "is required when changing the location";
 
         Class<?>[] groups() default {};
 
@@ -76,17 +87,29 @@ final class MerchantRequests {
             if (request == null) {
                 return true;
             }
-            int given = (request.address() == null ? 0 : 1)
-                    + (request.lat() == null ? 0 : 1)
-                    + (request.lng() == null ? 0 : 1);
-            if (given == 0 || given == 3) {
+            boolean hasAddress = request.address() != null;
+            boolean hasLat = request.lat() != null;
+            boolean hasLng = request.lng() != null;
+            if (hasAddress == hasLat && hasLat == hasLng) {
                 return true;
             }
             context.disableDefaultConstraintViolation();
-            context.buildConstraintViolationWithTemplate(context.getDefaultConstraintMessageTemplate())
-                    .addPropertyNode("address")
-                    .addConstraintViolation();
+            if (!hasAddress) {
+                reportMissing(context, "address");
+            }
+            if (!hasLat) {
+                reportMissing(context, "lat");
+            }
+            if (!hasLng) {
+                reportMissing(context, "lng");
+            }
             return false;
+        }
+
+        private static void reportMissing(ConstraintValidatorContext context, String field) {
+            context.buildConstraintViolationWithTemplate(context.getDefaultConstraintMessageTemplate())
+                    .addPropertyNode(field)
+                    .addConstraintViolation();
         }
     }
 }

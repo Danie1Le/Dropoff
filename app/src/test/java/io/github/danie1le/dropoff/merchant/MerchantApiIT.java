@@ -158,11 +158,72 @@ class MerchantApiIT {
 
         assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
         assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("VALIDATION_FAILED");
-        assertThat(result).bodyJson().extractingPath("$.errors[0].field").isEqualTo("address");
         assertThat(result)
                 .bodyJson()
-                .extractingPath("$.errors[0].message")
-                .isEqualTo("address, lat and lng must be changed together");
+                .extractingPath("$.errors[*].field")
+                .asArray()
+                .containsExactlyInAnyOrder("lat", "lng");
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.errors[*].message")
+                .asArray()
+                .containsOnly("is required when changing the location");
+    }
+
+    @Test
+    void rejectsALatitudeOnlyLocationChange() {
+        long id = createdId(create(TACO_SHOP));
+
+        MvcTestResult result = patch(id, "{\"lat\":30.1}");
+
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.errors[*].field")
+                .asArray()
+                .containsExactlyInAnyOrder("address", "lng");
+    }
+
+    @Test
+    void rejectsALongitudeOnlyLocationChange() {
+        long id = createdId(create(TACO_SHOP));
+
+        MvcTestResult result = patch(id, "{\"lng\":-97.7}");
+
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.errors[*].field")
+                .asArray()
+                .containsExactlyInAnyOrder("address", "lat");
+    }
+
+    @Test
+    void rejectsCoordinatesWithoutAnAddress() {
+        long id = createdId(create(TACO_SHOP));
+
+        MvcTestResult result = patch(id, "{\"lat\":30.1,\"lng\":-97.7}");
+
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.errors[*].field")
+                .asArray()
+                .containsExactlyInAnyOrder("address");
+    }
+
+    @Test
+    void rejectsAnOutOfRangeLatitudeOnUpdate() {
+        long id = createdId(create(TACO_SHOP));
+
+        MvcTestResult result = patch(id, "{\"address\":\"x\",\"lat\":95,\"lng\":-97.7}");
+
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.errors[*].field")
+                .asArray()
+                .containsExactlyInAnyOrder("lat");
     }
 
     @Test
@@ -173,6 +234,16 @@ class MerchantApiIT {
 
         assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
         assertThat(result).bodyJson().extractingPath("$.errors[0].field").isEqualTo("name");
+    }
+
+    @Test
+    void acceptsANameWithALineBreakOnUpdateLikeOnCreate() {
+        long id = createdId(create(TACO_SHOP));
+
+        MvcTestResult result = patch(id, "{\"name\":\"Taco\\nShop\"}");
+
+        assertThat(result).hasStatusOk();
+        assertThat(result).bodyJson().extractingPath("$.name").isEqualTo("Taco\nShop");
     }
 
     @Test

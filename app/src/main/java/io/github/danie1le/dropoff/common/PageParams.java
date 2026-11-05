@@ -19,11 +19,10 @@ public record PageParams(
     public static final int DEFAULT_SIZE = 20;
     public static final int MAX_SIZE = 100;
 
-    public Pageable toPageable() {
-        return toPageable(Sort.unsorted());
-    }
-
-    /** List endpoints pass a sort so a page holds the same rows each time it is requested. */
+    /**
+     * List endpoints must pass a sort (for example {@code Sort.by("id")}) so pages are stable: a page holds the same rows
+     * each time it is requested.
+     */
     public Pageable toPageable(Sort sort) {
         int number = page == null ? 0 : page;
         int pageSize = size == null ? DEFAULT_SIZE : size;

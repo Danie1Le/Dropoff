@@ -3,7 +3,6 @@ package io.github.danie1le.dropoff.merchant.internal;
 import io.github.danie1le.dropoff.common.DomainException;
 import io.github.danie1le.dropoff.merchant.internal.MerchantRequests.CreateMerchant;
 import io.github.danie1le.dropoff.merchant.internal.MerchantRequests.UpdateMerchant;
-import java.util.Objects;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -20,11 +19,7 @@ class MerchantService {
 
     @Transactional
     Merchant create(CreateMerchant request) {
-        Merchant merchant = new Merchant(
-                request.name().trim(),
-                request.address().trim(),
-                Objects.requireNonNull(request.lat()),
-                Objects.requireNonNull(request.lng()));
+        Merchant merchant = new Merchant(request.name().trim(), trimmed(request.location()));
         return merchants.save(merchant);
     }
 
@@ -49,13 +44,15 @@ class MerchantService {
         if (open != null) {
             merchant.setOpen(open);
         }
-        String address = request.address();
-        if (address != null) {
-            // @AddressChangedTogether guarantees lat and lng are present with an address.
-            merchant.moveTo(
-                    address.trim(), Objects.requireNonNull(request.lat()), Objects.requireNonNull(request.lng()));
+        Location location = request.location();
+        if (location != null) {
+            merchant.moveTo(trimmed(location));
         }
         return merchant;
+    }
+
+    private static Location trimmed(Location location) {
+        return new Location(location.address().trim(), location.lat(), location.lng());
     }
 
     private static DomainException notFound(long id) {

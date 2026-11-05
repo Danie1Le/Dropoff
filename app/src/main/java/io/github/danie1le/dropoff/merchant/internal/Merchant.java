@@ -37,11 +37,11 @@ class Merchant {
     @SuppressWarnings("NullAway.Init")
     protected Merchant() {}
 
-    Merchant(String name, String address, double lat, double lng) {
+    Merchant(String name, Location location) {
         this.name = name;
-        this.address = address;
-        this.lat = lat;
-        this.lng = lng;
+        this.address = location.address();
+        this.lat = location.lat();
+        this.lng = location.lng();
         this.open = true;
     }
 
@@ -73,10 +73,10 @@ class Merchant {
         this.name = newName;
     }
 
-    void moveTo(String newAddress, double newLat, double newLng) {
-        this.address = newAddress;
-        this.lat = newLat;
-        this.lng = newLng;
+    void moveTo(Location newLocation) {
+        this.address = newLocation.address();
+        this.lat = newLocation.lat();
+        this.lng = newLocation.lng();
     }
 
     void setOpen(boolean isOpen) {

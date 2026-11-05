@@ -10,7 +10,7 @@ class PageParamsTest {
 
     @Test
     void defaultsToFirstPageOfTwentyWhenNothingIsGiven() {
-        Pageable pageable = new PageParams(null, null).toPageable();
+        Pageable pageable = new PageParams(null, null).toPageable(Sort.unsorted());
 
         assertThat(pageable.getPageNumber()).isZero();
         assertThat(pageable.getPageSize()).isEqualTo(20);
@@ -19,7 +19,7 @@ class PageParamsTest {
 
     @Test
     void usesTheRequestedPageAndSize() {
-        Pageable pageable = new PageParams(3, 50).toPageable();
+        Pageable pageable = new PageParams(3, 50).toPageable(Sort.unsorted());
 
         assertThat(pageable.getPageNumber()).isEqualTo(3);
         assertThat(pageable.getPageSize()).isEqualTo(50);
