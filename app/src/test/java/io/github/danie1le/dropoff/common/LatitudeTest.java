@@ -39,4 +39,18 @@ class LatitudeTest {
                 .extracting(ConstraintViolation::getMessage)
                 .containsExactly("must be between -90 and 90");
     }
+
+    @Test
+    void rejectsNaN() {
+        assertThat(VALIDATOR.validate(new Point(Double.NaN)))
+                .extracting(ConstraintViolation::getMessage)
+                .containsExactly("must be between -90 and 90");
+    }
+
+    @Test
+    void rejectsInfinity() {
+        assertThat(VALIDATOR.validate(new Point(Double.POSITIVE_INFINITY)))
+                .extracting(ConstraintViolation::getMessage)
+                .containsExactly("must be between -90 and 90");
+    }
 }

@@ -1,6 +1,7 @@
 package io.github.danie1le.dropoff;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.codeUnits;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noConstructors;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noFields;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 
@@ -17,7 +18,9 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Jakarta {@code @NotBlank} uses its own whitespace rule, which can pass text that {@code trim()} empties before
- * storage. Production code must use {@code @NotNull @NotBlankIfPresent} instead.
+ * storage. Production code must use {@code @NotNull @NotBlankIfPresent} instead. The rule checks declarations
+ * (fields, record components, methods, constructors, parameters), not type-use positions such as
+ * {@code List<@NotBlank String>}, and not custom annotations that compose {@code @NotBlank}; review covers those.
  */
 class BlankCheckRuleTest {
 
@@ -32,6 +35,11 @@ class BlankCheckRuleTest {
 
         noFields().should().beAnnotatedWith(NotBlank.class).because(BECAUSE).check(production);
         noMethods().should().beAnnotatedWith(NotBlank.class).because(BECAUSE).check(production);
+        noConstructors()
+                .should()
+                .beAnnotatedWith(NotBlank.class)
+                .because(BECAUSE)
+                .check(production);
         codeUnits()
                 .should(haveNoParameterAnnotatedWithNotBlank())
                 .because(BECAUSE)

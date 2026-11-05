@@ -14,9 +14,10 @@ import org.jspecify.annotations.Nullable;
 /**
  * The project's blank check for text: null is valid, otherwise the text must not be empty after
  * {@link String#trim()}. That is the same rule as the trimming done before storage, so a value that passes is never
- * stored empty. Line breaks inside the text are allowed. Use it alone on optional text, such as a PATCH field, and
- * with {@code @NotNull} on required text. Don't use Jakarta {@code @NotBlank}: its whitespace rule differs from
- * {@code trim()}.
+ * stored empty. Line breaks inside the text are allowed. Text containing the NUL character (U+0000) is also
+ * rejected, with the message "must not contain the NUL character", because Postgres can't store it in a text column.
+ * Use it alone on optional text, such as a PATCH field, and with {@code @NotNull} on required text. Don't use Jakarta
+ * {@code @NotBlank}: its whitespace rule differs from {@code trim()}.
  */
 @Documented
 @Constraint(validatedBy = NotBlankIfPresent.Validator.class)
@@ -34,7 +35,20 @@ public @interface NotBlankIfPresent {
 
         @Override
         public boolean isValid(@Nullable CharSequence value, ConstraintValidatorContext context) {
-            return value == null || !value.toString().trim().isEmpty();
+            if (value == null) {
+                return true;
+            }
+            String text = value.toString();
+            if (text.trim().isEmpty()) {
+                return false;
+            }
+            if (text.indexOf('\u0000') >= 0) {
+                context.disableDefaultConstraintViolation();
+                context.buildConstraintViolationWithTemplate("must not contain the NUL character")
+                        .addConstraintViolation();
+                return false;
+            }
+            return true;
         }
     }
 }

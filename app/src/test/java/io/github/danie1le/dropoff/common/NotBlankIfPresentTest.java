@@ -50,4 +50,11 @@ class NotBlankIfPresentTest {
                 .extracting(ConstraintViolation::getMessage)
                 .containsExactly("must not be blank");
     }
+
+    @Test
+    void rejectsAValueContainingANulCharacter() {
+        assertThat(VALIDATOR.validate(new Named("Taco\u0000Shop")))
+                .extracting(ConstraintViolation::getMessage)
+                .containsExactly("must not contain the NUL character");
+    }
 }

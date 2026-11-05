@@ -113,6 +113,28 @@ class MerchantApiIT {
     }
 
     @Test
+    void rejectsANulCharacterInANameOnCreate() {
+        MvcTestResult result = create("""
+                {"name":"Taco\\u0000Shop","address":"100 Congress Ave","lat":30.2672,"lng":-97.7431}
+                """);
+
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("VALIDATION_FAILED");
+        assertThat(result).bodyJson().extractingPath("$.errors[0].field").isEqualTo("name");
+    }
+
+    @Test
+    void rejectsANonFiniteLatitudeOnCreate() {
+        MvcTestResult result = create("""
+                {"name":"Taco Shop","address":"1 Main","lat":"NaN","lng":-97.7}
+                """);
+
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("VALIDATION_FAILED");
+        assertThat(result).bodyJson().extractingPath("$.errors[0].field").isEqualTo("lat");
+    }
+
+    @Test
     void listsMerchantsOnePageAtATime() {
         create(TACO_SHOP);
         create(TACO_SHOP.replace("Taco Shop", "Noodle Bar"));
