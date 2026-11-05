@@ -54,6 +54,13 @@ class ProbeController {
     @Ordered
     record Range(int min, int max) {}
 
+    /** Its getter throws, so writing it as JSON fails with {@code HttpMessageNotWritableException}. */
+    static class Unwritable {
+        public String getValue() {
+            throw new IllegalStateException("secret serialization detail");
+        }
+    }
+
     @GetMapping("/domain/{category}")
     void domain(@PathVariable DomainException.Category category) {
         throw new DomainException(category, "PROBE_" + category.name(), "probe failed with " + category);
@@ -82,6 +89,11 @@ class ProbeController {
     @GetMapping("/boom")
     void boom() {
         throw new IllegalStateException("secret internal detail");
+    }
+
+    @GetMapping("/unwritable")
+    Unwritable unwritable() {
+        return new Unwritable();
     }
 
     @GetMapping("/page")

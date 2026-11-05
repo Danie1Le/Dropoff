@@ -8,7 +8,9 @@ import org.springframework.data.domain.Pageable;
 
 /**
  * Offset paging parameters for list endpoints ({@code ?page=0&size=20}). Bind with {@code @Valid PageParams}: a size
- * above {@value #MAX_SIZE} or a negative page is rejected with 400 instead of being silently capped (ticket #8).
+ * above {@value #MAX_SIZE}, a size below 1 or a negative page is then rejected with 400 (ticket #8). As a safety net
+ * for an endpoint that forgets {@code @Valid}, {@link #toPageable()} also clamps page to at least 0 and size to 1 ..
+ * {@value #MAX_SIZE}.
  */
 public record PageParams(
         @Nullable @Min(0) Integer page,
@@ -18,8 +20,8 @@ public record PageParams(
     public static final int MAX_SIZE = 100;
 
     public Pageable toPageable() {
-        int number = page == null ? 0 : page;
-        int pageSize = size == null ? DEFAULT_SIZE : size;
+        int number = page == null ? 0 : Math.max(page, 0);
+        int pageSize = size == null ? DEFAULT_SIZE : Math.clamp(size, 1, MAX_SIZE);
         return PageRequest.of(number, pageSize);
     }
 }

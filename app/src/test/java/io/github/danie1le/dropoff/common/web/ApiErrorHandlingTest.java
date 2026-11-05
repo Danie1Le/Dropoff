@@ -130,6 +130,15 @@ class ApiErrorHandlingTest {
     }
 
     @Test
+    void hidesInternalDetailsOfSpringRaisedServerErrors() {
+        MvcTestResult result = mvc.get().uri("/api/v1/probe/unwritable").exchange();
+
+        assertThat(result).hasStatus(HttpStatus.INTERNAL_SERVER_ERROR);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("INTERNAL_ERROR");
+        assertThat(result).bodyText().doesNotContain("secret serialization detail", "Could not write");
+    }
+
+    @Test
     void givesUnknownRoutesANotFoundCode() {
         MvcTestResult result = mvc.get().uri("/api/v1/no-such-route").exchange();
 

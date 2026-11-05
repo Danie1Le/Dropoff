@@ -23,4 +23,14 @@ class PageParamsTest {
         assertThat(pageable.getPageNumber()).isEqualTo(3);
         assertThat(pageable.getPageSize()).isEqualTo(50);
     }
+
+    @Test
+    void neverExceedsMaxSizeEvenWithoutValidation() {
+        assertThat(new PageParams(0, 500).toPageable().getPageSize()).isEqualTo(100);
+    }
+
+    @Test
+    void neverGoesBelowFirstPageEvenWithoutValidation() {
+        assertThat(new PageParams(-3, 10).toPageable().getPageNumber()).isZero();
+    }
 }

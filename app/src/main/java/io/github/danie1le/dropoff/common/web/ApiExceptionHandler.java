@@ -38,6 +38,8 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     private static final String CODE = "code";
     private static final String ERRORS = "errors";
     private static final String TYPE_MISMATCH = "typeMismatch";
+    private static final String INTERNAL_ERROR = "INTERNAL_ERROR";
+    private static final String INTERNAL_DETAIL = "An unexpected error occurred.";
 
     /** One invalid input: which field or parameter, and why. */
     record FieldViolation(String field, String message) {}
@@ -56,7 +58,7 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     ResponseEntity<ProblemDetail> handleUnexpected(Exception ex) {
         log.error("Unhandled exception", ex);
         HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR;
-        return ResponseEntity.status(status).body(problem(status, "INTERNAL_ERROR", "An unexpected error occurred."));
+        return ResponseEntity.status(status).body(problem(status, INTERNAL_ERROR, INTERNAL_DETAIL));
     }
 
     @Override
@@ -112,14 +114,24 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     /**
      * Framework errors (404 route, 405, 415 …) keep Spring's body but always get a {@code code}. Spring builds that
      * body inside {@code super}, so the code is added to the response it returns, not to the incoming {@code body}.
+     * Framework 5xx errors (e.g. a response that can't be written) are logged and get the same {@code INTERNAL_ERROR}
+     * code and fixed detail as {@link #handleUnexpected}, so Spring's detail never leaks internals.
      */
     @Override
     protected @Nullable ResponseEntity<Object> handleExceptionInternal(
             Exception ex, @Nullable Object body, HttpHeaders headers, HttpStatusCode statusCode, WebRequest request) {
+        if (statusCode.is5xxServerError()) {
+            log.error("Framework server error", ex);
+        }
         ResponseEntity<Object> response = super.handleExceptionInternal(ex, body, headers, statusCode, request);
-        if (response != null && response.getBody() instanceof ProblemDetail detail && !hasCode(detail)) {
-            HttpStatus resolved = HttpStatus.resolve(statusCode.value());
-            detail.setProperty(CODE, resolved == null ? "ERROR" : resolved.name());
+        if (response != null && response.getBody() instanceof ProblemDetail detail) {
+            if (statusCode.is5xxServerError()) {
+                detail.setDetail(INTERNAL_DETAIL);
+                detail.setProperty(CODE, INTERNAL_ERROR);
+            } else if (!hasCode(detail)) {
+                HttpStatus resolved = HttpStatus.resolve(statusCode.value());
+                detail.setProperty(CODE, resolved == null ? "ERROR" : resolved.name());
+            }
         }
         return response;
     }
