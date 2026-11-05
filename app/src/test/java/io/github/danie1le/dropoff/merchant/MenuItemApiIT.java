@@ -1,0 +1,202 @@
+package io.github.danie1le.dropoff.merchant;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import io.github.danie1le.dropoff.TestcontainersConfiguration;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.web.servlet.assertj.MockMvcTester;
+import org.springframework.test.web.servlet.assertj.MvcTestResult;
+import org.springframework.transaction.annotation.Transactional;
+
+/** Menu item endpoints end to end, against a real Postgres. Each test rolls back. */
+@SpringBootTest
+@AutoConfigureMockMvc
+@Import(TestcontainersConfiguration.class)
+@Transactional
+class MenuItemApiIT {
+
+    private static final String TACO_SHOP = """
+            {"name":"Taco Shop","address":"100 Congress Ave","lat":30.2672,"lng":-97.7431}
+            """;
+
+    private final MockMvcTester mvc;
+    private final JdbcTemplate jdbc;
+
+    MenuItemApiIT(@Autowired MockMvcTester mvc, @Autowired JdbcTemplate jdbc) {
+        this.mvc = mvc;
+        this.jdbc = jdbc;
+    }
+
+    private long merchant() {
+        return idFromLocation(mvc.post()
+                .uri("/api/v1/merchants")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(TACO_SHOP)
+                .exchange());
+    }
+
+    private static long idFromLocation(MvcTestResult result) {
+        String location = result.getResponse().getHeader(HttpHeaders.LOCATION);
+        assertThat(location).isNotNull();
+        return Long.parseLong(location.substring(location.lastIndexOf('/') + 1));
+    }
+
+    private MvcTestResult addItem(Object merchantId, String json) {
+        return mvc.post()
+                .uri("/api/v1/merchants/{id}/menu-items", merchantId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json)
+                .exchange();
+    }
+
+    private static void assertFieldError(MvcTestResult result, String field) {
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("VALIDATION_FAILED");
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.errors[*].field")
+                .asArray()
+                .isNotEmpty()
+                .allMatch(field::equals);
+    }
+
+    @Test
+    void addsAnAvailableItemWithATrimmedNameAndPointsToIt() {
+        long merchantId = merchant();
+
+        MvcTestResult result = addItem(merchantId, """
+                {"name":"  Al Pastor Taco ","priceCents":399}
+                """);
+
+        assertThat(result).hasStatus(HttpStatus.CREATED);
+        assertThat(result.getResponse().getHeader(HttpHeaders.LOCATION)).matches(".*/api/v1/menu-items/\\d+");
+        long itemId = idFromLocation(result);
+        assertThat(result).bodyJson().isEqualTo("""
+                {"id":%d,"merchantId":%d,"name":"Al Pastor Taco","priceCents":399,"available":true}
+                """.formatted(itemId, merchantId));
+    }
+
+    @Test
+    void returnsAMenuItemById() {
+        long merchantId = merchant();
+        long itemId = idFromLocation(addItem(merchantId, """
+                {"name":"Horchata","priceCents":250}
+                """));
+
+        MvcTestResult result = mvc.get().uri("/api/v1/menu-items/{id}", itemId).exchange();
+
+        assertThat(result).hasStatusOk();
+        assertThat(result).bodyJson().isEqualTo("""
+                {"id":%d,"merchantId":%d,"name":"Horchata","priceCents":250,"available":true}
+                """.formatted(itemId, merchantId));
+    }
+
+    @Test
+    void acceptsAFreeItem() {
+        MvcTestResult result = addItem(merchant(), """
+                {"name":"Salsa","priceCents":0}
+                """);
+
+        assertThat(result).hasStatus(HttpStatus.CREATED);
+        assertThat(result).bodyJson().extractingPath("$.priceCents").isEqualTo(0);
+    }
+
+    @Test
+    void reportsAnUnknownMerchantOnCreateAsNotFound() {
+        MvcTestResult result = addItem(999_999, """
+                {"name":"Salsa","priceCents":0}
+                """);
+
+        assertThat(result).hasStatus(HttpStatus.NOT_FOUND);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("MERCHANT_NOT_FOUND");
+    }
+
+    @Test
+    void reportsAnUnknownMenuItemAsNotFound() {
+        MvcTestResult result = mvc.get().uri("/api/v1/menu-items/{id}", 999_999).exchange();
+
+        assertThat(result).hasStatus(HttpStatus.NOT_FOUND);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("MENU_ITEM_NOT_FOUND");
+    }
+
+    @Test
+    void rejectsABlankName() {
+        assertFieldError(addItem(merchant(), """
+                {"name":"   ","priceCents":100}
+                """), "name");
+    }
+
+    @Test
+    void rejectsAMissingName() {
+        assertFieldError(addItem(merchant(), """
+                {"priceCents":100}
+                """), "name");
+    }
+
+    @Test
+    void rejectsANameOver200Characters() {
+        assertFieldError(addItem(merchant(), """
+                {"name":"%s","priceCents":100}
+                """.formatted("x".repeat(201))), "name");
+    }
+
+    @Test
+    void rejectsAMissingPrice() {
+        assertFieldError(addItem(merchant(), """
+                {"name":"Salsa"}
+                """), "priceCents");
+    }
+
+    @Test
+    void rejectsANegativePrice() {
+        assertFieldError(addItem(merchant(), """
+                {"name":"Salsa","priceCents":-1}
+                """), "priceCents");
+    }
+
+    @Test
+    void rejectsADecimalPrice() {
+        assertFieldError(addItem(merchant(), """
+                {"name":"Salsa","priceCents":9.99}
+                """), "priceCents");
+    }
+
+    @Test
+    void rejectsMalformedJson() {
+        MvcTestResult result = addItem(merchant(), "{\"name\":");
+
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("MALFORMED_REQUEST");
+    }
+
+    @Test
+    void rejectsANonNumericMerchantIdNamingTheParameter() {
+        assertFieldError(addItem("abc", """
+                {"name":"Salsa","priceCents":0}
+                """), "id");
+    }
+
+    @Test
+    void rejectsANonNumericMenuItemIdNamingTheParameter() {
+        assertFieldError(mvc.get().uri("/api/v1/menu-items/{id}", "abc").exchange(), "id");
+    }
+
+    @Test
+    void databaseRejectsANegativePrice() {
+        long merchantId = merchant();
+
+        assertThatThrownBy(() -> jdbc.update(
+                        "INSERT INTO menu_items (merchant_id, name, price_cents) VALUES (?, 'Salsa', -1)", merchantId))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+}
