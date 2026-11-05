@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Min;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 /**
  * Offset paging parameters for list endpoints ({@code ?page=0&size=20}). Bind with {@code @Valid PageParams} (enforced
@@ -19,8 +20,13 @@ public record PageParams(
     public static final int MAX_SIZE = 100;
 
     public Pageable toPageable() {
+        return toPageable(Sort.unsorted());
+    }
+
+    /** List endpoints pass a sort so a page holds the same rows each time it is requested. */
+    public Pageable toPageable(Sort sort) {
         int number = page == null ? 0 : page;
         int pageSize = size == null ? DEFAULT_SIZE : size;
-        return PageRequest.of(number, pageSize);
+        return PageRequest.of(number, pageSize, sort);
     }
 }
