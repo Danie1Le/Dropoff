@@ -20,10 +20,10 @@ class DropoffApplicationIT {
     }
 
     @Test
-    void startsAgainstRealPostgresWithBaselineMigrationApplied() {
+    void startsAgainstRealPostgresWithEveryMigrationApplied() {
         MigrationInfo current = flyway.info().current();
 
         assertThat(current).isNotNull();
-        assertThat(current.getVersion().getVersion()).isEqualTo("1");
+        assertThat(flyway.info().pending()).isEmpty();
     }
 }

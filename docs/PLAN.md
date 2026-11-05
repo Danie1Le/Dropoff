@@ -70,6 +70,10 @@ These apply across many PRs, and #42 is the source for all of them.
 
 **Order body** (from `GET /api/v1/orders/{id}` and every order command): `{id, customerId, merchantId, courierId|null, status, totalCents, deliveryAddress: {address, lat, lng}, lines: [{menuItemId, quantity, priceCents}], createdAt, updatedAt}`.
 
+**Merchant body** (from `POST /api/v1/merchants`, `GET` and `PATCH /api/v1/merchants/{id}`, and each item of the list): `{id, name, address, lat, lng, open}`.
+
+PATCH bodies: an absent or null field means unchanged; to change a location send address, lat and lng together. Text fields (names, addresses) are trimmed before they are stored: leading and trailing characters up to U+0020 (spaces, tabs, line breaks and other control characters) are removed, and a value that is empty after trimming is rejected as blank.
+
 **STOMP messages** on `/topic/orders/{id}`:
 - `{type: "STATUS", orderId, status, actor, at}`
 - `{type: "LOCATION", orderId, courierId, lat, lng, at}`
