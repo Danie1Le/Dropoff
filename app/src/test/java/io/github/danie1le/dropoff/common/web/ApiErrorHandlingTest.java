@@ -139,6 +139,15 @@ class ApiErrorHandlingTest {
     }
 
     @Test
+    void keepsOtherServerErrorStatusesNamedButHidesTheirDetail() {
+        MvcTestResult result = mvc.get().uri("/api/v1/probe/timeout").exchange();
+
+        assertThat(result).hasStatus(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("SERVICE_UNAVAILABLE");
+        assertThat(result).bodyJson().extractingPath("$.detail").isEqualTo("An unexpected error occurred.");
+    }
+
+    @Test
     void givesUnknownRoutesANotFoundCode() {
         MvcTestResult result = mvc.get().uri("/api/v1/no-such-route").exchange();
 
@@ -186,15 +195,6 @@ class ApiErrorHandlingTest {
         assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("VALIDATION_FAILED");
         assertThat(result).bodyJson().extractingPath("$.errors[0].field").isEqualTo("size");
         assertThat(result).bodyJson().extractingPath("$.errors[0].message").isEqualTo("must be a valid Integer");
-    }
-
-    @Test
-    void reportsTypeMismatchInUnvalidatedQueryObjectAsValidationFailed() {
-        MvcTestResult result = mvc.get().uri("/api/v1/probe/raw-page?size=abc").exchange();
-
-        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
-        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("VALIDATION_FAILED");
-        assertThat(result).bodyJson().extractingPath("$.errors[0].field").isEqualTo("size");
     }
 
     @Test

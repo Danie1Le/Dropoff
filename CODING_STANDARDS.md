@@ -46,6 +46,8 @@ How code in Dropoff is written and reviewed. Decided in [Coding standards for co
   _Why:_ HTTP stays out of the domain.
 - The error codes, status rules (404 path / 409 state / 422 content) and response shapes are in `docs/PLAN.md` under "Shared contracts", decided in [API conventions](https://github.com/Danie1Le/Dropoff/issues/8).
   _Why:_ every error looks the same to clients.
+- **(tool: PageParamsValidationTest)** List endpoints take `@Valid PageParams`. Out-of-range paging is rejected with 400, never capped.
+  _Why:_ the 100-item limit can't be skipped by forgetting `@Valid`.
 
 ## Tests
 

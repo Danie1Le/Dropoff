@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 
 /** Test-only endpoints that trigger each error shape and the paging rules. */
 @RestController
@@ -102,8 +103,8 @@ class ProbeController {
         return new PagedModel<>(new PageImpl<>(List.of("a", "b"), pageable, 2));
     }
 
-    @GetMapping("/raw-page")
-    int rawPage(PageParams params) {
-        return params.toPageable().getPageSize();
+    @GetMapping("/timeout")
+    void timeout() {
+        throw new AsyncRequestTimeoutException();
     }
 }

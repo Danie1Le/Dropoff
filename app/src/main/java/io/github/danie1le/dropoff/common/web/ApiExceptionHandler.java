@@ -114,8 +114,9 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     /**
      * Framework errors (404 route, 405, 415 …) keep Spring's body but always get a {@code code}. Spring builds that
      * body inside {@code super}, so the code is added to the response it returns, not to the incoming {@code body}.
-     * Framework 5xx errors (e.g. a response that can't be written) are logged and get the same {@code INTERNAL_ERROR}
-     * code and fixed detail as {@link #handleUnexpected}, so Spring's detail never leaks internals.
+     * Framework 5xx errors (e.g. a response that can't be written) are logged once at error level and get the same
+     * fixed detail as {@link #handleUnexpected}, so Spring's detail never leaks internals. A 500 gets the
+     * {@code INTERNAL_ERROR} code; any other 5xx (e.g. 503) keeps its status name as code.
      */
     @Override
     protected @Nullable ResponseEntity<Object> handleExceptionInternal(
@@ -127,10 +128,13 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         if (response != null && response.getBody() instanceof ProblemDetail detail) {
             if (statusCode.is5xxServerError()) {
                 detail.setDetail(INTERNAL_DETAIL);
-                detail.setProperty(CODE, INTERNAL_ERROR);
+                detail.setProperty(
+                        CODE,
+                        statusCode.value() == HttpStatus.INTERNAL_SERVER_ERROR.value()
+                                ? INTERNAL_ERROR
+                                : statusName(statusCode));
             } else if (!hasCode(detail)) {
-                HttpStatus resolved = HttpStatus.resolve(statusCode.value());
-                detail.setProperty(CODE, resolved == null ? "ERROR" : resolved.name());
+                detail.setProperty(CODE, statusName(statusCode));
             }
         }
         return response;
@@ -155,6 +159,11 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 ProblemDetail.forStatusAndDetail(status, detail == null ? status.getReasonPhrase() : detail);
         problem.setProperty(CODE, code);
         return problem;
+    }
+
+    private static String statusName(HttpStatusCode statusCode) {
+        HttpStatus resolved = HttpStatus.resolve(statusCode.value());
+        return resolved == null ? "ERROR" : resolved.name();
     }
 
     private static boolean hasCode(ProblemDetail detail) {
