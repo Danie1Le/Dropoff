@@ -17,7 +17,7 @@ How code in Dropoff is written and reviewed. Decided in [Coding standards for co
   _Why:_ warnings that nobody reads pile up and hide the next real bug.
 - **(tool)** NullAway checks every `@NullMarked` (JSpecify) package at error level, in standard mode (`OnlyNullMarked=true`), and honours Spring's `@Contract` annotations (`CustomContractAnnotations=org.springframework.lang.Contract`); test code is not checked (NullAway is disabled for `compileTestJava`). JSpecify mode is not used: it is still experimental and doesn't support Oracle JDK 21.
   _Why:_ null bugs become compile errors instead of production errors.
-- **(review)** Every package has a `package-info.java` marked `@NullMarked`.
+- **(tool: NullMarkedPackagesTest)** Every package has a `package-info.java` marked `@NullMarked`.
   _Why:_ NullAway skips unmarked packages, so a missing marker silently turns the check off.
 - **(review)** Mark `@Nullable` only where null is allowed. Use `Optional` only as a return type. Return empty collections, never null.
   _Why:_ callers can trust a signature without reading the body.
@@ -46,6 +46,8 @@ How code in Dropoff is written and reviewed. Decided in [Coding standards for co
   _Why:_ HTTP stays out of the domain.
 - The error codes, status rules (404 path / 409 state / 422 content) and response shapes are in `docs/PLAN.md` under "Shared contracts", decided in [API conventions](https://github.com/Danie1Le/Dropoff/issues/8).
   _Why:_ every error looks the same to clients.
+- **(tool: PageParamsValidationTest)** List endpoints take `@Valid PageParams`. Out-of-range paging is rejected with 400, never capped.
+  _Why:_ the 100-item limit can't be skipped by forgetting `@Valid`.
 
 ## Tests
 
