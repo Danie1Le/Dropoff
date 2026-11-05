@@ -179,6 +179,8 @@ Goal: merchants can list what they sell.
 
 Goal: customers place orders that move through a safe lifecycle.
 
+Build order, issues (#50–#56) and quiz points: `docs/milestones/M2.md`.
+
 **M2-1 Customers.**
 - Scope:
   - Migration `customers` (order module).
