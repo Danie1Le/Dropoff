@@ -1,0 +1,145 @@
+package io.github.danie1le.dropoff.common.web;
+
+import io.github.danie1le.dropoff.common.DomainException;
+import java.util.List;
+import java.util.Map;
+import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.TypeMismatchException;
+import org.springframework.context.MessageSourceResolvable;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.validation.FieldError;
+import org.springframework.validation.method.ParameterErrors;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+
+/**
+ * Turns every error into an RFC 9457 Problem Details body with a stable {@code code} field (ticket #8). Domain
+ * exceptions map by category; validation errors list each bad field; unexpected errors never leak internals.
+ */
+@RestControllerAdvice
+class ApiExceptionHandler extends ResponseEntityExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
+
+    private static final String CODE = "code";
+    private static final String ERRORS = "errors";
+
+    /** One invalid input: which field or parameter, and why. */
+    record FieldViolation(String field, String message) {}
+
+    @ExceptionHandler(DomainException.class)
+    ResponseEntity<ProblemDetail> handleDomain(DomainException ex) {
+        HttpStatus status = switch (ex.category()) {
+            case NOT_FOUND -> HttpStatus.NOT_FOUND;
+            case CONFLICT -> HttpStatus.CONFLICT;
+            case UNPROCESSABLE -> HttpStatus.UNPROCESSABLE_CONTENT;
+        };
+        return ResponseEntity.status(status).body(problem(status, ex.code(), ex.getMessage()));
+    }
+
+    @ExceptionHandler(Exception.class)
+    ResponseEntity<ProblemDetail> handleUnexpected(Exception ex) {
+        log.error("Unhandled exception", ex);
+        HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR;
+        return ResponseEntity.status(status).body(problem(status, "INTERNAL_ERROR", "An unexpected error occurred."));
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleMethodArgumentNotValid(
+            MethodArgumentNotValidException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        List<FieldViolation> violations = ex.getBindingResult().getFieldErrors().stream()
+                .map(ApiExceptionHandler::violation)
+                .toList();
+        return validationFailed(violations, headers);
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleHandlerMethodValidationException(
+            HandlerMethodValidationException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        List<FieldViolation> violations = ex.getParameterValidationResults().stream()
+                .flatMap(result -> {
+                    if (result instanceof ParameterErrors errors) {
+                        return errors.getFieldErrors().stream().map(ApiExceptionHandler::violation);
+                    }
+                    String name = String.valueOf(result.getMethodParameter().getParameterName());
+                    return result.getResolvableErrors().stream().map(error -> new FieldViolation(name, message(error)));
+                })
+                .toList();
+        return validationFailed(violations, headers);
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleTypeMismatch(
+            TypeMismatchException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        String name = ex instanceof MethodArgumentTypeMismatchException mismatch
+                ? mismatch.getName()
+                : String.valueOf(ex.getPropertyName());
+        Class<?> requiredType = ex.getRequiredType();
+        String expected = requiredType == null ? "value" : requiredType.getSimpleName();
+        return validationFailed(List.of(new FieldViolation(name, "must be a valid " + expected)), headers);
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleHttpMessageNotReadable(
+            HttpMessageNotReadableException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        HttpStatus badRequest = HttpStatus.BAD_REQUEST;
+        return ResponseEntity.status(badRequest)
+                .headers(headers)
+                .body(problem(badRequest, "MALFORMED_REQUEST", "The request body could not be read."));
+    }
+
+    /**
+     * Framework errors (404 route, 405, 415 …) keep Spring's body but always get a {@code code}. Spring builds that
+     * body inside {@code super}, so the code is added to the response it returns, not to the incoming {@code body}.
+     */
+    @Override
+    protected @Nullable ResponseEntity<Object> handleExceptionInternal(
+            Exception ex, @Nullable Object body, HttpHeaders headers, HttpStatusCode statusCode, WebRequest request) {
+        ResponseEntity<Object> response = super.handleExceptionInternal(ex, body, headers, statusCode, request);
+        if (response != null && response.getBody() instanceof ProblemDetail detail && !hasCode(detail)) {
+            HttpStatus resolved = HttpStatus.resolve(statusCode.value());
+            detail.setProperty(CODE, resolved == null ? "ERROR" : resolved.name());
+        }
+        return response;
+    }
+
+    private ResponseEntity<Object> validationFailed(List<FieldViolation> violations, HttpHeaders headers) {
+        HttpStatus badRequest = HttpStatus.BAD_REQUEST;
+        ProblemDetail detail = problem(badRequest, "VALIDATION_FAILED", "The request has invalid fields.");
+        detail.setProperty(ERRORS, violations);
+        return ResponseEntity.status(badRequest).headers(headers).body(detail);
+    }
+
+    private static ProblemDetail problem(HttpStatus status, String code, @Nullable String detail) {
+        ProblemDetail problem =
+                ProblemDetail.forStatusAndDetail(status, detail == null ? status.getReasonPhrase() : detail);
+        problem.setProperty(CODE, code);
+        return problem;
+    }
+
+    private static boolean hasCode(ProblemDetail detail) {
+        Map<String, @Nullable Object> properties = detail.getProperties();
+        return properties != null && properties.containsKey(CODE);
+    }
+
+    private static FieldViolation violation(FieldError error) {
+        return new FieldViolation(error.getField(), message(error));
+    }
+
+    private static String message(MessageSourceResolvable error) {
+        String message = error.getDefaultMessage();
+        return message == null ? "is invalid" : message;
+    }
+}

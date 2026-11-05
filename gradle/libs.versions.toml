@@ -26,6 +26,7 @@ flyway-database-postgresql = { module = "org.flywaydb:flyway-database-postgresql
 postgresql = { module = "org.postgresql:postgresql" }
 spring-modulith-starter-core = { module = "org.springframework.modulith:spring-modulith-starter-core" }
 spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
+spring-boot-starter-webmvc-test = { module = "org.springframework.boot:spring-boot-starter-webmvc-test" }
 spring-modulith-starter-test = { module = "org.springframework.modulith:spring-modulith-starter-test" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
 spring-boot-testcontainers = { module = "org.springframework.boot:spring-boot-testcontainers" }

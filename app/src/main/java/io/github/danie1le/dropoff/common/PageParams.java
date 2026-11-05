@@ -1,0 +1,30 @@
+package io.github.danie1le.dropoff.common;
+
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import org.jspecify.annotations.Nullable;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+
+/**
+ * Offset paging parameters for list endpoints ({@code ?page=0&size=20}). Bind with {@code @Valid PageParams}: a size
+ * above {@value #MAX_SIZE} or a negative page is rejected with 400 instead of being silently capped (ticket #8).
+ */
+public record PageParams(
+        @Nullable @Min(0) Integer page,
+        @Nullable @Min(1) @Max(MAX_SIZE) Integer size) {
+
+    public static final int DEFAULT_SIZE = 20;
+    public static final int MAX_SIZE = 100;
+
+    public Pageable toPageable() {
+        return toPageable(Sort.unsorted());
+    }
+
+    public Pageable toPageable(Sort sort) {
+        int number = page == null ? 0 : page;
+        int pageSize = size == null ? DEFAULT_SIZE : size;
+        return PageRequest.of(number, pageSize, sort);
+    }
+}

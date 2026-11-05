@@ -66,6 +66,7 @@ These apply across many PRs, and #42 is the source for all of them.
 - 409: `INVALID_STATUS_TRANSITION`, `OFFER_CLOSED`, `COURIER_BUSY`, `COURIER_LOCATION_UNKNOWN`, `COURIER_HAS_ACTIVE_DELIVERY`.
 - 422 (an id or rule in the body): `CUSTOMER_UNKNOWN`, `MERCHANT_UNKNOWN`, `MENU_ITEM_UNKNOWN`, `MENU_ITEM_UNAVAILABLE`, `MENU_ITEM_WRONG_MERCHANT`, `MERCHANT_CLOSED`, `IDEMPOTENCY_KEY_REUSED`.
 - 500: `INTERNAL_ERROR`.
+- Errors raised by Spring itself (unknown route, wrong method, unsupported media type …) use the HTTP status name as their code, e.g. `NOT_FOUND`, `METHOD_NOT_ALLOWED`.
 
 **Order body** (from `GET /api/v1/orders/{id}` and every order command): `{id, customerId, merchantId, courierId|null, status, totalCents, deliveryAddress: {address, lat, lng}, lines: [{menuItemId, quantity, priceCents}], createdAt, updatedAt}`.
 
@@ -140,7 +141,7 @@ Goal: merchants can list what they sell.
   - One `@RestControllerAdvice` producing Problem Details with `code`.
   - `VALIDATION_FAILED` with `errors[{field,message}]` for body and parameters.
   - `MALFORMED_REQUEST`.
-  - A path-variable type mismatch returns 400.
+  - A path-variable or parameter type mismatch returns 400 `VALIDATION_FAILED`, naming the parameter.
   - `INTERNAL_ERROR` with no internals leaked.
   - The `/api/v1` prefix, configured once.
   - Paging: default 20, max 100, above returns 400; `PagedModel` responses.
