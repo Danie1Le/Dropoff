@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.danie1le.dropoff.merchant.internal.MenuItemRequests.CreateMenuItem;
+import io.github.danie1le.dropoff.merchant.internal.MenuItemRequests.UpdateMenuItem;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -23,7 +24,7 @@ class MenuItemRequestsTest {
         FACTORY.close();
     }
 
-    private static List<String> badFields(CreateMenuItem request) {
+    private static List<String> badFields(Object request) {
         return VALIDATOR.validate(request).stream()
                 .map(ConstraintViolation::getPropertyPath)
                 .map(Object::toString)
@@ -77,5 +78,37 @@ class MenuItemRequestsTest {
         assertThatThrownBy(() -> new CreateMenuItem("Salsa", null).priceCentsValue())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("name and priceCents are required; validate with @Valid first");
+    }
+
+    @Test
+    void acceptsAnEmptyUpdate() {
+        assertThat(badFields(new UpdateMenuItem(null, null, null))).isEmpty();
+    }
+
+    @Test
+    void rejectsABlankOrOver200CharacterNameOnUpdate() {
+        assertThat(badFields(new UpdateMenuItem(" ", null, null))).containsExactly("name");
+        assertThat(badFields(new UpdateMenuItem("x".repeat(201), null, null))).containsExactly("name");
+        assertThat(badFields(new UpdateMenuItem("x".repeat(200), null, null))).isEmpty();
+    }
+
+    @Test
+    void rejectsANegativeDecimalOrTooLargePriceOnUpdate() {
+        assertThat(badFields(new UpdateMenuItem(null, new BigDecimal("-1"), null)))
+                .containsExactly("priceCents");
+        assertThat(badFields(new UpdateMenuItem(null, new BigDecimal("9.99"), null)))
+                .containsExactly("priceCents");
+        assertThat(badFields(new UpdateMenuItem(null, new BigDecimal("9223372036854775808"), null)))
+                .containsExactly("priceCents");
+    }
+
+    @Test
+    void givesTheTrimmedNameAndWholePriceOnUpdateOrNullWhenAbsent() {
+        UpdateMenuItem request = new UpdateMenuItem(" Salsa  ", new BigDecimal("399"), null);
+
+        assertThat(request.trimmedName()).isEqualTo("Salsa");
+        assertThat(request.priceCentsValue()).isEqualTo(399L);
+        assertThat(new UpdateMenuItem(null, null, null).trimmedName()).isNull();
+        assertThat(new UpdateMenuItem(null, null, null).priceCentsValue()).isNull();
     }
 }

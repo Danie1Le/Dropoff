@@ -199,4 +199,115 @@ class MenuItemApiIT {
                         "INSERT INTO menu_items (merchant_id, name, price_cents) VALUES (?, 'Salsa', -1)", merchantId))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
+
+    private long item(String json) {
+        return idFromLocation(addItem(merchant(), json));
+    }
+
+    private MvcTestResult patchItem(Object itemId, String json) {
+        return mvc.patch()
+                .uri("/api/v1/menu-items/{id}", itemId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json)
+                .exchange();
+    }
+
+    @Test
+    void updatesNamePriceAndAvailabilityTrimmingTheName() {
+        long itemId = item("""
+                {"name":"Horchata","priceCents":250}
+                """);
+
+        MvcTestResult result = patchItem(itemId, """
+                {"name":"  Large Horchata ","priceCents":350,"available":false}
+                """);
+
+        assertThat(result).hasStatusOk();
+        assertThat(result).bodyJson().extractingPath("$.name").isEqualTo("Large Horchata");
+        assertThat(result).bodyJson().extractingPath("$.priceCents").isEqualTo(350);
+        assertThat(result).bodyJson().extractingPath("$.available").isEqualTo(false);
+        assertThat(mvc.get().uri("/api/v1/menu-items/{id}", itemId).exchange())
+                .bodyJson()
+                .extractingPath("$.name")
+                .isEqualTo("Large Horchata");
+    }
+
+    @Test
+    void emptyOrNullUpdateLeavesTheItemUnchanged() {
+        long merchantId = merchant();
+        long itemId = idFromLocation(addItem(merchantId, """
+                {"name":"Horchata","priceCents":250}
+                """));
+
+        for (String body : new String[] {"{}", "{\"name\":null,\"priceCents\":null,\"available\":null}"}) {
+            MvcTestResult result = patchItem(itemId, body);
+
+            assertThat(result).hasStatusOk();
+            assertThat(result).bodyJson().isEqualTo("""
+                    {"id":%d,"merchantId":%d,"name":"Horchata","priceCents":250,"available":true}
+                    """.formatted(itemId, merchantId));
+        }
+    }
+
+    @Test
+    void markingUnavailableThenAvailableRoundTrips() {
+        long itemId = item("""
+                {"name":"Horchata","priceCents":250}
+                """);
+
+        assertThat(patchItem(itemId, "{\"available\":false}"))
+                .bodyJson()
+                .extractingPath("$.available")
+                .isEqualTo(false);
+        assertThat(patchItem(itemId, "{\"available\":true}"))
+                .bodyJson()
+                .extractingPath("$.available")
+                .isEqualTo(true);
+    }
+
+    @Test
+    void rejectsABlankOrOver200CharacterNameOnUpdate() {
+        long itemId = item("""
+                {"name":"Horchata","priceCents":250}
+                """);
+
+        assertFieldError(patchItem(itemId, "{\"name\":\"  \"}"), "name");
+        assertFieldError(patchItem(itemId, "{\"name\":\"%s\"}".formatted("x".repeat(201))), "name");
+    }
+
+    @Test
+    void rejectsANegativePriceOnUpdate() {
+        assertFieldError(patchItem(item("""
+                {"name":"Horchata","priceCents":250}
+                """), "{\"priceCents\":-1}"), "priceCents");
+    }
+
+    @Test
+    void rejectsADecimalPriceOnUpdateInsteadOfTruncatingIt() {
+        long itemId = item("""
+                {"name":"Horchata","priceCents":250}
+                """);
+
+        assertFieldError(patchItem(itemId, "{\"priceCents\":9.99}"), "priceCents");
+        assertThat(mvc.get().uri("/api/v1/menu-items/{id}", itemId).exchange())
+                .bodyJson()
+                .extractingPath("$.priceCents")
+                .isEqualTo(250);
+    }
+
+    @Test
+    void reportsAnUnknownMenuItemOnUpdateAsNotFound() {
+        MvcTestResult result = patchItem(999_999, "{}");
+
+        assertThat(result).hasStatus(HttpStatus.NOT_FOUND);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("MENU_ITEM_NOT_FOUND");
+    }
+
+    @Test
+    void hasNoDeleteEndpoint() {
+        MvcTestResult result = mvc.delete().uri("/api/v1/menu-items/{id}", 1).exchange();
+
+        assertThat(result).hasStatus(HttpStatus.METHOD_NOT_ALLOWED);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("METHOD_NOT_ALLOWED");
+    }
 }

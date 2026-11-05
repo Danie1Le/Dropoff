@@ -45,6 +45,34 @@ final class MenuItemRequests {
         }
     }
 
+    /**
+     * Partial update: an absent or null field means unchanged (ticket #61). Same rules as {@link CreateMenuItem};
+     * {@code priceCents} is a {@link BigDecimal} for the same reason.
+     */
+    record UpdateMenuItem(
+            @Nullable @NotBlankIfPresent @Size(max = 200) String name,
+
+            @Nullable
+            @PositiveOrZero
+            @Digits(integer = 19, fraction = 0, message = "must be a whole number of cents")
+            @DecimalMax(value = "9223372036854775807", message = "is too large")
+            BigDecimal priceCents,
+
+            @Nullable Boolean available) {
+
+        /** The new name without surrounding whitespace, or null when it doesn't change. */
+        @Nullable
+        String trimmedName() {
+            return name == null ? null : name.trim();
+        }
+
+        /** The new price as a long, or null when it doesn't change. {@code @Valid} rejects a bad price first. */
+        @Nullable
+        Long priceCentsValue() {
+            return priceCents == null ? null : priceCents.longValueExact();
+        }
+    }
+
     record MenuItemResponse(long id, long merchantId, String name, long priceCents, boolean available) {
 
         static MenuItemResponse of(MenuItem item) {

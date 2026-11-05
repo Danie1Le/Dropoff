@@ -2,6 +2,7 @@ package io.github.danie1le.dropoff.merchant.internal;
 
 import io.github.danie1le.dropoff.common.DomainException;
 import io.github.danie1le.dropoff.merchant.internal.MenuItemRequests.CreateMenuItem;
+import io.github.danie1le.dropoff.merchant.internal.MenuItemRequests.UpdateMenuItem;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +27,25 @@ class MenuItemService {
     @Transactional(readOnly = true)
     MenuItem get(long id) {
         return items.findById(id).orElseThrow(() -> notFound(id));
+    }
+
+    /** Changes only the fields the request gives. Items are never deleted (ticket #61). */
+    @Transactional
+    MenuItem update(long id, UpdateMenuItem request) {
+        MenuItem item = get(id);
+        String name = request.trimmedName();
+        if (name != null) {
+            item.rename(name);
+        }
+        Long priceCents = request.priceCentsValue();
+        if (priceCents != null) {
+            item.reprice(priceCents);
+        }
+        Boolean available = request.available();
+        if (available != null) {
+            item.setAvailable(available);
+        }
+        return item;
     }
 
     private static DomainException notFound(long id) {

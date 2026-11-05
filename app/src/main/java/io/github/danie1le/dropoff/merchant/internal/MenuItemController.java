@@ -2,17 +2,19 @@ package io.github.danie1le.dropoff.merchant.internal;
 
 import io.github.danie1le.dropoff.merchant.internal.MenuItemRequests.CreateMenuItem;
 import io.github.danie1le.dropoff.merchant.internal.MenuItemRequests.MenuItemResponse;
+import io.github.danie1le.dropoff.merchant.internal.MenuItemRequests.UpdateMenuItem;
 import jakarta.validation.Valid;
 import java.net.URI;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
-/** Menu item endpoints under {@code /api/v1} (ticket #59). No DELETE: orders keep a link to every item. */
+/** Menu item endpoints under {@code /api/v1} (tickets #59, #61). No DELETE: orders keep a link to every item. */
 @RestController
 class MenuItemController {
 
@@ -35,5 +37,10 @@ class MenuItemController {
     @GetMapping("/menu-items/{id}")
     MenuItemResponse get(@PathVariable long id) {
         return MenuItemResponse.of(service.get(id));
+    }
+
+    @PatchMapping("/menu-items/{id}")
+    MenuItemResponse update(@PathVariable long id, @Valid @RequestBody UpdateMenuItem request) {
+        return MenuItemResponse.of(service.update(id, request));
     }
 }
