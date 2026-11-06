@@ -539,7 +539,7 @@ const MILESTONES = [
     { t: 'POST /api/v1/orders: server computes total, price snapshot per order line', done: true },
     { t: 'Reject unavailable or wrong-merchant menu items; closed merchant → 422 MERCHANT_CLOSED', done: true },
     { t: 'Customer endpoints (POST/GET/PATCH /api/v1/customers); lat/lng range-checked, no geocoder; delivery address snapshot on each order, no override in the request', done: true },
-    { t: 'Order lists (paginated): GET /api/v1/merchants/{id}/orders?status= and GET /api/v1/customers/{id}/orders (hand-written SQL, ADR-0002)' },
+    { t: 'Order lists (paginated): GET /api/v1/merchants/{id}/orders?status= and GET /api/v1/customers/{id}/orders (hand-written SQL, ADR-0002)', done: true },
     { t: 'Order status state machine: wrong caller → 404, illegal jump → 409, repeated command → 200 no-op', done: true },
     { t: 'Merchant commands: POST /api/v1/merchants/{id}/orders/{orderId}/accept, start-preparing, ready, cancel', done: true },
     { t: 'Customer cancel: POST /api/v1/customers/{id}/orders/{orderId}/cancel', done: true },

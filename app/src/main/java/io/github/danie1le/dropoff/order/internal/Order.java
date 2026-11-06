@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import org.hibernate.annotations.BatchSize;
 import org.jspecify.annotations.Nullable;
 
 /** A customer's request to buy menu items from one merchant. Flyway owns the table (V5); Hibernate only validates. */
@@ -67,6 +68,8 @@ class Order {
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
     @JoinColumn(name = "order_id", nullable = false)
     @OrderBy("id")
+    // Lists load the lines of a whole page in one query instead of one per order.
+    @BatchSize(size = 100)
     private List<OrderLine> lines = new ArrayList<>();
 
     /** For JPA only. */
