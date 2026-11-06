@@ -74,6 +74,8 @@ These apply across many PRs, and #42 is the source for all of them.
 
 **Customer body** (from `POST /api/v1/customers`, `GET` and `PATCH /api/v1/customers/{id}`): `{id, name, address, lat, lng}`.
 
+Location shape: a merchant's or customer's own location is flat (`address, lat, lng`), as in their request bodies; only an order's delivery address, a copy taken at placement, is nested as `deliveryAddress: {address, lat, lng}`. Events keep their own flat fields (see the table above).
+
 PATCH bodies: an absent or null field means unchanged; to change a location send address, lat and lng together. Text fields (names, addresses) are trimmed before they are stored: leading and trailing characters up to U+0020 (spaces, tabs, line breaks and other control characters) are removed, and a value that is empty after trimming is rejected as blank.
 
 **STOMP messages** on `/topic/orders/{id}`:
@@ -143,7 +145,7 @@ Goal: merchants can list what they sell.
 
 **M1-1 Error handling and paging (`common`).**
 - Scope:
-  - `DomainException` with `code` and a category (`NOT_FOUND` / `CONFLICT` / `UNPROCESSABLE`).
+  - `DomainException` with `code` and a category (`BAD_REQUEST` / `NOT_FOUND` / `CONFLICT` / `UNPROCESSABLE`).
   - One `@RestControllerAdvice` producing Problem Details with `code`.
   - `VALIDATION_FAILED` with `errors[{field,message}]` for body and parameters.
   - `MALFORMED_REQUEST`.
@@ -209,7 +211,7 @@ Build order, issues (#50–#56) and quiz points: `docs/milestones/M2.md`.
 
 **M2-3 Place order.**
 - Scope:
-  - `POST /api/v1/orders` (customerId, merchantId, lines of menuItemId + quantity).
+  - `POST /api/v1/orders` (customerId, merchantId, lines of menuItemId + quantity): 1 to 100 lines, quantity 1 to 999; outside these limits returns 400 `VALIDATION_FAILED`.
   - The server computes the total and copies price snapshots and the customer's address.
   - 422 errors: `CUSTOMER_UNKNOWN`, `MERCHANT_UNKNOWN`, `MENU_ITEM_UNKNOWN`, `MENU_ITEM_UNAVAILABLE`, `MENU_ITEM_WRONG_MERCHANT`, `MERCHANT_CLOSED`.
   - Publishes `OrderPlaced`.
@@ -218,7 +220,7 @@ Build order, issues (#50–#56) and quiz points: `docs/milestones/M2.md`.
 
 **M2-4 Idempotency key.**
 - Scope:
-  - The `Idempotency-Key` header is required (missing returns 400 `IDEMPOTENCY_KEY_REQUIRED`).
+  - The `Idempotency-Key` header is required (missing or blank returns 400 `IDEMPOTENCY_KEY_REQUIRED`, checked before the body). A key longer than 255 characters returns 400 `VALIDATION_FAILED` on `Idempotency-Key`.
   - `request_hash` = SHA-256 of the canonical request (lines sorted by menuItemId).
   - Same key + same hash replays 201 with `Idempotent-Replayed: true`. Same key + different hash returns 422 `IDEMPOTENCY_KEY_REUSED`.
   - A concurrent duplicate waits on the unique index, then replays, gets 422, or proceeds if the first rolled back.
