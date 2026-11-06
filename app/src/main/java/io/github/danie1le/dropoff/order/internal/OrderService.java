@@ -1,9 +1,11 @@
 package io.github.danie1le.dropoff.order.internal;
 
+import static io.github.danie1le.dropoff.common.Validated.required;
+
 import io.github.danie1le.dropoff.common.DomainException;
-import io.github.danie1le.dropoff.merchant.MerchantCatalog;
-import io.github.danie1le.dropoff.merchant.MerchantCatalog.MenuItemView;
-import io.github.danie1le.dropoff.merchant.MerchantCatalog.MerchantView;
+import io.github.danie1le.dropoff.merchant.MerchantDirectory;
+import io.github.danie1le.dropoff.merchant.MerchantDirectory.MenuItemView;
+import io.github.danie1le.dropoff.merchant.MerchantDirectory.MerchantView;
 import io.github.danie1le.dropoff.order.Actor;
 import io.github.danie1le.dropoff.order.OrderPlaced;
 import io.github.danie1le.dropoff.order.internal.OrderRequests.OrderResponse;
@@ -23,7 +25,6 @@ import java.util.TreeMap;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.jspecify.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
@@ -34,7 +35,7 @@ class OrderService {
 
     private final OrderRepository orders;
     private final CustomerRepository customers;
-    private final MerchantCatalog catalog;
+    private final MerchantDirectory merchants;
     private final JdbcClient jdbc;
     private final ApplicationEventPublisher events;
     private final Clock clock;
@@ -42,16 +43,22 @@ class OrderService {
     OrderService(
             OrderRepository orders,
             CustomerRepository customers,
-            MerchantCatalog catalog,
+            MerchantDirectory merchants,
             JdbcClient jdbc,
             ApplicationEventPublisher events,
             Clock clock) {
         this.orders = orders;
         this.customers = customers;
-        this.catalog = catalog;
+        this.merchants = merchants;
         this.jdbc = jdbc;
         this.events = events;
         this.clock = clock;
+    }
+
+    /** One order as a response body, built inside the transaction because its lines load lazily. */
+    @Transactional(readOnly = true)
+    OrderResponse get(long orderId) {
+        return OrderResponse.of(orders.findById(orderId).orElseThrow(() -> OrderCommandService.notFound(orderId)));
     }
 
     /** The outcome of a place-order request: the order, and whether it was an earlier order replayed. */
@@ -81,13 +88,14 @@ class OrderService {
         Customer customer = customers
                 .findById(customerId)
                 .orElseThrow(() -> unprocessable("CUSTOMER_UNKNOWN", "The customer does not exist."));
-        MerchantView merchant = catalog.findMerchant(merchantId)
+        MerchantView merchant = merchants
+                .findMerchant(merchantId)
                 .orElseThrow(() -> unprocessable("MERCHANT_UNKNOWN", "The merchant does not exist."));
         if (!merchant.open()) {
             throw unprocessable("MERCHANT_CLOSED", "The merchant is closed.");
         }
 
-        Map<Long, MenuItemView> items = catalog.findMenuItems(quantities.keySet()).stream()
+        Map<Long, MenuItemView> items = merchants.findMenuItems(quantities.keySet()).stream()
                 .collect(Collectors.toMap(MenuItemView::id, Function.identity()));
         List<OrderLine> lines = new ArrayList<>();
         quantities.forEach((menuItemId, quantity) -> {
@@ -157,14 +165,6 @@ class OrderService {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 is always available", e);
         }
-    }
-
-    /** {@code @Valid} rejects nulls before the service runs. */
-    private static <T> T required(@Nullable T value) {
-        if (value == null) {
-            throw new IllegalStateException("validate the request with @Valid first");
-        }
-        return value;
     }
 
     private static DomainException unprocessable(String code, String message) {

@@ -51,7 +51,7 @@ class MenuItemService {
         }
         Boolean available = request.available();
         if (available != null) {
-            item.setAvailable(available);
+            item.changeAvailability(available);
         }
         return item;
     }

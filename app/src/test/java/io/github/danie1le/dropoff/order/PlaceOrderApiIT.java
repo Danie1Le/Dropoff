@@ -220,4 +220,25 @@ class PlaceOrderApiIT {
         assertThat(zero).hasStatus(HttpStatus.BAD_REQUEST);
         assertThat(zero).bodyJson().extractingPath("$.errors[0].field").isEqualTo("lines[0].quantity");
     }
+
+    @Test
+    void rejectsAQuantityAboveTheLimit() {
+        long customerId = customer(jdbc);
+        long merchantId = merchant(jdbc, true);
+
+        MvcTestResult tooMany = place(customerId, merchantId, "[" + line(1, 1000) + "]");
+
+        assertThat(tooMany).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(tooMany).bodyJson().extractingPath("$.code").isEqualTo("VALIDATION_FAILED");
+        assertThat(tooMany).bodyJson().extractingPath("$.errors[0].field").isEqualTo("lines[0].quantity");
+    }
+
+    @Test
+    void acceptsAQuantityAtTheLimit() {
+        long customerId = customer(jdbc);
+        long merchantId = merchant(jdbc, true);
+        long taco = item(jdbc, merchantId, 399, true);
+
+        assertThat(place(customerId, merchantId, "[" + line(taco, 999) + "]")).hasStatus(HttpStatus.CREATED);
+    }
 }

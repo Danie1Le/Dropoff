@@ -171,6 +171,36 @@ class IdempotencyApiIT {
         assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("IDEMPOTENCY_KEY_REQUIRED");
     }
 
+    @Test
+    void missingHeaderIsReportedBeforeAnInvalidBody() {
+        MvcTestResult result = mvc.post()
+                .uri("/api/v1/orders")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body("[]"))
+                .exchange();
+
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("IDEMPOTENCY_KEY_REQUIRED");
+    }
+
+    @Test
+    void overLongHeaderFailsValidation() {
+        MvcTestResult result = place("k".repeat(256), body("[{\"menuItemId\":%d,\"quantity\":1}]".formatted(taco)));
+
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("VALIDATION_FAILED");
+        assertThat(result).bodyJson().extractingPath("$.errors[0].field").isEqualTo(HEADER);
+    }
+
+    @Test
+    void headerOfExactly255CharactersIsAccepted() {
+        String key = "k".repeat(255);
+        keys.add(key);
+
+        assertThat(place(key, body("[{\"menuItemId\":%d,\"quantity\":1}]".formatted(taco))))
+                .hasStatus(HttpStatus.CREATED);
+    }
+
     /** Starts the duplicate while the first request's transaction is still open, so it waits on the unique index. */
     private CompletableFuture<MvcTestResult> duplicateDuringOpenTransaction(
             String key, String firstBody, String secondBody, boolean commitFirst) {

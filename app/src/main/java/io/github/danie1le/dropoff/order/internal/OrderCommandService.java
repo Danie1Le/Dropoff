@@ -1,8 +1,8 @@
 package io.github.danie1le.dropoff.order.internal;
 
 import io.github.danie1le.dropoff.common.DomainException;
-import io.github.danie1le.dropoff.merchant.MerchantCatalog;
-import io.github.danie1le.dropoff.merchant.MerchantCatalog.MerchantView;
+import io.github.danie1le.dropoff.merchant.MerchantDirectory;
+import io.github.danie1le.dropoff.merchant.MerchantDirectory.MerchantView;
 import io.github.danie1le.dropoff.order.Actor;
 import io.github.danie1le.dropoff.order.OrderCancelled;
 import io.github.danie1le.dropoff.order.OrderReady;
@@ -21,7 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Reads orders (as response bodies, built inside the transaction because lines load lazily) and applies path-scoped status commands (ADR-0005). The status write is a conditional {@code UPDATE …
+ * Applies path-scoped status commands (ADR-0005). The status write is a conditional {@code UPDATE …
  * WHERE status IN (sources)}, so of two racing commands only one moves the order; the loser re-reads and becomes a
  * no-op or a 409.
  */
@@ -29,7 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 class OrderCommandService {
 
     private final OrderRepository orders;
-    private final MerchantCatalog catalog;
+    private final MerchantDirectory merchants;
     private final JdbcClient jdbc;
     private final EntityManager entityManager;
     private final ApplicationEventPublisher events;
@@ -37,22 +37,17 @@ class OrderCommandService {
 
     OrderCommandService(
             OrderRepository orders,
-            MerchantCatalog catalog,
+            MerchantDirectory merchants,
             JdbcClient jdbc,
             EntityManager entityManager,
             ApplicationEventPublisher events,
             Clock clock) {
         this.orders = orders;
-        this.catalog = catalog;
+        this.merchants = merchants;
         this.jdbc = jdbc;
         this.entityManager = entityManager;
         this.events = events;
         this.clock = clock;
-    }
-
-    @Transactional(readOnly = true)
-    OrderResponse get(long orderId) {
-        return OrderResponse.of(orders.findById(orderId).orElseThrow(() -> notFound(orderId)));
     }
 
     /** A merchant command on one of its own orders; another merchant's order is a 404. */
@@ -127,7 +122,8 @@ class OrderCommandService {
             case CANCEL ->
                 events.publishEvent(new OrderCancelled(UUID.randomUUID(), order.id(), order.merchantId(), actor, now));
             case MARK_READY -> {
-                MerchantView merchant = catalog.findMerchant(order.merchantId())
+                MerchantView merchant = merchants
+                        .findMerchant(order.merchantId())
                         .orElseThrow(() -> new IllegalStateException("order's merchant is gone"));
                 Location delivery = order.deliveryAddress();
                 events.publishEvent(new OrderReady(
@@ -148,7 +144,7 @@ class OrderCommandService {
         }
     }
 
-    private static DomainException notFound(long orderId) {
+    static DomainException notFound(long orderId) {
         return new DomainException(
                 DomainException.Category.NOT_FOUND, "ORDER_NOT_FOUND", "Order " + orderId + " does not exist.");
     }

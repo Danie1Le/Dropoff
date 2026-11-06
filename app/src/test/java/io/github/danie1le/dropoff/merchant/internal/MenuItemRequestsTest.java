@@ -77,7 +77,7 @@ class MenuItemRequestsTest {
     void unvalidatedRequestWithoutAPriceThrows() {
         assertThatThrownBy(() -> new CreateMenuItem("Salsa", null).priceCentsValue())
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("name and priceCents are required; validate with @Valid first");
+                .hasMessage("a required field is missing; validate the request with @Valid first");
     }
 
     @Test

@@ -1,6 +1,6 @@
 package io.github.danie1le.dropoff.merchant.internal;
 
-import io.github.danie1le.dropoff.merchant.MerchantCatalog;
+import io.github.danie1le.dropoff.merchant.MerchantDirectory;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -8,12 +8,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 @Component
-class JpaMerchantCatalog implements MerchantCatalog {
+class JpaMerchantDirectory implements MerchantDirectory {
 
     private final MerchantRepository merchants;
     private final MenuItemRepository items;
 
-    JpaMerchantCatalog(MerchantRepository merchants, MenuItemRepository items) {
+    JpaMerchantDirectory(MerchantRepository merchants, MenuItemRepository items) {
         this.merchants = merchants;
         this.items = items;
     }

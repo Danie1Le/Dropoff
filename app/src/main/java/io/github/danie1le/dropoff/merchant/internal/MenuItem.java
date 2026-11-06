@@ -69,7 +69,7 @@ class MenuItem {
         this.priceCents = priceCents;
     }
 
-    void setAvailable(boolean available) {
+    void changeAvailability(boolean available) {
         this.available = available;
     }
 }

@@ -1,17 +1,16 @@
 package io.github.danie1le.dropoff.order.internal;
 
-import io.github.danie1le.dropoff.common.DomainException;
 import io.github.danie1le.dropoff.order.internal.OrderRequests.OrderResponse;
 import io.github.danie1le.dropoff.order.internal.OrderRequests.PlaceOrder;
 import io.github.danie1le.dropoff.order.internal.OrderService.Placement;
 import jakarta.validation.Valid;
 import java.net.URI;
-import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
@@ -21,10 +20,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 @RequestMapping("/orders")
 class OrderController {
 
-    private static final String IDEMPOTENCY_KEY = "Idempotency-Key";
     private static final String REPLAYED = "Idempotent-Replayed";
-    /** The width of {@code orders.idempotency_key}. */
-    private static final int MAX_KEY_LENGTH = 255;
 
     private final OrderService service;
 
@@ -32,20 +28,18 @@ class OrderController {
         this.service = service;
     }
 
+    @GetMapping("/{id}")
+    OrderResponse get(@PathVariable long id) {
+        return service.get(id);
+    }
+
     /**
      * Places an order. The {@code Idempotency-Key} header is required; a repeat of an earlier request with the same
-     * key returns the original order with {@code Idempotent-Replayed: true} (M2-4, ticket #42).
+     * key returns the original order with {@code Idempotent-Replayed: true} (M2-4, ticket #42). The key is declared
+     * before the body so it is checked first ({@link IdempotencyKey}).
      */
     @PostMapping
-    ResponseEntity<OrderResponse> place(
-            @RequestHeader(name = IDEMPOTENCY_KEY, required = false) @Nullable String idempotencyKey,
-            @Valid @RequestBody PlaceOrder request) {
-        if (idempotencyKey == null || idempotencyKey.isBlank() || idempotencyKey.length() > MAX_KEY_LENGTH) {
-            throw new DomainException(
-                    DomainException.Category.BAD_REQUEST,
-                    "IDEMPOTENCY_KEY_REQUIRED",
-                    "The Idempotency-Key header is required and must be 1 to 255 characters.");
-        }
+    ResponseEntity<OrderResponse> place(@IdempotencyKey String idempotencyKey, @Valid @RequestBody PlaceOrder request) {
         Placement placement;
         try {
             placement = service.place(idempotencyKey, request);

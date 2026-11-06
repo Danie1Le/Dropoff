@@ -1,5 +1,7 @@
 package io.github.danie1le.dropoff.merchant.internal;
 
+import static io.github.danie1le.dropoff.common.Validated.required;
+
 import io.github.danie1le.dropoff.common.NotBlankIfPresent;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.Digits;
@@ -35,13 +37,6 @@ final class MenuItemRequests {
         /** The price as a long. {@code @Valid} rejects a missing, decimal or out-of-range price first. */
         long priceCentsValue() {
             return required(priceCents).longValueExact();
-        }
-
-        private static <T> T required(@Nullable T value) {
-            if (value == null) {
-                throw new IllegalStateException("name and priceCents are required; validate with @Valid first");
-            }
-            return value;
         }
     }
 

@@ -1,5 +1,7 @@
 package io.github.danie1le.dropoff.order.internal;
 
+import static io.github.danie1le.dropoff.common.Validated.required;
+
 import io.github.danie1le.dropoff.common.Latitude;
 import io.github.danie1le.dropoff.common.Longitude;
 import io.github.danie1le.dropoff.common.NotBlankIfPresent;
@@ -30,10 +32,7 @@ final class CustomerRequests {
 
         /** The location. {@code @Valid} rejects a missing lat or lng before this is called. */
         Location location() {
-            if (lat == null || lng == null) {
-                throw new IllegalStateException("lat and lng are required; validate with @Valid first");
-            }
-            return new Location(address, lat, lng);
+            return new Location(address, required(lat), required(lng));
         }
     }
 
