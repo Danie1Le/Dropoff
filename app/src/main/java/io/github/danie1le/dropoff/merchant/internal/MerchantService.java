@@ -1,6 +1,6 @@
 package io.github.danie1le.dropoff.merchant.internal;
 
-import io.github.danie1le.dropoff.common.DomainException;
+import io.github.danie1le.dropoff.merchant.MerchantDirectory;
 import io.github.danie1le.dropoff.merchant.internal.MerchantRequests.CreateMerchant;
 import io.github.danie1le.dropoff.merchant.internal.MerchantRequests.UpdateMerchant;
 import org.springframework.data.domain.Page;
@@ -25,7 +25,7 @@ class MerchantService {
 
     @Transactional(readOnly = true)
     Merchant get(long id) {
-        return merchants.findById(id).orElseThrow(() -> notFound(id));
+        return merchants.findById(id).orElseThrow(() -> MerchantDirectory.notFound(id));
     }
 
     @Transactional(readOnly = true)
@@ -53,10 +53,5 @@ class MerchantService {
 
     private static Location trimmed(Location location) {
         return new Location(location.address().trim(), location.lat(), location.lng());
-    }
-
-    private static DomainException notFound(long id) {
-        return new DomainException(
-                DomainException.Category.NOT_FOUND, "MERCHANT_NOT_FOUND", "Merchant " + id + " does not exist.");
     }
 }
