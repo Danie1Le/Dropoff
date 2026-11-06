@@ -12,7 +12,9 @@ import jakarta.persistence.EntityManager;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -67,6 +69,34 @@ class OrderCommandService {
             throw notFound(orderId);
         }
         return OrderResponse.of(apply(order, command, Actor.CUSTOMER));
+    }
+
+    /**
+     * Cancels, as {@link Actor#SYSTEM}, the oldest order still PLACED before {@code cutoff} and not in {@code tried}
+     * (decisions #13, #14). The row is locked with {@code SKIP LOCKED}, so concurrent runs each take a different order.
+     *
+     * <p>The picked id is added to {@code tried} before the cancel runs, so if the cancel throws (and rolls back) the
+     * caller still knows which order failed and the next call steps past it.
+     *
+     * @return whether an order was cancelled; {@code false} means none is left to cancel
+     */
+    @Transactional
+    boolean cancelOldestPlacedBefore(Instant cutoff, Set<Long> tried) {
+        String skipTried = tried.isEmpty() ? "" : " AND id NOT IN (:tried)";
+        JdbcClient.StatementSpec select = jdbc.sql(
+                        "SELECT id FROM orders WHERE status = 'PLACED' AND created_at < :cutoff" + skipTried
+                                + " ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED")
+                .param("cutoff", Timestamp.from(cutoff));
+        if (!tried.isEmpty()) {
+            select = select.param("tried", List.copyOf(tried));
+        }
+        Optional<Long> id = select.query(Long.class).optional();
+        if (id.isEmpty()) {
+            return false;
+        }
+        tried.add(id.get());
+        apply(find(id.get()), OrderCommand.CANCEL, Actor.SYSTEM);
+        return true;
     }
 
     private Order find(long orderId) {
