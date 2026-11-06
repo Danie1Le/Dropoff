@@ -1,0 +1,65 @@
+package io.github.danie1le.dropoff.order.internal;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
+import java.time.Instant;
+import java.util.List;
+import org.jspecify.annotations.Nullable;
+
+/** Request and response bodies of the order endpoints (docs/PLAN.md, "Shared contracts"). */
+final class OrderRequests {
+
+    private OrderRequests() {}
+
+    /**
+     * The client sends only ids and quantities; prices, total and delivery address come from the server (#3, #9). At
+     * most {@value #MAX_LINES} lines and {@value #MAX_QUANTITY} per line, so merged quantities never overflow.
+     */
+    record PlaceOrder(
+            @NotNull Long customerId,
+            @NotNull Long merchantId,
+            @NotNull @NotEmpty @Size(max = MAX_LINES) List<@NotNull @Valid Line> lines) {
+
+        static final int MAX_LINES = 100;
+        static final int MAX_QUANTITY = 999;
+
+        record Line(
+                @NotNull Long menuItemId,
+                @NotNull @Positive @Max(MAX_QUANTITY) Integer quantity) {}
+    }
+
+    record OrderResponse(
+            long id,
+            long customerId,
+            long merchantId,
+            @Nullable Long courierId,
+            OrderStatus status,
+            long totalCents,
+            Location deliveryAddress,
+            List<LineResponse> lines,
+            Instant createdAt,
+            Instant updatedAt) {
+
+        record LineResponse(long menuItemId, int quantity, long priceCents) {}
+
+        static OrderResponse of(Order order) {
+            return new OrderResponse(
+                    order.id(),
+                    order.customerId(),
+                    order.merchantId(),
+                    order.courierId(),
+                    order.status(),
+                    order.totalCents(),
+                    order.deliveryAddress(),
+                    order.lines().stream()
+                            .map(l -> new LineResponse(l.menuItemId(), l.quantity(), l.priceCents()))
+                            .toList(),
+                    order.createdAt(),
+                    order.updatedAt());
+        }
+    }
+}
