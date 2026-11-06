@@ -50,7 +50,7 @@ class OrderStatusRulesTest {
     @ParameterizedTest
     @MethodSource("legalSteps")
     void legalStepMovesTheOrder(OrderStatus from, OrderCommand command, Actor actor, OrderStatus to) {
-        assertThat(OrderStatusRules.decide(from, command, actor)).isEqualTo(new StatusDecision.Move());
+        assertThat(OrderStatusRules.decide(from, command, actor)).isEqualTo(StatusDecision.MOVE);
     }
 
     static Stream<Arguments> illegalSteps() {
@@ -138,7 +138,7 @@ class OrderStatusRulesTest {
     @ParameterizedTest
     @MethodSource("repeats")
     void repeatedCommandIsANoOp(OrderStatus current, OrderCommand command, Actor actor) {
-        assertThat(OrderStatusRules.decide(current, command, actor)).isEqualTo(new StatusDecision.NoOp(current));
+        assertThat(OrderStatusRules.decide(current, command, actor)).isEqualTo(StatusDecision.NO_OP);
     }
 
     @Test
