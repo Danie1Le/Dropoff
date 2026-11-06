@@ -2,6 +2,7 @@ package io.github.danie1le.dropoff.order.internal;
 
 import static io.github.danie1le.dropoff.common.Validated.required;
 
+import io.github.danie1le.dropoff.common.DbClock;
 import io.github.danie1le.dropoff.common.DomainException;
 import io.github.danie1le.dropoff.merchant.MerchantDirectory;
 import io.github.danie1le.dropoff.merchant.MerchantDirectory.MenuItemView;
@@ -15,7 +16,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
@@ -113,7 +113,7 @@ class OrderService {
         });
 
         // Postgres keeps microseconds; truncate so the response matches what a replay reads back.
-        Instant now = clock.instant().truncatedTo(ChronoUnit.MICROS);
+        Instant now = DbClock.now(clock);
         Order order = orders.save(
                 new Order(customerId, merchantId, customer.location(), lines, idempotencyKey, requestHash, now));
         OrderEventLog.record(jdbc, order.id(), null, OrderStatus.PLACED, Actor.CUSTOMER, now);

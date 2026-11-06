@@ -10,6 +10,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -23,6 +25,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
+import org.springframework.context.event.EventListener;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.modulith.test.EnableScenarios;
 import org.springframework.modulith.test.Scenario;
@@ -33,7 +36,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @SpringBootTest(properties = "dropoff.scheduling.enabled=false")
 @AutoConfigureMockMvc
 @EnableScenarios
-@Import({TestcontainersConfiguration.class, AutoCancelJobIT.ClockFixture.class})
+@Import({TestcontainersConfiguration.class, AutoCancelJobIT.ClockFixture.class, AutoCancelJobIT.FailingOrder.class})
 class AutoCancelJobIT {
 
     /** A clock the test moves by hand. */
@@ -73,23 +76,45 @@ class AutoCancelJobIT {
         }
     }
 
+    /**
+     * Makes cancelling one chosen order fail: a synchronous listener throws inside the cancel transaction, so that
+     * order's cancel rolls back.
+     */
+    static class FailingOrder {
+        private volatile long orderId = -1;
+
+        void set(long id) {
+            orderId = id;
+        }
+
+        @EventListener
+        void on(OrderCancelled event) {
+            if (event.orderId() == orderId) {
+                throw new IllegalStateException("cancel of order " + orderId + " fails");
+            }
+        }
+    }
+
     private final MockMvcTester mvc;
     private final JdbcClient jdbc;
     private final AutoCancelJob job;
     private final MutableClock clock;
     private final TransactionTemplate transactions;
+    private final FailingOrder failing;
 
     AutoCancelJobIT(
             @Autowired MockMvcTester mvc,
             @Autowired JdbcClient jdbc,
             @Autowired AutoCancelJob job,
             @Autowired MutableClock clock,
-            @Autowired TransactionTemplate transactions) {
+            @Autowired TransactionTemplate transactions,
+            @Autowired FailingOrder failing) {
         this.mvc = mvc;
         this.jdbc = jdbc;
         this.job = job;
         this.clock = clock;
         this.transactions = transactions;
+        this.failing = failing;
     }
 
     @BeforeEach
@@ -99,6 +124,7 @@ class AutoCancelJobIT {
 
     @AfterEach
     void cleanUp() {
+        failing.set(-1);
         OrderCommandApiIT.deleteAll(jdbc);
     }
 
@@ -192,5 +218,51 @@ class AutoCancelJobIT {
             assertThat(status(f.orderId())).isEqualTo("CANCELLED");
             assertThat(systemCancels(f.orderId())).isEqualTo(1);
         }
+    }
+
+    /** Two runs at once over the same stale orders: every order is cancelled, and none is cancelled twice. */
+    @Test
+    void concurrentRunsNeverCancelAnOrderTwice() throws Exception {
+        List<Fixture> stale = new ArrayList<>();
+        for (int i = 0; i < 10; i++) {
+            stale.add(OrderCommandApiIT.placed(mvc, jdbc));
+        }
+        clock.advance(Duration.ofMinutes(11));
+        CountDownLatch start = new CountDownLatch(1);
+        Runnable run = () -> {
+            try {
+                start.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(e);
+            }
+            job.run();
+        };
+        CompletableFuture<Void> first = CompletableFuture.runAsync(run);
+        CompletableFuture<Void> second = CompletableFuture.runAsync(run);
+        start.countDown();
+        CompletableFuture.allOf(first, second).get(30, TimeUnit.SECONDS);
+        for (Fixture f : stale) {
+            assertThat(status(f.orderId())).isEqualTo("CANCELLED");
+            assertThat(systemCancels(f.orderId())).isEqualTo(1);
+        }
+    }
+
+    /** A cancel that fails for the oldest order does not stop the run: it steps past it and cancels the rest. */
+    @Test
+    void oneFailingOrderDoesNotStallTheRun() {
+        Fixture bad = OrderCommandApiIT.placed(mvc, jdbc);
+        clock.advance(Duration.ofMinutes(1));
+        Fixture b = OrderCommandApiIT.placed(mvc, jdbc);
+        Fixture c = OrderCommandApiIT.placed(mvc, jdbc);
+        clock.advance(Duration.ofMinutes(11));
+        failing.set(bad.orderId());
+
+        job.run();
+
+        assertThat(status(bad.orderId())).isEqualTo("PLACED");
+        assertThat(systemCancels(bad.orderId())).isZero();
+        assertThat(status(b.orderId())).isEqualTo("CANCELLED");
+        assertThat(status(c.orderId())).isEqualTo("CANCELLED");
     }
 }

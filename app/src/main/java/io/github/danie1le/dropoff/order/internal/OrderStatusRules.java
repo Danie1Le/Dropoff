@@ -24,7 +24,7 @@ final class OrderStatusRules {
             throw new IllegalArgumentException(actor + " may not send " + command);
         }
         if (current == command.target()) {
-            return new StatusDecision.NoOp(current);
+            return StatusDecision.NO_OP;
         }
         boolean beyondSystemLimit = actor == Actor.SYSTEM && current != OrderStatus.PLACED;
         if (!command.sources().contains(current) || beyondSystemLimit) {
@@ -33,6 +33,6 @@ final class OrderStatusRules {
                     "INVALID_STATUS_TRANSITION",
                     "The order's current status does not allow this step.");
         }
-        return new StatusDecision.Move();
+        return StatusDecision.MOVE;
     }
 }

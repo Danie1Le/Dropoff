@@ -1,5 +1,6 @@
 package io.github.danie1le.dropoff.order.internal;
 
+import io.github.danie1le.dropoff.common.DbClock;
 import io.github.danie1le.dropoff.common.DomainException;
 import io.github.danie1le.dropoff.merchant.MerchantDirectory;
 import io.github.danie1le.dropoff.merchant.MerchantDirectory.MerchantView;
@@ -11,10 +12,10 @@ import jakarta.persistence.EntityManager;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
-import java.util.function.LongPredicate;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
@@ -53,48 +54,62 @@ class OrderCommandService {
     /** A merchant command on one of its own orders; another merchant's order is a 404. */
     @Transactional
     OrderResponse byMerchant(long merchantId, long orderId, OrderCommand command) {
-        return OrderResponse.of(apply(orderId, o -> o == merchantId, command, Actor.MERCHANT));
+        Order order = find(orderId);
+        if (order.merchantId() != merchantId) {
+            throw notFound(orderId);
+        }
+        return OrderResponse.of(apply(order, command, Actor.MERCHANT));
     }
 
     /** A customer command on one of their own orders; another customer's order is a 404. */
     @Transactional
     OrderResponse byCustomer(long customerId, long orderId, OrderCommand command) {
-        return OrderResponse.of(apply(orderId, c -> c == customerId, command, Actor.CUSTOMER));
+        Order order = find(orderId);
+        if (order.customerId() != customerId) {
+            throw notFound(orderId);
+        }
+        return OrderResponse.of(apply(order, command, Actor.CUSTOMER));
     }
 
     /**
-     * Cancels, as {@link Actor#SYSTEM}, the oldest order still PLACED before {@code cutoff} (decisions #13, #14). The
-     * row is locked with {@code SKIP LOCKED}, so concurrent runs each take a different order.
+     * Cancels, as {@link Actor#SYSTEM}, the oldest order still PLACED before {@code cutoff} and not in {@code tried}
+     * (decisions #13, #14). The row is locked with {@code SKIP LOCKED}, so concurrent runs each take a different order.
+     *
+     * <p>The picked id is added to {@code tried} before the cancel runs, so if the cancel throws (and rolls back) the
+     * caller still knows which order failed and the next call steps past it.
      *
      * @return whether an order was cancelled; {@code false} means none is left to cancel
      */
     @Transactional
-    boolean cancelOldestPlacedBefore(Instant cutoff) {
-        Optional<Long> id = jdbc.sql("SELECT id FROM orders WHERE status = 'PLACED' AND created_at < :cutoff"
-                        + " ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED")
-                .param("cutoff", Timestamp.from(cutoff))
-                .query(Long.class)
-                .optional();
-        id.ifPresent(orderId -> apply(orderId, owner -> true, OrderCommand.CANCEL, Actor.SYSTEM));
-        return id.isPresent();
+    boolean cancelOldestPlacedBefore(Instant cutoff, Set<Long> tried) {
+        String skipTried = tried.isEmpty() ? "" : " AND id NOT IN (:tried)";
+        JdbcClient.StatementSpec select = jdbc.sql(
+                        "SELECT id FROM orders WHERE status = 'PLACED' AND created_at < :cutoff" + skipTried
+                                + " ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED")
+                .param("cutoff", Timestamp.from(cutoff));
+        if (!tried.isEmpty()) {
+            select = select.param("tried", List.copyOf(tried));
+        }
+        Optional<Long> id = select.query(Long.class).optional();
+        if (id.isEmpty()) {
+            return false;
+        }
+        tried.add(id.get());
+        apply(find(id.get()), OrderCommand.CANCEL, Actor.SYSTEM);
+        return true;
     }
 
-    private Order apply(long orderId, LongPredicate owns, OrderCommand command, Actor actor) {
-        Order order = orders.findById(orderId).orElseThrow(() -> notFound(orderId));
-        boolean owned = switch (actor) {
-            case MERCHANT -> owns.test(order.merchantId());
-            case CUSTOMER -> owns.test(order.customerId());
-            case SYSTEM -> true;
-            case COURIER -> throw new IllegalStateException("courier commands are not built yet (M3)");
-        };
-        if (!owned) {
-            throw notFound(orderId);
-        }
-        if (OrderStatusRules.decide(order.status(), command, actor) instanceof StatusDecision.NoOp) {
+    private Order find(long orderId) {
+        return orders.findById(orderId).orElseThrow(() -> notFound(orderId));
+    }
+
+    /** Applies {@code command} to an order the caller has already checked {@code actor} may act on. */
+    private Order apply(Order order, OrderCommand command, Actor actor) {
+        long orderId = order.id();
+        if (OrderStatusRules.decide(order.status(), command, actor) == StatusDecision.NO_OP) {
             return order;
         }
-        // Postgres keeps microseconds; truncate so events match what is stored.
-        Instant now = clock.instant().truncatedTo(ChronoUnit.MICROS);
+        Instant now = DbClock.now(clock);
         // Conditional update: the FOR UPDATE sub-select waits for a racing command and re-reads the row, so only the
         // first command moves the order, and RETURNING gives the status it really left.
         Optional<String> from = jdbc.sql("UPDATE orders o SET status = :to, updated_at = :now"
