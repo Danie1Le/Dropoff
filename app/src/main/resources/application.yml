@@ -20,3 +20,7 @@ spring:
       jdbc:
         schema-initialization:
           enabled: false
+dropoff:
+  orders:
+    # Decision #13: PLACED orders the merchant has not accepted after this long are cancelled by SYSTEM.
+    auto-cancel-after: 10m
