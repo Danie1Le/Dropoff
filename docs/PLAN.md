@@ -163,11 +163,14 @@ Goal: merchants can list what they sell.
 
 **M1-3 Menu items and menu.**
 - Scope:
-  - Migration `menu_items` (`price_cents BIGINT CHECK >= 0`, `is_available`).
+  - Migration `menu_items` (`merchant_id` FK indexed, name not blank after trim, `price_cents BIGINT CHECK >= 0`, `is_available` default true).
   - `POST /api/v1/merchants/{id}/menu-items`, `GET /api/v1/menu-items/{id}`, `PATCH /api/v1/menu-items/{id}` (available, name, priceCents).
-  - `GET /api/v1/merchants/{id}/menu` returns all items with an `available` flag.
+  - Menu item body: `{id, merchantId, name, priceCents, available}`; name trimmed.
+  - `GET /api/v1/merchants/{id}/menu` returns all items with an `available` flag, as a JSON array ordered by id, not paged.
+  - A decimal `priceCents` (e.g. `9.99`) returns 400 `VALIDATION_FAILED` on that field; 0 is allowed.
+  - A closed merchant can still add and edit items; its menu stays readable.
   - No DELETE.
-- Tests: web-slice tests and repository ITs; price CHECK.
+- Tests: `MenuItemApiIT` (full app, MockMvc, Testcontainers Postgres, including the price CHECK via plain SQL) and `MenuItemRequestsTest` (request records with a Bean Validation validator).
 - Decisions: #3, #9.
 
 **M1-4 Swagger UI.**

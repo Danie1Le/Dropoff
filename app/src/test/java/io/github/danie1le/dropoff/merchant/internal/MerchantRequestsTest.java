@@ -48,6 +48,6 @@ class MerchantRequestsTest {
 
         assertThatThrownBy(request::location)
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("lat and lng are required; validate with @Valid first");
+                .hasMessage("a required field is missing; validate the request with @Valid first");
     }
 }

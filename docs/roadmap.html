@@ -526,9 +526,9 @@ const MILESTONES = [
     { t: 'CODING_STANDARDS.md + formatter wired into the build', done: true },
   ]},
   { id: 'M1', name: 'Merchants & menus', gh: 2, needs: [8, 9], goal: 'Merchants can list what they sell.', items: [
-    { t: 'Migration: merchants, menu_items' },
-    { t: 'POST /api/v1/merchants, GET /api/v1/merchants (paginated), GET /api/v1/merchants/{id}, POST /api/v1/merchants/{id}/menu-items, GET /api/v1/merchants/{id}/menu' },
-    { t: 'PATCH /api/v1/merchants/{id} (open, name, address) and PATCH /api/v1/menu-items/{id} (available, name, price); no DELETE' },
+    { t: 'Migration: merchants, menu_items', done: true },
+    { t: 'POST /api/v1/merchants, GET /api/v1/merchants (paginated), GET /api/v1/merchants/{id}, POST /api/v1/merchants/{id}/menu-items, GET /api/v1/merchants/{id}/menu', done: true },
+    { t: 'PATCH /api/v1/merchants/{id} (open, name, address) and PATCH /api/v1/menu-items/{id} (available, name, price); no DELETE', done: true },
     { t: 'Input validation + Problem Details error responses (VALIDATION_FAILED, code field)', done: true },
     { t: 'Swagger UI via springdoc 3.2.0' },
     { t: 'Tests: web slice + Testcontainers repository tests' },
