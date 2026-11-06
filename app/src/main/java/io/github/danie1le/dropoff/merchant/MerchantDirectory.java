@@ -1,5 +1,6 @@
 package io.github.danie1le.dropoff.merchant;
 
+import io.github.danie1le.dropoff.common.DomainException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -18,4 +19,12 @@ public interface MerchantDirectory {
     record MerchantView(long id, String name, String address, double lat, double lng, boolean open) {}
 
     record MenuItemView(long id, long merchantId, long priceCents, boolean available) {}
+
+    /** The 404 for a merchant named in the URL path, shared by every module so it reads the same everywhere. */
+    static DomainException notFound(long merchantId) {
+        return new DomainException(
+                DomainException.Category.NOT_FOUND,
+                "MERCHANT_NOT_FOUND",
+                "Merchant " + merchantId + " does not exist.");
+    }
 }
