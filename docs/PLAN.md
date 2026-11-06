@@ -72,6 +72,8 @@ These apply across many PRs, and #42 is the source for all of them.
 
 **Merchant body** (from `POST /api/v1/merchants`, `GET` and `PATCH /api/v1/merchants/{id}`, and each item of the list): `{id, name, address, lat, lng, open}`.
 
+**Customer body** (from `POST /api/v1/customers`, `GET` and `PATCH /api/v1/customers/{id}`): `{id, name, address, lat, lng}`.
+
 PATCH bodies: an absent or null field means unchanged; to change a location send address, lat and lng together. Text fields (names, addresses) are trimmed before they are stored: leading and trailing characters up to U+0020 (spaces, tabs, line breaks and other control characters) are removed, and a value that is empty after trimming is rejected as blank.
 
 **STOMP messages** on `/topic/orders/{id}`:
@@ -189,7 +191,7 @@ Build order, issues (#50–#56) and quiz points: `docs/milestones/M2.md`.
   - Migration `customers` (order module).
   - `POST/GET/PATCH /api/v1/customers`.
   - lat −90..90, lng −180..180; address + lat + lng change together; no geocoder.
-- Tests: web-slice tests and repository ITs.
+- Tests: `CustomerApiIT` (full app, MockMvc, Testcontainers Postgres) and `CustomerRequestsTest` (request records with a Bean Validation validator).
 - Decisions: #9, #42.
 
 **M2-2 Order schema and order status rules (TDD).**

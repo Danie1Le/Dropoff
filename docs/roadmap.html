@@ -538,7 +538,7 @@ const MILESTONES = [
     { t: 'Events are records with eventId (UUID), occurredAt and their data, e.g. OrderPlaced(eventId, orderId, customerId, merchantId, totalCents, occurredAt), full list in docs/PLAN.md; module listeners use @ApplicationModuleListener' },
     { t: 'POST /api/v1/orders: server computes total, price snapshot per order line' },
     { t: 'Reject unavailable or wrong-merchant menu items; closed merchant → 422 MERCHANT_CLOSED' },
-    { t: 'Customer endpoints (POST/GET/PATCH /api/v1/customers); lat/lng range-checked, no geocoder; delivery address snapshot on each order, no override in the request' },
+    { t: 'Customer endpoints (POST/GET/PATCH /api/v1/customers); lat/lng range-checked, no geocoder; delivery address snapshot on each order, no override in the request', done: true },
     { t: 'Order lists (paginated): GET /api/v1/merchants/{id}/orders?status= and GET /api/v1/customers/{id}/orders (hand-written SQL, ADR-0002)' },
     { t: 'Order status state machine: wrong caller → 404, illegal jump → 409, repeated command → 200 no-op' },
     { t: 'Merchant commands: POST /api/v1/merchants/{id}/orders/{orderId}/accept, start-preparing, ready, cancel' },
