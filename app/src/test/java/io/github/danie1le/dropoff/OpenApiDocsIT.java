@@ -174,9 +174,13 @@ class OpenApiDocsIT {
                 .containsKeys("Location", "Idempotent-Replayed");
         assertThat(result)
                 .bodyJson()
-                .extractingPath("$.paths['/api/v1/orders'].post.responses.201.content.*.schema.$ref")
-                .asArray()
-                .containsExactly("#/components/schemas/OrderResponse");
+                .extractingPath("$.paths['/api/v1/orders'].post.responses.201.content")
+                .asMap()
+                .containsOnlyKeys("application/json");
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.paths['/api/v1/orders'].post.responses.201.content['application/json'].schema.$ref")
+                .isEqualTo("#/components/schemas/OrderResponse");
     }
 
     @Test

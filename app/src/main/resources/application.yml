@@ -28,6 +28,8 @@ springdoc:
       paths-to-match: /api/v1/**
   # Error responses come from ProblemDetailsOpenApi, not from scanning ApiExceptionHandler.
   override-with-generic-response: false
+  # The API only returns JSON (errors use application/problem+json via ProblemDetailsOpenApi).
+  default-produces-media-type: application/json
 dropoff:
   orders:
     # Decision #13: PLACED orders the merchant has not accepted after this long are cancelled by SYSTEM.
