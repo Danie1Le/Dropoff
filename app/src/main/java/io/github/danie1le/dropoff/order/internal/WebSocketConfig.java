@@ -24,6 +24,8 @@ class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
         registry.enableSimpleBroker("/topic");
+        // The outbound channel is a thread pool; without this, two STATUS messages for one session can swap places.
+        registry.setPreservePublishOrder(true);
     }
 
     @Override

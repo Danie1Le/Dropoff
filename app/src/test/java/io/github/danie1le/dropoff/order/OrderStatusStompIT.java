@@ -1,5 +1,6 @@
 package io.github.danie1le.dropoff.order;
 
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.danie1le.dropoff.TestcontainersConfiguration;
@@ -37,6 +38,8 @@ import org.springframework.messaging.simp.stomp.StompSession;
 import org.springframework.messaging.simp.stomp.StompSessionHandlerAdapter;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.socket.client.standard.StandardWebSocketClient;
 import org.springframework.web.socket.messaging.WebSocketStompClient;
 import tools.jackson.databind.JsonNode;
@@ -52,11 +55,14 @@ import tools.jackson.databind.JsonNode;
 class OrderStatusStompIT {
 
     private static final Duration WAIT = Duration.ofSeconds(5);
+    /** How long the open transaction holds before commit, to show PLACED is not sent early. */
+    private static final Duration BEFORE_COMMIT = Duration.ofMillis(300);
 
     private final MockMvcTester mvc;
     private final JdbcClient jdbc;
     private final AutoCancelJob autoCancelJob;
     private final SimpleBrokerMessageHandler broker;
+    private final TransactionTemplate transactions;
     private final WebSocketStompClient client;
     private final BlockingQueue<String> errors = new LinkedBlockingQueue<>();
     private final StompSession session;
@@ -66,12 +72,14 @@ class OrderStatusStompIT {
             @Autowired JdbcClient jdbc,
             @Autowired AutoCancelJob autoCancelJob,
             @Autowired SimpleBrokerMessageHandler broker,
+            @Autowired PlatformTransactionManager transactionManager,
             @LocalServerPort int port)
             throws Exception {
         this.mvc = mvc;
         this.jdbc = jdbc;
         this.autoCancelJob = autoCancelJob;
         this.broker = broker;
+        this.transactions = new TransactionTemplate(transactionManager);
         this.client = new WebSocketStompClient(new StandardWebSocketClient());
         client.setMessageConverter(new CompositeMessageConverter(
                 List.of(new StringMessageConverter(), new JacksonJsonMessageConverter())));
@@ -165,21 +173,27 @@ class OrderStatusStompIT {
     }
 
     @Test
-    void aNewOrderIsPushedAsPlaced() throws Exception {
-        // A client normally learns the id from the 201, after PLACED is sent; subscribe to the next id first instead.
-        // Safe because ITs run one at a time.
-        long nextId = jdbc.sql(
-                        "SELECT COALESCE(pg_sequence_last_value(pg_get_serial_sequence('orders', 'id')::regclass),"
-                                + " 0) + 1")
-                .query(Long.class)
-                .single();
-        BlockingQueue<JsonNode> messages = subscribe(nextId);
+    void aNewOrderIsPushedAsPlacedOnlyAfterCommit() throws Exception {
+        // MockMvc runs the request on this thread, so the place-order transaction joins this one and commits with
+        // it. The test learns the id and subscribes while PLACED is still held back by the open transaction.
+        Subscribed placed = requireNonNull(transactions.execute(status -> {
+            long orderId = OrderCommandApiIT.placed(mvc, jdbc).orderId();
+            BlockingQueue<JsonNode> messages = subscribe(orderId);
+            try {
+                assertThat(messages.poll(BEFORE_COMMIT.toMillis(), TimeUnit.MILLISECONDS))
+                        .as("no STATUS message before commit")
+                        .isNull();
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(ex);
+            }
+            return new Subscribed(orderId, messages);
+        }));
 
-        Fixture f = OrderCommandApiIT.placed(mvc, jdbc);
-
-        assertThat(f.orderId()).isEqualTo(nextId);
-        assertThat(next(messages, f.orderId(), 1)).containsExactly("PLACED/CUSTOMER");
+        assertThat(next(placed.messages(), placed.orderId(), 1)).containsExactly("PLACED/CUSTOMER");
     }
+
+    private record Subscribed(long orderId, BlockingQueue<JsonNode> messages) {}
 
     @Test
     void everyStatusFromAcceptedToDeliveredIsPushedInOrder() throws Exception {
