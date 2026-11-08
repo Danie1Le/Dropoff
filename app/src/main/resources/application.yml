@@ -11,3 +11,12 @@ spring:
     hibernate:
       ddl-auto: validate
     open-in-view: false
+  modulith:
+    events:
+      # Outbox settings (ticket #42, ADR-0006): delete completed publications, retry outstanding ones on restart,
+      # and let Flyway (V6) own the event_publication table.
+      completion-mode: delete
+      republish-outstanding-events-on-restart: true
+      jdbc:
+        schema-initialization:
+          enabled: false
