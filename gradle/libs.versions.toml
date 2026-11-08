@@ -2,6 +2,7 @@
 # Application stack (ticket #5: version matrix)
 spring-boot = "4.1.2"
 spring-modulith = "2.1.2"
+springdoc = "3.2.0"
 
 # Build tooling (ticket #7: coding standards)
 spotless = "8.11.0"
@@ -24,6 +25,7 @@ spring-boot-starter-data-jpa = { module = "org.springframework.boot:spring-boot-
 spring-boot-starter-flyway = { module = "org.springframework.boot:spring-boot-starter-flyway" }
 flyway-database-postgresql = { module = "org.flywaydb:flyway-database-postgresql" }
 postgresql = { module = "org.postgresql:postgresql" }
+springdoc-openapi-starter-webmvc-ui = { module = "org.springdoc:springdoc-openapi-starter-webmvc-ui", version.ref = "springdoc" }
 spring-modulith-starter-core = { module = "org.springframework.modulith:spring-modulith-starter-core" }
 spring-modulith-starter-jdbc = { module = "org.springframework.modulith:spring-modulith-starter-jdbc" }
 spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }

@@ -20,6 +20,16 @@ spring:
       jdbc:
         schema-initialization:
           enabled: false
+springdoc:
+  # Swagger UI (/swagger-ui.html) shows one group, v1, served at /v3/api-docs/v1: only the versioned REST API
+  # (M1-4, ticket #5). Actuator stays out.
+  group-configs:
+    - group: v1
+      paths-to-match: /api/v1/**
+  # Error responses come from ProblemDetailsOpenApi, not from scanning ApiExceptionHandler.
+  override-with-generic-response: false
+  # The API only returns JSON (errors use application/problem+json via ProblemDetailsOpenApi).
+  default-produces-media-type: application/json
 dropoff:
   orders:
     # Decision #13: PLACED orders the merchant has not accepted after this long are cancelled by SYSTEM.
