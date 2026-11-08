@@ -11,6 +11,9 @@ build/
 # Simulator state (ticket #42)
 .simulator/
 
+# k6 summaries (M7-1); M7-2 copies the numbers it keeps into docs/perf/README.md
+ops/k6/results/
+
 # OS
 .DS_Store
 Thumbs.db
