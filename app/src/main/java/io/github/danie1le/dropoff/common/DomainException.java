@@ -10,6 +10,8 @@ public class DomainException extends RuntimeException {
 
     /** What kind of rule was broken. Decides the HTTP status. */
     public enum Category {
+        /** The request itself is incomplete, for example a required header is missing (400). */
+        BAD_REQUEST,
         /** The resource named in the URL path does not exist (404). */
         NOT_FOUND,
         /** The request conflicts with the current state of the target resource (409). */
