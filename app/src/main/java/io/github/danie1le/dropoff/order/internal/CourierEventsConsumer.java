@@ -20,23 +20,20 @@ class CourierEventsConsumer {
     static final String GROUP = "order-service";
 
     private final ProcessedEvents processed;
-    private final CourierAssignedListener assigned;
-    private final CourierUnassignedListener unassigned;
+    private final CourierAssignmentWriter assignments;
 
-    CourierEventsConsumer(
-            ProcessedEvents processed, CourierAssignedListener assigned, CourierUnassignedListener unassigned) {
+    CourierEventsConsumer(ProcessedEvents processed, CourierAssignmentWriter assignments) {
         this.processed = processed;
-        this.assigned = assigned;
-        this.unassigned = unassigned;
+        this.assignments = assignments;
     }
 
     @KafkaHandler
     void on(CourierAssigned event) {
-        processed.runOnce(GROUP, event.eventId(), () -> assigned.on(event));
+        processed.runOnce(GROUP, event.eventId(), () -> assignments.record(event));
     }
 
     @KafkaHandler
     void on(CourierUnassigned event) {
-        processed.runOnce(GROUP, event.eventId(), () -> unassigned.on(event));
+        processed.runOnce(GROUP, event.eventId(), () -> assignments.clear(event));
     }
 }

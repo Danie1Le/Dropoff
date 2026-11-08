@@ -5,11 +5,14 @@ import static org.awaitility.Awaitility.await;
 
 import io.github.danie1le.dropoff.KafkaTestSupport;
 import io.github.danie1le.dropoff.TestcontainersConfiguration;
+import io.github.danie1le.dropoff.common.KafkaTopics;
 import io.github.danie1le.dropoff.order.OrderFixtures;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -44,6 +47,7 @@ class DeliveryIT {
     private final List<Long> courierIds = new ArrayList<>();
     private final List<Long> customerIds = new ArrayList<>();
     private final List<Long> merchantIds = new ArrayList<>();
+    private final List<UUID> eventIds = new ArrayList<>();
 
     DeliveryIT(
             @Autowired DispatchService dispatch,
@@ -64,6 +68,12 @@ class DeliveryIT {
     void deleteCreatedRows() {
         // The API test's events reach their Kafka consumers asynchronously; let them finish before deleting their rows.
         KafkaTestSupport.awaitSettled(jdbc);
+        if (!eventIds.isEmpty()) {
+            jdbc.sql("DELETE FROM processed_events WHERE event_id IN (:ids)")
+                    .param("ids", eventIds)
+                    .update();
+            eventIds.clear();
+        }
         if (!courierIds.isEmpty()) {
             redis.opsForGeo()
                     .remove(
@@ -388,6 +398,87 @@ class DeliveryIT {
                 .query(Long.class)
                 .single();
         return new Offered(courierId, orderId, offerId);
+    }
+
+    /**
+     * Sends an order event to {@code order-events} as the order module would, and waits until dispatch has handled it.
+     */
+    private void sendOrderEvent(String type, long orderId, long courierId, UUID eventId) {
+        byte[] value = "{\"eventId\":\"%s\",\"orderId\":%d,\"courierId\":%d,\"occurredAt\":\"2026-11-08T12:00:00Z\"}"
+                .formatted(eventId, orderId, courierId)
+                .getBytes(StandardCharsets.UTF_8);
+        KafkaTestSupport.send(KafkaTopics.ORDER_EVENTS, Long.toString(orderId), type, value);
+        KafkaTestSupport.awaitSettled(jdbc);
+    }
+
+    /** Forgets that dispatch processed the event, as a crash between the step's commit and the event id's would. */
+    private void loseProcessedRow(UUID eventId) {
+        assertThat(jdbc.sql("DELETE FROM processed_events WHERE consumer_group = 'dispatch-service' AND event_id = ?")
+                        .param(eventId)
+                        .update())
+                .isOne();
+    }
+
+    private boolean processed(UUID eventId) {
+        return jdbc.sql("SELECT count(*) FROM processed_events WHERE consumer_group = 'dispatch-service'"
+                                + " AND event_id = ?")
+                        .param(eventId)
+                        .query(Long.class)
+                        .single()
+                == 1;
+    }
+
+    /** Everything a re-run could change: the dispatch row, the courier, and every offer of the order. */
+    private String dispatchState(long orderId, long courierId) {
+        return jdbc.sql("SELECT d.status || '/' || d.courier_id || '/' || c.status || '/' || ("
+                        + "SELECT coalesce(string_agg(o.id || ':' || o.status, ',' ORDER BY o.id), '')"
+                        + " FROM offers o WHERE o.order_id = d.order_id OR o.courier_id = c.id)"
+                        + " FROM dispatch_orders d, couriers c WHERE d.order_id = ? AND c.id = ?")
+                .params(orderId, courierId)
+                .query(String.class)
+                .single();
+    }
+
+    /**
+     * The pickup and delivery steps commit before their event id (ticket #15, ADR-0006), so a crash in between makes
+     * Kafka redeliver an event whose work is already done. Its status guards must make that second run a no-op.
+     */
+    @Test
+    void aRedeliveredPickupOrDeliveryWhoseEventIdWasLostChangesNothing() {
+        Offered o = assigned();
+        await().atMost(Duration.ofSeconds(10)).until(() -> orderCourier(o.orderId()) != null);
+
+        UUID pickupId = UUID.randomUUID();
+        eventIds.add(pickupId);
+        sendOrderEvent("OrderPickedUp", o.orderId(), o.courierId(), pickupId);
+        assertThat(dispatchStatus(o.orderId())).isEqualTo("PICKED_UP");
+        String afterPickup = dispatchState(o.orderId(), o.courierId());
+
+        loseProcessedRow(pickupId);
+        sendOrderEvent("OrderPickedUp", o.orderId(), o.courierId(), pickupId);
+
+        assertThat(processed(pickupId)).as("the redelivered pickup ran again").isTrue();
+        assertThat(dispatchState(o.orderId(), o.courierId())).isEqualTo(afterPickup);
+
+        UUID deliveryId = UUID.randomUUID();
+        eventIds.add(deliveryId);
+        sendOrderEvent("OrderDelivered", o.orderId(), o.courierId(), deliveryId);
+        assertThat(dispatchStatus(o.orderId())).isEqualTo("DONE");
+        assertThat(courierStatus(o.courierId())).isEqualTo("AVAILABLE");
+        // The freed courier takes the next order, so freeing them a second time would show.
+        Offered next = offeredTo(o.courierId());
+        String afterDelivery = dispatchState(o.orderId(), o.courierId());
+        assertThat(courierStatus(o.courierId())).isEqualTo("BUSY");
+
+        loseProcessedRow(deliveryId);
+        sendOrderEvent("OrderDelivered", o.orderId(), o.courierId(), deliveryId);
+
+        assertThat(processed(deliveryId))
+                .as("the redelivered delivery ran again")
+                .isTrue();
+        assertThat(dispatchState(o.orderId(), o.courierId())).isEqualTo(afterDelivery);
+        assertThat(value("SELECT status FROM offers WHERE id = ?", next.offerId()))
+                .isEqualTo("OFFERED");
     }
 
     @Test

@@ -13,8 +13,13 @@ import org.springframework.stereotype.Component;
 
 /**
  * Dispatch reads the order module's events from Kafka as the {@code dispatch-service} group (M5-1, tickets #32, #42).
- * One listener per topic and group: two listeners in one group would split the topic's partitions between them. Each
- * event runs once per group ({@link ProcessedEvents}); a failure is retried, then dead-lettered.
+ * One listener per topic and group: two listeners in one group would split the topic's partitions between them.
+ * {@link ProcessedEvents} skips an event the group already recorded; a failure is retried, then dead-lettered.
+ *
+ * <p>Only {@code OrderReady} records its work and its event id in one transaction. Pickup and delivery run their steps
+ * in their own transactions ({@link DeliveryService}), which commit before the event id does. If the app crashes in
+ * between, the redelivery runs them again, and their status guards make that second run a no-op: see {@link
+ * #on(OrderPickedUp)} and {@link #on(OrderDelivered)}.
  */
 @Component
 @KafkaListener(topics = KafkaTopics.ORDER_EVENTS, groupId = OrderEventsConsumer.GROUP)
@@ -51,13 +56,21 @@ class OrderEventsConsumer {
         }
     }
 
-    /** Follows the order through pickup (M3-5). */
+    /**
+     * Follows the order through pickup (M3-5). The event id is only a fast path here: the pickup commits before it.
+     * A re-run after the event id was lost misses the {@code status = 'ASSIGNED'} guard, and the take-back finds the
+     * row PICKED_UP, which cannot be reassigned, so it skips.
+     */
     @KafkaHandler
     void on(OrderPickedUp event) {
         processed.runOnce(GROUP, event.eventId(), () -> delivery.pickedUp(event.orderId(), event.courierId()));
     }
 
-    /** Follows the order through delivery (M3-5). */
+    /**
+     * Follows the order through delivery (M3-5). The event id is only a fast path here: the delivery commits before
+     * it. A re-run after the event id was lost misses the ASSIGNED-or-PICKED_UP guard, and the take-back finds the row
+     * DONE, which cannot be reassigned, so it skips and the courier is not freed twice.
+     */
     @KafkaHandler
     void on(OrderDelivered event) {
         processed.runOnce(GROUP, event.eventId(), () -> delivery.delivered(event.orderId(), event.courierId()));

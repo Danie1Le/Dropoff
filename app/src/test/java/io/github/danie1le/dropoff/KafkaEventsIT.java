@@ -14,8 +14,11 @@ import java.util.concurrent.ThreadLocalRandom;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -86,8 +89,14 @@ class KafkaEventsIT {
                         .contains(rolledBack.eventId().toString()));
     }
 
+    /**
+     * The handler logs a skip for the unknown order each time it runs, and {@code ProcessedEvents} logs a skip each time
+     * it drops a duplicate, so each line must appear exactly once. Had the duplicate run the handler again, the first
+     * would appear twice and the second not at all.
+     */
     @Test
-    void aDuplicateIsProcessedOnce() {
+    @ExtendWith(OutputCaptureExtension.class)
+    void aDuplicateIsProcessedOnce(CapturedOutput output) {
         UUID eventId = UUID.randomUUID();
         eventIds.add(eventId);
         long orderId = unknownOrderId();
@@ -106,6 +115,16 @@ class KafkaEventsIT {
                         .query(Long.class)
                         .single())
                 .isOne();
+        assertThat(occurrences(output, "Skipped CourierUnassigned " + eventId))
+                .as("handler runs")
+                .isOne();
+        assertThat(occurrences(output, "Skipped event " + eventId + ": consumer group order-service"))
+                .as("duplicates skipped")
+                .isOne();
+    }
+
+    private static long occurrences(CapturedOutput output, String text) {
+        return output.getOut().lines().filter(line -> line.contains(text)).count();
     }
 
     @Test

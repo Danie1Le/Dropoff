@@ -55,7 +55,12 @@ class KafkaConfig {
     static final Duration DLT_RETENTION = Duration.ofDays(14);
     static final String DLT_SUFFIX = ".DLT";
 
-    /** Every event that crosses Kafka. Its simple name is its logical type name. */
+    /**
+     * Every event that crosses Kafka. Its simple name is its logical type name. Add each new contract event here
+     * (M5-3: {@code MerchantChanged}, {@code MenuItemChanged}), and route it in {@link #eventExternalization} if the
+     * registry sends it. A type missing from this list has no logical name, so its records fail conversion and go
+     * straight to the DLT.
+     */
     static final List<Class<? extends Record>> EVENTS = List.of(
             OrderPlaced.class,
             OrderCancelled.class,
