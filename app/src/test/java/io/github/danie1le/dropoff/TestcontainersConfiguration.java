@@ -3,9 +3,10 @@ package io.github.danie1le.dropoff;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
-/** Starts a real Postgres for integration tests and points the datasource at it. */
+/** Starts a real Postgres and Redis for integration tests and points the app at them. */
 @TestConfiguration(proxyBeanMethods = false)
 public class TestcontainersConfiguration {
 
@@ -14,5 +15,12 @@ public class TestcontainersConfiguration {
     PostgreSQLContainer postgres() {
         // Same image as compose.yaml; keep the two in sync.
         return new PostgreSQLContainer("postgres:18.6-alpine");
+    }
+
+    @Bean
+    @ServiceConnection(name = "redis")
+    GenericContainer<?> redis() {
+        // Same image as compose.yaml; keep the two in sync.
+        return new GenericContainer<>("redis:8.10.3-alpine").withExposedPorts(6379);
     }
 }

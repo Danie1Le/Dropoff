@@ -6,6 +6,11 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/dropoff}
     username: ${DB_USERNAME:dropoff}
     password: ${DB_PASSWORD:dropoff}
+  data:
+    redis:
+      # Defaults match compose.yaml; containers override them with REDIS_HOST and REDIS_PORT.
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
   jpa:
     # Flyway owns the schema; Hibernate only checks entities match it (ADR-0002).
     hibernate:

@@ -552,10 +552,10 @@ const MILESTONES = [
   ]},
   { id: 'M3', name: 'Dispatch', gh: 4, needs: [11, 12, 13, 14, 33], goal: 'Ready orders get the nearest available courier, with reassignment.', items: [
     { t: 'Migrations: couriers, offers, dispatch_orders (filled from OrderReady; WAITING → ASSIGNED → PICKED_UP → DONE)' },
-    { t: 'New couriers start OFFLINE; location updates allowed in any status (GEOADD only while AVAILABLE, after commit); AVAILABLE needs a location (409 COURIER_LOCATION_UNKNOWN), not while BUSY (409 COURIER_BUSY); geo key couriers:available' },
-    { t: 'POST /api/v1/couriers, PATCH /api/v1/couriers/{id}/status, PUT /api/v1/couriers/{id}/location' },
+    { t: 'New couriers start OFFLINE; location updates allowed in any status (GEOADD only while AVAILABLE, after commit); AVAILABLE needs a location (409 COURIER_LOCATION_UNKNOWN), not while BUSY (409 COURIER_BUSY); geo key couriers:available', done: true },
+    { t: 'POST /api/v1/couriers, PATCH /api/v1/couriers/{id}/status, PUT /api/v1/couriers/{id}/location', done: true },
     { t: 'Courier commands: POST /api/v1/couriers/{id}/orders/{orderId}/pick-up and deliver' },
-    { t: 'Redis GEO index of AVAILABLE couriers' },
+    { t: 'Redis GEO index of AVAILABLE couriers', done: true },
     { t: 'On READY: GEOSEARCH 5 km dispatch radius, nearest first' },
     { t: 'Claim with UPDATE … WHERE status = AVAILABLE' },
     { t: 'Offers: GET /api/v1/couriers/{id}/offers/current (200 or 204), POST /api/v1/couriers/{id}/offers/{offerId}/accept and decline' },
