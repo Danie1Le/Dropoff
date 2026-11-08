@@ -1,11 +1,12 @@
 # Local infrastructure and the three services as containers (ticket #6 picks the images, M6-3 adds the services).
 # Build the jars, then start everything:
 #   ./gradlew :services:merchant:bootJar :services:order:bootJar :services:dispatch:bootJar :tools:simulator:installDist
-#   docker compose up -d --build                  # merchant 8081, order 8082, dispatch 8083, Prometheus 9090
+#   docker compose up -d --build                  # merchant 8081, order 8082, dispatch 8083, Prometheus 9090, Grafana 3000
 #   docker compose --profile demo up -d --build   # the same, plus the simulator: seeds once, then runs the bots
-# Each service logs in as its own user to its own database (ADR-0007). Prometheus scrapes all three by service name.
+# Each service logs in as its own user to its own database (ADR-0007). Prometheus scrapes all three by service name
+# (M6-1); Grafana charts them (M6-2).
 # To run a service from source instead, start only the infrastructure, then `./gradlew :services:<name>:bootRun`:
-#   docker compose up -d postgres redis kafka prometheus
+#   docker compose up -d postgres redis kafka prometheus grafana
 # The services are capped at 512 MB each (heap 256 MB) to fit small machines.
 services:
   postgres:
@@ -170,8 +171,27 @@ services:
       dispatch:
         condition: service_healthy
 
+  grafana:
+    # Dashboard, datasource and alert rules come from ops/grafana/provisioning (M6-2, ticket #34). UI at
+    # http://localhost:3000, no login needed (read-only viewer); sign in as admin/admin to edit. Alerts show in the UI only.
+    image: grafana/grafana:13.3.0
+    depends_on:
+      - prometheus
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/provisioning/dashboards/dropoff-overview.json
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    volumes:
+      - ./ops/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+
 volumes:
   postgres-data:
   kafka-data:
   prometheus-data:
+  grafana-data:
   simulator-data:

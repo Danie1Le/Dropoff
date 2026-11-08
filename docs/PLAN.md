@@ -443,7 +443,8 @@ Goal: containers, published images and dashboards.
 
 **M6-3 Dockerfiles and the demo profile.**
 - Scope:
-  - One Dockerfile per service: layered jar extract on `eclipse-temurin:21-jre-alpine`, non-root user.
+  - One Dockerfile per service: layered jar extract, non-root user. The runtime is a `jlink` cut of Temurin 21 on
+    Alpine, since the full `eclipse-temurin:21-jre-alpine` (165 MB) leaves no room under 300 MB.
   - A Dockerfile for the simulator.
   - Compose runs the images; profile `demo` adds the simulator, which seeds if there's no state file and then runs.
 - Tests: CI builds each image and checks it is under 300 MB.

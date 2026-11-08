@@ -3,11 +3,9 @@
 # DELIVERED within 5 minutes. The simulator seeds first if there is no state file, then runs its own merchant and
 # courier bots.
 #
-# Needs Compose up and every service running:
-#   docker compose up -d
-#   ./gradlew :services:merchant:bootRun      # merchant, port 8081 (only needed to seed)
-#   ./gradlew :services:order:bootRun         # order, port 8082
-#   ./gradlew :services:dispatch:bootRun      # dispatch, port 8083
+# Needs every service up on its port (merchant 8081, only needed to seed; order 8082; dispatch 8083), either as
+# containers (M6-3: build the jars, then `docker compose up -d --build`) or with `./gradlew :services:<name>:bootRun`.
+# `docker compose --profile demo run --rm simulator smoke` runs the same check inside Compose.
 # On fresh databases (after `docker compose down -v`), delete .simulator/state.json first: its ids are gone.
 #
 # Override the service URLs with MERCHANT_URL, ORDER_URL and DISPATCH_URL, and the run with ORDERS and TIMEOUT.
