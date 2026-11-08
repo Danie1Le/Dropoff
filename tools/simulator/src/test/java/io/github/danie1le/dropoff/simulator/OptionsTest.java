@@ -18,7 +18,7 @@ class OptionsTest {
         assertThat(options.urls())
                 .isEqualTo(new ServiceUrls(
                         URI.create("http://localhost:8081"),
-                        URI.create("http://localhost:8080"),
+                        URI.create("http://localhost:8082"),
                         URI.create("http://localhost:8083")));
         assertThat(options.seed()).isEqualTo(42);
         assertThat(options.stateFile()).isEqualTo(Path.of(".simulator", "state.json"));
@@ -36,7 +36,7 @@ class OptionsTest {
                 "--merchant-url",
                 "http://localhost:8081",
                 "--order-url",
-                "http://localhost:8082",
+                "http://localhost:9092",
                 "--dispatch-url",
                 "http://localhost:9093",
                 "--seed",
@@ -58,7 +58,7 @@ class OptionsTest {
         assertThat(options.urls())
                 .isEqualTo(new ServiceUrls(
                         URI.create("http://localhost:8081"),
-                        URI.create("http://localhost:8082"),
+                        URI.create("http://localhost:9092"),
                         URI.create("http://localhost:9093")));
         assertThat(options.seed()).isEqualTo(7);
         assertThat(options.stateFile()).isEqualTo(Path.of("tmp/s.json"));

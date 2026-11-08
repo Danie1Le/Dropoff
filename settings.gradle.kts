@@ -18,7 +18,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "dropoff"
 
-include("app")
 // Event records every module and, after the split, every service shares (M5-2, ADR-0008). No Spring on its classpath.
 include("contracts")
 // DomainException, Problem Details error handling, paging limits and the /api/v1 prefix for every service (M5-2).
@@ -29,5 +28,7 @@ include("libs:service-common")
 include("services:dispatch")
 // merchant-service on port 8081 with its own merchant_db (M5-5, ADR-0007): merchants and menu items.
 include("services:merchant")
+// order-service on port 8082 with its own order_db (M5-6, ADR-0007): customers, orders and the live WebSocket.
+include("services:order")
 // Demo data seeder and courier/merchant/customer bots (M3-6, ticket #33). Plain Java, no Spring.
 include("tools:simulator")
