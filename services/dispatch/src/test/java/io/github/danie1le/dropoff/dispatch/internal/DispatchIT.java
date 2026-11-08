@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -47,6 +48,7 @@ class DispatchIT {
     private final JsonMapper json;
     private final List<Long> orderIds = new ArrayList<>();
     private final List<Long> courierIds = new ArrayList<>();
+    private final List<UUID> eventIds = new ArrayList<>();
 
     DispatchIT(
             @Autowired DispatchService dispatch,
@@ -75,6 +77,12 @@ class DispatchIT {
         }
         DispatchFixtures.deleteOrders(jdbc, orderIds);
         deleteByIds("couriers", courierIds);
+        for (UUID eventId : eventIds) {
+            jdbc.sql("DELETE FROM processed_events WHERE event_id = ?")
+                    .param(eventId)
+                    .update();
+        }
+        eventIds.clear();
         orderIds.clear();
         courierIds.clear();
     }
@@ -140,6 +148,8 @@ class DispatchIT {
         long orderId = DispatchFixtures.orderId();
         orderIds.add(orderId);
         OrderReady ready = DispatchFixtures.ready(orderId);
+        // The consumer commits this row with the WAITING row; deleteCreatedRows removes it.
+        eventIds.add(ready.eventId());
 
         DispatchFixtures.sendOrderEvent(json, orderId, ready);
 
@@ -158,10 +168,6 @@ class DispatchIT {
         await().atMost(Duration.ofSeconds(5)).until(() -> !inGeoSet(near));
         assertThat(courierStatus(far)).isEqualTo("AVAILABLE");
         assertThat(inGeoSet(far)).isTrue();
-        // The consumer committed this row with the WAITING row, before the offer; the test removes it like its rows.
-        jdbc.sql("DELETE FROM processed_events WHERE event_id = ?")
-                .param(ready.eventId())
-                .update();
     }
 
     @Test

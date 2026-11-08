@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,6 +47,9 @@ final class Smoke {
     private final List<Bot> bots;
     /** Order id to its last status read, in the order they were placed. */
     private final Map<Long, String> placed = new LinkedHashMap<>();
+
+    /** An order whose POST got no answer; the next try repeats it with the same key. */
+    private @Nullable PendingOrder pending;
 
     private Instant nextOrderAt = Instant.MIN;
     private Instant nextCheckAt = Instant.MIN;
@@ -95,14 +100,14 @@ final class Smoke {
     }
 
     private void placeNext(Instant now) {
-        long customerId = pick(state.customerIds());
-        SimState.MerchantState merchant = pick(state.merchants());
-        List<OrderLine> lines = CustomerBot.lines(merchant.menuItemIds(), random);
+        PendingOrder order = pending != null ? pending : newOrder();
+        pending = null;
         try {
-            long orderId = api.placeOrder(customerId, merchant.id(), lines);
+            long orderId = api.placeOrder(order.customerId(), order.merchantId(), order.lines(), order.key());
             placed.put(orderId, "PLACED");
             log.info("Smoke order {} of {} placed: {}", placed.size(), orders, orderId);
         } catch (ApiException e) {
+            // The server answered, so the order may not exist: the next try is a new order with a new key.
             nextOrderAt = now.plus(RETRY);
             if (NOT_IN_COPIES_YET.contains(e.code())) {
                 log.info("Order rejected with {}: merchant copies not caught up yet, retrying", e.code());
@@ -110,8 +115,49 @@ final class Smoke {
                 log.warn("Order rejected: {}; retrying", e.getMessage());
             }
         } catch (RuntimeException e) {
+            // No answer (a timeout, or a reset after the POST landed): the order may exist. Retry it with the same
+            // body and key, so a replay returns that order instead of making a second one.
+            pending = order;
             nextOrderAt = now.plus(RETRY);
-            log.warn("Order failed: {}; retrying", e.getMessage());
+            log.warn("Order failed: {}; retrying with the same Idempotency-Key", e.getMessage());
+        }
+    }
+
+    private PendingOrder newOrder() {
+        long customerId = pick(state.customerIds());
+        SimState.MerchantState merchant = pick(state.merchants());
+        return new PendingOrder(
+                customerId,
+                merchant.id(),
+                CustomerBot.lines(merchant.menuItemIds(), random),
+                UUID.randomUUID().toString());
+    }
+
+    /** One order and its Idempotency-Key, kept across retries of a transport failure. */
+    private record PendingOrder(long customerId, long merchantId, List<OrderLine> lines, String key) {}
+
+    /**
+     * Compares the state file with the running services.
+     *
+     * @return what is wrong (a stale state file after {@code docker compose down -v}, or a service that does not
+     *     answer), or null if the first seeded courier and merchant exist
+     */
+    @Nullable
+    String stateProblem() {
+        long courierId = state.couriers().get(0).id();
+        long merchantId = state.merchants().get(0).id();
+        try {
+            api.courier(courierId);
+            api.placedOrders(merchantId);
+            return null;
+        } catch (ApiException e) {
+            if (e.status() == 404) {
+                return "state file is stale (courier " + courierId + " or merchant " + merchantId
+                        + " not found): delete it or reseed";
+            }
+            return "services not ready: " + e.getMessage();
+        } catch (RuntimeException e) {
+            return "services not reachable: " + e.getMessage();
         }
     }
 
@@ -138,6 +184,11 @@ final class Smoke {
      * @return whether every order was DELIVERED in time
      */
     boolean run(Clock clock, Duration timeout) {
+        String problem = stateProblem();
+        if (problem != null) {
+            log.error("Smoke test cannot start: {}", problem);
+            return false;
+        }
         Instant start = clock.instant();
         Instant end = start.plus(timeout);
         log.info("Smoke test: {} orders, timeout {}", orders, timeout);

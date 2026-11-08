@@ -1,8 +1,8 @@
 package io.github.danie1le.dropoff.order;
 
 import io.github.danie1le.dropoff.Consumers;
+import io.github.danie1le.dropoff.TestIds;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 /**
@@ -11,25 +11,19 @@ import org.springframework.jdbc.core.simple.JdbcClient;
  */
 public final class OrderFixtures {
 
-    /** Above the int range, so JSON always reads an id back as a long. */
-    private static final long ID_BASE = 10_000_000_000L;
-
-    /**
-     * Courier and offer ids for orders. Couriers and offers live in dispatch-service since M5-4, with no FK from
-     * {@code orders}, so any id will do; these count up from a random start so tests never share one.
-     */
-    private static final AtomicLong NEXT_ID = new AtomicLong(ID_BASE + System.nanoTime() % 1_000_000_000L * 1_000);
-
     private OrderFixtures() {}
 
-    /** A courier id, as dispatch-service would assign one. */
+    /**
+     * A courier id, as dispatch-service would assign one. Couriers and offers live in dispatch-service since M5-4,
+     * with no FK from {@code orders}, so any id will do.
+     */
     public static long courierId() {
-        return NEXT_ID.incrementAndGet();
+        return TestIds.next();
     }
 
     /** An offer id, as dispatch-service would assign one. Each call returns a larger id than the last. */
     public static long offerId() {
-        return NEXT_ID.incrementAndGet();
+        return TestIds.next();
     }
 
     public static long customer(JdbcClient jdbc) {

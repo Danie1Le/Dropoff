@@ -12,7 +12,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -134,14 +133,14 @@ final class HttpDropoffApi implements DropoffApi {
     }
 
     @Override
-    public long placeOrder(long customerId, long merchantId, List<OrderLine> lines) {
-        // The endpoint requires an Idempotency-Key (M2-4). The bot never retries, so each order gets a fresh one.
+    public long placeOrder(long customerId, long merchantId, List<OrderLine> lines, String idempotencyKey) {
+        // The endpoint requires an Idempotency-Key (M2-4). A caller that retries one order passes the same key.
         return id(send(
                 order,
                 "POST",
                 "orders",
                 Map.of("customerId", customerId, "merchantId", merchantId, "lines", lines),
-                Map.of("Idempotency-Key", UUID.randomUUID().toString())));
+                Map.of("Idempotency-Key", idempotencyKey)));
     }
 
     @Override

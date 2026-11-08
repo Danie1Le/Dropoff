@@ -31,6 +31,9 @@ dependencies {
     testFixturesApi(libs.spring.boot.testcontainers)
     testFixturesApi(libs.testcontainers.postgresql)
     testFixturesApi(libs.testcontainers.kafka)
+    testFixturesApi(libs.archunit)
+    testFixturesImplementation(libs.jakarta.validation.api)
+    testFixturesImplementation(libs.jspecify)
     testFixturesImplementation(libs.spring.boot.starter.jdbc)
     testFixturesImplementation(libs.spring.boot.starter.kafka)
 }

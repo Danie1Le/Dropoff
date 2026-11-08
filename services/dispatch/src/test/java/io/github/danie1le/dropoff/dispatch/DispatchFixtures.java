@@ -2,13 +2,13 @@ package io.github.danie1le.dropoff.dispatch;
 
 import io.github.danie1le.dropoff.Consumers;
 import io.github.danie1le.dropoff.KafkaTestSupport;
+import io.github.danie1le.dropoff.TestIds;
 import io.github.danie1le.dropoff.common.KafkaTopics;
 import io.github.danie1le.dropoff.contracts.OrderReady;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicLong;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import tools.jackson.databind.json.JsonMapper;
@@ -26,18 +26,11 @@ public final class DispatchFixtures {
 
     public static final double SHOP_LNG = -97.7431;
 
-    /** Above the int range, so JSON always reads an id back as a long. */
-    private static final long ID_BASE = 10_000_000_000L;
-
-    /** Order ids count up from a random start, so tests never share one, nor reuse one left on the shared broker. */
-    private static final AtomicLong NEXT_ORDER_ID =
-            new AtomicLong(ID_BASE + System.nanoTime() % 1_000_000_000L * 1_000);
-
     private DispatchFixtures() {}
 
     /** An order id order-service could have assigned, with no rows yet. */
     public static long orderId() {
-        return NEXT_ORDER_ID.incrementAndGet();
+        return TestIds.next();
     }
 
     /** A READY order in {@code dispatch_orders} as WAITING, as the {@code OrderReady} consumer leaves it. */

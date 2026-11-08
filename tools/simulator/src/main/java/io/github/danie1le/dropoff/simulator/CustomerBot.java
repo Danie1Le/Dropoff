@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,7 +50,8 @@ final class CustomerBot implements Bot {
         SimState.MerchantState merchant = pick(state.merchants());
         List<OrderLine> lines = lines(merchant.menuItemIds(), random);
         try {
-            long orderId = api.placeOrder(customerId, merchant.id(), lines);
+            long orderId = api.placeOrder(
+                    customerId, merchant.id(), lines, UUID.randomUUID().toString());
             stats.ordersPlaced++;
             log.info("Customer {} placed order {} at merchant {}", customerId, orderId, merchant.id());
         } catch (RuntimeException e) {

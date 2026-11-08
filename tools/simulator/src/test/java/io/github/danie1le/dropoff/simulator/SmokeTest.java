@@ -48,6 +48,40 @@ class SmokeTest {
     }
 
     @Test
+    void retriesATransportFailureWithTheSameKeyAndBody() {
+        Smoke smoke = smoke(1);
+        api.failOn = "placeOrder";
+        api.failure = new IllegalStateException("timeout");
+
+        smoke.tick(T0);
+        smoke.tick(T0.plus(Smoke.RETRY));
+
+        assertThat(api.idempotencyKeys).hasSize(2).containsOnly(api.idempotencyKeys.get(0));
+        assertThat(smoke.statuses()).containsOnlyKeys(1L);
+    }
+
+    @Test
+    void usesANewKeyAfterTheServerRejectedTheOrder() {
+        Smoke smoke = smoke(1);
+        api.failOn = "placeOrder";
+        api.failure = new ApiException(422, "MENU_ITEM_UNKNOWN");
+
+        smoke.tick(T0);
+        smoke.tick(T0.plus(Smoke.RETRY));
+
+        assertThat(api.idempotencyKeys).hasSize(2).doesNotHaveDuplicates();
+    }
+
+    @Test
+    void reportsAStaleStateFile() {
+        assertThat(smoke(1).stateProblem()).contains("state file is stale");
+
+        api.couriers.put(201L, new CourierView(CourierStatus.OFFLINE, SHOP));
+
+        assertThat(smoke(1).stateProblem()).isNull();
+    }
+
+    @Test
     void placesTheGivenNumberOfOrdersAndNoMore() {
         Smoke smoke = smoke(3);
 
