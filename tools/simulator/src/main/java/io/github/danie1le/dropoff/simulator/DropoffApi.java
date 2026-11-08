@@ -41,4 +41,7 @@ interface DropoffApi {
     List<Long> placedOrders(long merchantId);
 
     void merchantStep(long merchantId, long orderId, MerchantStep step);
+
+    /** The order's status name from {@code GET /orders/{id}}, such as {@code PLACED} or {@code DELIVERED}. */
+    String orderStatus(long orderId);
 }

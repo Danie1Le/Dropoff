@@ -65,4 +65,22 @@ class OptionsTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> Options.parse("run", "--speed-kmh", "0")).isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void readsTheOrderIdForWatch() {
+        Options options = Options.parse("watch", "7", "--base-url", "http://localhost:9090");
+
+        assertThat(options.command()).isEqualTo(Options.Command.WATCH);
+        assertThat(options.orderId()).isEqualTo(7L);
+        assertThat(options.baseUrl()).isEqualTo(URI.create("http://localhost:9090"));
+        assertThat(Options.parse("run").orderId()).isNull();
+    }
+
+    @Test
+    void rejectsWatchWithoutAPositiveOrderId() {
+        assertThatThrownBy(() -> Options.parse("watch")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Options.parse("watch", "--base-url", "http://x"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Options.parse("watch", "0")).isInstanceOf(IllegalArgumentException.class);
+    }
 }

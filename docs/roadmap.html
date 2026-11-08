@@ -581,7 +581,7 @@ const MILESTONES = [
     { t: 'Dispatch publishes CourierLocationUpdated for couriers with an accepted, not-yet-delivered offer, at most every 5 s (Redis SET courier:{id}:loc-pub 1 NX EX 5); extra updates are dropped, Postgres still saves every one', done: true },
     { t: 'Order module pushes CourierLocationUpdated to /topic/orders/{id}', done: true },
     { t: 'Integration test with a STOMP client', done: true },
-    { t: 'Simulator watch <orderId>: prints live updates from /topic/orders/{id}' },
+    { t: 'Simulator watch <orderId>: prints live updates from /topic/orders/{id}', done: true },
   ]},
   { id: 'M5', name: 'Kafka & service split', gh: 6, needs: [15, 16, 31, 32], goal: 'Three services talking through durable events.', items: [
     { t: 'M5-1 Kafka inside the app: apache/kafka:4.4.0 (KRaft); NewTopic beans (auto-create off): order-events, courier-events, courier-locations (key orderId; 7 d / 7 d / 1 h), compacted merchants and menu-items; 3 partitions, RF 1' },
