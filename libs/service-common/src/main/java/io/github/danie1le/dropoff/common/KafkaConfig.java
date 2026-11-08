@@ -10,13 +10,14 @@ import io.github.danie1le.dropoff.contracts.OrderDelivered;
 import io.github.danie1le.dropoff.contracts.OrderPickedUp;
 import io.github.danie1le.dropoff.contracts.OrderPlaced;
 import io.github.danie1le.dropoff.contracts.OrderReady;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.config.TopicConfig;
@@ -25,6 +26,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.kafka.core.KafkaAdmin;
 import org.springframework.kafka.core.KafkaOperations;
+import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.ExponentialBackOffWithMaxRetries;
@@ -74,6 +76,14 @@ class KafkaConfig {
             MerchantChanged.class,
             MenuItemChanged.class);
 
+    /** Every topic events are sent to; each has a {@code .DLT} twin. */
+    static final List<String> SOURCE_TOPICS = List.of(
+            KafkaTopics.ORDER_EVENTS,
+            KafkaTopics.COURIER_EVENTS,
+            KafkaTopics.COURIER_LOCATIONS,
+            KafkaTopics.MERCHANTS,
+            KafkaTopics.MENU_ITEMS);
+
     @Bean
     KafkaAdmin.NewTopics topics() {
         List<NewTopic> topics = new ArrayList<>();
@@ -90,12 +100,7 @@ class KafkaConfig {
                 .replicas(1)
                 .compact()
                 .build());
-        Stream.of(
-                        KafkaTopics.ORDER_EVENTS,
-                        KafkaTopics.COURIER_EVENTS,
-                        KafkaTopics.COURIER_LOCATIONS,
-                        KafkaTopics.MERCHANTS,
-                        KafkaTopics.MENU_ITEMS)
+        SOURCE_TOPICS.stream()
                 .map(topic -> deleting(deadLetterTopic(topic), DLT_RETENTION))
                 .forEach(topics::add);
         return new KafkaAdmin.NewTopics(topics.toArray(NewTopic[]::new));
@@ -153,12 +158,29 @@ class KafkaConfig {
     /**
      * Retries, then dead-letters to {@code <topic>.DLT} on the record's partition (ticket #32). Spring Kafka's own
      * default suffix is {@code -dlt}, so the name is set here.
+     *
+     * <p>Each record that reaches a DLT adds one to {@code dropoff_dlt_messages_total{topic}}, tagged with the topic it
+     * came from (M6-1, ticket #42 point 11). The counter moves only once the DLT send has worked. Every topic's counter
+     * is registered at 0 up front, so the series exists before the first dead letter and an alert on its increase
+     * fires on the first one.
      */
     @Bean
-    DefaultErrorHandler kafkaErrorHandler(KafkaOperations<?, ?> template) {
-        DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(
+    DefaultErrorHandler kafkaErrorHandler(KafkaOperations<?, ?> template, MeterRegistry meters) {
+        DeadLetterPublishingRecoverer deadLetters = new DeadLetterPublishingRecoverer(
                 template, (record, ex) -> new TopicPartition(deadLetterTopic(record.topic()), record.partition()));
+        SOURCE_TOPICS.forEach(topic -> deadLetterCounter(meters, topic));
+        ConsumerRecordRecoverer recoverer = (record, ex) -> {
+            deadLetters.accept(record, ex);
+            deadLetterCounter(meters, record.topic()).increment();
+        };
         return new DefaultErrorHandler(recoverer, retryBackOff());
+    }
+
+    static Counter deadLetterCounter(MeterRegistry meters, String topic) {
+        return Counter.builder("dropoff.dlt.messages")
+                .description("Records sent to a dead-letter topic, by the topic they came from")
+                .tag("topic", topic)
+                .register(meters);
     }
 
     static String deadLetterTopic(String topic) {

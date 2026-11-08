@@ -1,11 +1,14 @@
 package io.github.danie1le.dropoff;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
 import io.github.danie1le.dropoff.common.KafkaTopics;
 import io.github.danie1le.dropoff.contracts.Actor;
 import io.github.danie1le.dropoff.contracts.OrderCancelled;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -24,7 +27,10 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** Events reach Kafka through the outbox, and consumers dedupe and dead-letter (M5-1, tickets #15, #32). */
+/**
+ * Events reach Kafka through the outbox, and consumers dedupe and dead-letter (M5-1, tickets #15, #32). A dead letter
+ * moves {@code dropoff_dlt_messages_total} (M6-1).
+ */
 @SpringBootTest
 @Import(TestcontainersConfiguration.class)
 class KafkaEventsIT {
@@ -32,15 +38,18 @@ class KafkaEventsIT {
     private final JdbcClient jdbc;
     private final ApplicationEventPublisher events;
     private final TransactionTemplate tx;
+    private final MeterRegistry meters;
     private final List<UUID> eventIds = new java.util.ArrayList<>();
 
     KafkaEventsIT(
             @Autowired JdbcClient jdbc,
             @Autowired ApplicationEventPublisher events,
-            @Autowired TransactionTemplate tx) {
+            @Autowired TransactionTemplate tx,
+            @Autowired MeterRegistry meters) {
         this.jdbc = jdbc;
         this.events = events;
         this.tx = tx;
+        this.meters = meters;
     }
 
     @AfterEach
@@ -131,6 +140,7 @@ class KafkaEventsIT {
     void aPoisonMessageEndsInTheDeadLetterTopic() {
         String key = Long.toString(unknownOrderId());
         byte[] poison = "not json".getBytes(StandardCharsets.UTF_8);
+        double deadLetters = deadLetters(KafkaTopics.COURIER_EVENTS);
 
         KafkaTestSupport.send(KafkaTopics.COURIER_EVENTS, key, "CourierAssigned", poison);
 
@@ -140,5 +150,13 @@ class KafkaEventsIT {
         assertThat(dead.value()).isEqualTo(poison);
         assertThat(KafkaTestSupport.header(dead, "kafka_dlt-original-consumer-group"))
                 .isEqualTo("order-service");
+        // The counter moves right after the DLT send, on the consumer thread, so it may trail the record by a moment.
+        await().atMost(Duration.ofSeconds(10))
+                .untilAsserted(() ->
+                        assertThat(deadLetters(KafkaTopics.COURIER_EVENTS)).isEqualTo(deadLetters + 1));
+    }
+
+    private double deadLetters(String topic) {
+        return meters.get("dropoff.dlt.messages").tag("topic", topic).counter().count();
     }
 }

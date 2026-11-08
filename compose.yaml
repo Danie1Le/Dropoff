@@ -2,6 +2,7 @@
 # Start with `docker compose up -d`; then run merchant-service with `./gradlew :services:merchant:bootRun` (port 8081),
 # order-service with `./gradlew :services:order:bootRun` (port 8082) and dispatch-service with
 # `./gradlew :services:dispatch:bootRun` (port 8083). Each logs in as its own user to its own database (ADR-0007).
+# Prometheus (port 9090) scrapes all three (M6-1).
 services:
   postgres:
     # Keep in sync with TestcontainersConfiguration (integration tests use the same image).
@@ -64,6 +65,19 @@ services:
       timeout: 10s
       retries: 10
 
+  prometheus:
+    # Scrapes /actuator/prometheus on every service every 15 s (M6-1, ticket #34). UI at http://localhost:9090.
+    image: prom/prometheus:v3.13.5
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./ops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    # The services run on the host until M6-3; this makes host.docker.internal work on Linux too.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
 volumes:
   postgres-data:
   kafka-data:
+  prometheus-data:

@@ -21,11 +21,16 @@ class CourierAssignments {
 
     private final JdbcClient jdbc;
     private final ApplicationEventPublisher events;
+    private final DispatchMetrics metrics;
 
-    CourierAssignments(JdbcClient jdbc, ApplicationEventPublisher events) {
+    CourierAssignments(JdbcClient jdbc, ApplicationEventPublisher events, DispatchMetrics metrics) {
         this.jdbc = jdbc;
         this.events = events;
+        this.metrics = metrics;
     }
+
+    /** An open offer that going OFFLINE closed, and how it closed. */
+    private record Closed(long orderId, OfferStatus status) {}
 
     /**
      * Whether the courier has picked up an order that is not delivered yet. Locks the courier's open {@code
@@ -51,12 +56,18 @@ class CourierAssignments {
      */
     @Transactional(propagation = Propagation.MANDATORY)
     List<Long> releaseForOffline(long courierId, Instant now) {
-        List<Long> released = new ArrayList<>(jdbc.sql("UPDATE offers"
-                        + " SET status = CASE WHEN expires_at > now() THEN 'DECLINED' ELSE 'TIMED_OUT' END,"
-                        + " responded_at = now() WHERE courier_id = ? AND status = 'OFFERED' RETURNING order_id")
+        List<Long> released = new ArrayList<>();
+        List<Closed> closed = jdbc.sql(
+                        "UPDATE offers"
+                                + " SET status = CASE WHEN expires_at > now() THEN 'DECLINED' ELSE 'TIMED_OUT' END,"
+                                + " responded_at = now() WHERE courier_id = ? AND status = 'OFFERED' RETURNING order_id, status")
                 .param(courierId)
-                .query(Long.class)
-                .list());
+                .query((rs, row) -> new Closed(rs.getLong("order_id"), OfferStatus.valueOf(rs.getString("status"))))
+                .list();
+        for (Closed offer : closed) {
+            metrics.offerAnswered(offer.status());
+            released.add(offer.orderId());
+        }
         List<Long> unassigned = jdbc.sql("UPDATE dispatch_orders SET status = 'WAITING', courier_id = NULL"
                         + " WHERE courier_id = ? AND status = 'ASSIGNED' RETURNING order_id")
                 .param(courierId)

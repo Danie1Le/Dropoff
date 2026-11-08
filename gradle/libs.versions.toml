@@ -45,6 +45,10 @@ spring-boot-testcontainers = { module = "org.springframework.boot:spring-boot-te
 testcontainers-postgresql = { module = "org.testcontainers:testcontainers-postgresql" }
 testcontainers-kafka = { module = "org.testcontainers:testcontainers-kafka" }
 
+# Metrics (M6-1, ticket #34): Micrometer meters in the shared Kafka setup, exported for Prometheus by each service
+micrometer-core = { module = "io.micrometer:micrometer-core" }
+micrometer-registry-prometheus = { module = "io.micrometer:micrometer-registry-prometheus" }
+
 # Simulator (M3-6, ticket #33): plain Java, versions from the Spring Boot BOM so they match the app
 jackson-databind = { module = "tools.jackson.core:jackson-databind" }
 slf4j-api = { module = "org.slf4j:slf4j-api" }

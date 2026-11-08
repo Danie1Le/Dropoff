@@ -6,6 +6,9 @@ import io.github.danie1le.dropoff.dispatch.internal.OfferResponses.OfferResponse
 import io.github.danie1le.dropoff.web.DomainException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -38,18 +41,21 @@ class OfferService {
     private final DispatchService dispatch;
     private final ApplicationEventPublisher events;
     private final TransactionTemplate transaction;
+    private final DispatchMetrics metrics;
 
     OfferService(
             JdbcClient jdbc,
             CourierService couriers,
             DispatchService dispatch,
             ApplicationEventPublisher events,
-            TransactionTemplate transaction) {
+            TransactionTemplate transaction,
+            DispatchMetrics metrics) {
         this.jdbc = jdbc;
         this.couriers = couriers;
         this.dispatch = dispatch;
         this.events = events;
         this.transaction = transaction;
+        this.metrics = metrics;
     }
 
     /** The courier's open, unexpired offer with the order's pickup and delivery details, or empty when there is none. */
@@ -93,15 +99,17 @@ class OfferService {
             return repeatOrClosed(courierId, offerId, OfferStatus.ACCEPTED);
         }
         OfferResponse offer = accepted.get();
-        int assigned = jdbc.sql("UPDATE dispatch_orders SET status = 'ASSIGNED', courier_id = :courierId"
-                        + " WHERE order_id = :orderId AND status = 'WAITING'")
+        Instant readyAt = jdbc.sql("UPDATE dispatch_orders SET status = 'ASSIGNED', courier_id = :courierId"
+                        + " WHERE order_id = :orderId AND status = 'WAITING' RETURNING ready_at")
                 .param("courierId", courierId)
                 .param("orderId", offer.orderId())
-                .update();
-        if (assigned != 1) {
-            // An open offer implies a WAITING order; anything else is a bug, so roll the accept back.
-            throw new IllegalStateException("order " + offer.orderId() + " is not WAITING for its open offer");
-        }
+                .query(Timestamp.class)
+                .optional()
+                .map(Timestamp::toInstant)
+                // An open offer implies a WAITING order; anything else is a bug, so roll the accept back.
+                .orElseThrow(() ->
+                        new IllegalStateException("order " + offer.orderId() + " is not WAITING for its open offer"));
+        metrics.accepted(Duration.between(readyAt, offer.respondedAt()));
         events.publishEvent(
                 new CourierAssigned(UUID.randomUUID(), offer.orderId(), courierId, offerId, offer.respondedAt()));
         return offer;
@@ -164,6 +172,7 @@ class OfferService {
                 .param(expired.offerId())
                 .update();
         couriers.timeOut(expired.courierId());
+        metrics.offerAnswered(OfferStatus.TIMED_OUT);
         return Optional.of(expired.orderId());
     }
 
@@ -186,6 +195,7 @@ class OfferService {
             return new Declined(repeatOrClosed(courierId, offerId, OfferStatus.DECLINED), false);
         }
         couriers.release(courier);
+        metrics.offerAnswered(OfferStatus.DECLINED);
         return new Declined(declined.get(), true);
     }
 
