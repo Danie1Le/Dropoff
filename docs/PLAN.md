@@ -483,6 +483,7 @@ Goal: measured load and one or two measured wins.
 - Scope:
   - The median of 3 runs per scenario: throughput, p50/p95/p99, errors, dispatch p95 and the top 5 queries.
   - Hardware and SHA recorded.
+  - The simulator seeds 30 couriers, which saturate far below 10 orders/s, so dispatch p95 mostly measures courier capacity. Record the courier count with the result, or seed more couriers for the run.
   - `docs/perf/README.md` started.
 - Tests: none; this is a measurement PR.
 - Decisions: #35.
