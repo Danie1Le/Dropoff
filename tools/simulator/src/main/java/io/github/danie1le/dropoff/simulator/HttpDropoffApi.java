@@ -138,6 +138,11 @@ final class HttpDropoffApi implements DropoffApi {
         send("POST", "merchants/" + merchantId + "/orders/" + orderId + "/" + step.path(), null);
     }
 
+    @Override
+    public String orderStatus(long orderId) {
+        return required(send("GET", "orders/" + orderId, null)).path("status").asString();
+    }
+
     /** Sends the request; returns the JSON body, or null for an empty one (204). A non-2xx throws ApiException. */
     private @Nullable JsonNode send(String method, String path, @Nullable Object body) {
         return send(method, path, body, Map.of());

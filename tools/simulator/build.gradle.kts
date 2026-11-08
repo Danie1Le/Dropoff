@@ -1,5 +1,6 @@
 // Demo data seeder and bots (M3-6, ticket #33): a plain Java 21 CLI with HttpClient and Jackson, no Spring.
 // Run with `./gradlew :tools:simulator:run --args="seed"`, then `--args="run"`, while the app is running.
+// `--args="watch 7"` prints order 7's live STATUS and LOCATION messages over STOMP (M4-3), with java.net.http only.
 plugins {
     id("dropoff.java-conventions")
     application
