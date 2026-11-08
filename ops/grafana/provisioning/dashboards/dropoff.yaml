@@ -1,0 +1,9 @@
+# Loads every dashboard JSON that sits next to this file (M6-2).
+apiVersion: 1
+providers:
+  - name: dropoff
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/provisioning/dashboards
