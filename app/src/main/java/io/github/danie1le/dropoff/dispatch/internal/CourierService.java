@@ -53,7 +53,7 @@ class CourierService {
 
     /**
      * AVAILABLE adds the courier to the geo set at their last location; OFFLINE removes them and releases what they
-     * hold (M3-4, ticket #85): an open offer is declined, an ASSIGNED order is unassigned, and a picked-up order refuses
+     * hold (M3-4, ticket #85): an open offer is declined (TIMED_OUT if it has expired), an ASSIGNED order is unassigned, and a picked-up order refuses
      * the change with 409 {@code COURIER_HAS_ACTIVE_DELIVERY}. Released orders are dispatched again after the change
      * commits, each in its own transaction, so a failed dispatch cannot undo it; it is logged and the dispatch-again
      * job retries the order.
@@ -114,6 +114,16 @@ class CourierService {
     @Transactional(propagation = Propagation.MANDATORY)
     void release(Courier courier) {
         courier.release(DbClock.now(clock));
+        syncGeoIndex(courier);
+    }
+
+    /**
+     * Makes a courier locked with {@link #lock} BUSY again with the order they picked up, and takes them out of the geo
+     * set (ticket #85).
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    void resumeDelivery(Courier courier) {
+        courier.resumeDelivery(DbClock.now(clock));
         syncGeoIndex(courier);
     }
 

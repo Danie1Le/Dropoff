@@ -67,16 +67,7 @@ class OfferApiIT {
                             CourierGeoIndex.KEY,
                             courierIds.stream().map(String::valueOf).toArray(String[]::new));
         }
-        if (!orderIds.isEmpty()) {
-            for (String table : List.of("offers", "dispatch_orders", "order_events", "order_lines")) {
-                jdbc.sql("DELETE FROM " + table + " WHERE order_id IN (:ids)")
-                        .param("ids", orderIds)
-                        .update();
-            }
-            jdbc.sql("DELETE FROM orders WHERE id IN (:ids)")
-                    .param("ids", orderIds)
-                    .update();
-        }
+        OrderFixtures.deleteOrders(jdbc, orderIds);
         deleteByIds("couriers", courierIds);
         deleteByIds("customers", customerIds);
         deleteByIds("merchants", merchantIds);

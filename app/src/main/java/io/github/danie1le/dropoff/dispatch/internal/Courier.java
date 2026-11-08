@@ -93,6 +93,15 @@ class Courier {
         }
     }
 
+    /**
+     * Puts the courier back to work on an order they picked up after going OFFLINE before dispatch heard of the pickup
+     * (ticket #85): any status becomes BUSY. The pickup already happened, so their own status request cannot refuse it.
+     */
+    void resumeDelivery(Instant now) {
+        this.status = CourierStatus.BUSY;
+        this.updatedAt = now;
+    }
+
     /** Stores a new location. Allowed in every status (ticket #42, second gate pass). */
     void moveTo(Position position, Instant now) {
         this.lastLat = position.lat();

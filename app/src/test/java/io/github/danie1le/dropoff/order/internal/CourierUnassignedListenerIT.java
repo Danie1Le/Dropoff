@@ -44,7 +44,7 @@ class CourierUnassignedListenerIT {
 
     @AfterEach
     void deleteCreatedRows() {
-        deleteByIds("orders", orderIds);
+        OrderFixtures.deleteOrders(jdbc, orderIds);
         deleteByIds("couriers", courierIds);
         deleteByIds("customers", customerIds);
         deleteByIds("merchants", merchantIds);
@@ -89,6 +89,13 @@ class CourierUnassignedListenerIT {
                 .get(0);
     }
 
+    /** Assigns the courier for a new accepted offer, and returns its id. */
+    private long assign(long orderId, long courierId) {
+        long offerId = OrderFixtures.acceptedOffer(jdbc, orderId, courierId);
+        assign(orderId, courierId, offerId);
+        return offerId;
+    }
+
     private void assign(long orderId, long courierId, long offerId) {
         assigned.on(new CourierAssigned(UUID.randomUUID(), orderId, courierId, offerId, Instant.now()));
     }
@@ -101,10 +108,10 @@ class CourierUnassignedListenerIT {
     void clearsTheCourierAndKeepsTheOrderReady() {
         long orderId = order("READY");
         long courierId = courier();
-        assign(orderId, courierId, 1);
+        long offerId = assign(orderId, courierId);
 
-        unassign(orderId, courierId, 1);
-        unassign(orderId, courierId, 1);
+        unassign(orderId, courierId, offerId);
+        unassign(orderId, courierId, offerId);
 
         assertThat(courierOf(orderId)).isNull();
         assertThat(jdbc.sql("SELECT status FROM orders WHERE id = ?")
@@ -118,10 +125,10 @@ class CourierUnassignedListenerIT {
     void aRedeliveredAssignAfterTheUnassignDoesNotRestoreTheCourier() {
         long orderId = order("READY");
         long courierId = courier();
-        assign(orderId, courierId, 1);
-        unassign(orderId, courierId, 1);
+        long offerId = assign(orderId, courierId);
+        unassign(orderId, courierId, offerId);
 
-        assign(orderId, courierId, 1);
+        assign(orderId, courierId, offerId);
 
         assertThat(courierOf(orderId)).isNull();
     }
@@ -131,10 +138,10 @@ class CourierUnassignedListenerIT {
         long orderId = order("READY");
         long first = courier();
         long second = courier();
-        assign(orderId, first, 1);
-        assign(orderId, second, 2);
+        long firstOffer = assign(orderId, first);
+        assign(orderId, second);
 
-        unassign(orderId, first, 1);
+        unassign(orderId, first, firstOffer);
 
         assertThat(courierOf(orderId)).isEqualTo(second);
     }
@@ -143,12 +150,12 @@ class CourierUnassignedListenerIT {
     void leavesAnOrderThatIsNoLongerReadyAlone() {
         long orderId = order("READY");
         long courierId = courier();
-        assign(orderId, courierId, 1);
+        long offerId = assign(orderId, courierId);
         jdbc.sql("UPDATE orders SET status = 'PICKED_UP' WHERE id = ?")
                 .param(orderId)
                 .update();
 
-        unassign(orderId, courierId, 1);
+        unassign(orderId, courierId, offerId);
 
         assertThat(courierOf(orderId)).isEqualTo(courierId);
     }

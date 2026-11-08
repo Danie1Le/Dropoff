@@ -81,16 +81,7 @@ class ReassignmentIT {
                             CourierGeoIndex.KEY,
                             courierIds.stream().map(String::valueOf).toArray(String[]::new));
         }
-        if (!orderIds.isEmpty()) {
-            for (String table : List.of("offers", "dispatch_orders", "order_events", "order_lines")) {
-                jdbc.sql("DELETE FROM " + table + " WHERE order_id IN (:ids)")
-                        .param("ids", orderIds)
-                        .update();
-            }
-            jdbc.sql("DELETE FROM orders WHERE id IN (:ids)")
-                    .param("ids", orderIds)
-                    .update();
-        }
+        OrderFixtures.deleteOrders(jdbc, orderIds);
         deleteByIds("couriers", courierIds);
         deleteByIds("customers", customerIds);
         deleteByIds("merchants", merchantIds);
@@ -326,5 +317,65 @@ class ReassignmentIT {
                 .isEqualTo("BUSY");
         assertThat(value("SELECT status FROM dispatch_orders WHERE order_id = ?", o.orderId()))
                 .isEqualTo("PICKED_UP");
+    }
+
+    @Test
+    void goingOfflineWaitsForAPickupInFlightAndThenRefuses() throws Exception {
+        Offered o = offeredWithANextCourier();
+        assertThat(accept(o)).hasStatusOk();
+        CountDownLatch pickedUp = new CountDownLatch(1);
+        CountDownLatch finish = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            // Dispatch's pickup, not committed yet: it holds the dispatch_orders row lock.
+            Future<?> pickup = executor.submit(() -> transaction.executeWithoutResult(status -> {
+                jdbc.sql("UPDATE dispatch_orders SET status = 'PICKED_UP' WHERE order_id = ?")
+                        .param(o.orderId())
+                        .update();
+                pickedUp.countDown();
+                try {
+                    finish.await(10, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }));
+            assertThat(pickedUp.await(5, TimeUnit.SECONDS)).isTrue();
+            Future<MvcTestResult> offline = executor.submit(() -> goOffline(o.courierId()));
+            await().atMost(Duration.ofSeconds(5)).until(this::someoneWaitsOnDispatchOrders);
+
+            finish.countDown();
+            pickup.get(10, TimeUnit.SECONDS);
+
+            assertThat(offline.get(10, TimeUnit.SECONDS))
+                    .hasStatus(HttpStatus.CONFLICT)
+                    .bodyJson()
+                    .extractingPath("$.code")
+                    .isEqualTo("COURIER_HAS_ACTIVE_DELIVERY");
+        } finally {
+            finish.countDown();
+            executor.shutdownNow();
+        }
+        assertThat(value("SELECT status FROM couriers WHERE id = ?", o.courierId()))
+                .isEqualTo("BUSY");
+        assertThat(value("SELECT status FROM dispatch_orders WHERE order_id = ?", o.orderId()))
+                .isEqualTo("PICKED_UP");
+    }
+
+    /** Whether a session is blocked on a row lock in a statement on {@code dispatch_orders}. */
+    private boolean someoneWaitsOnDispatchOrders() {
+        return jdbc.sql("SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE wait_event_type = 'Lock'"
+                        + " AND query LIKE '%dispatch_orders%' AND pid <> pg_backend_pid())")
+                .query(Boolean.class)
+                .single();
+    }
+
+    @Test
+    void goingOfflineTimesOutAnOfferThatHasAlreadyExpired() {
+        Offered o = offeredWithANextCourier();
+        expire(o.offerId());
+
+        assertThat(goOffline(o.courierId())).hasStatusOk();
+
+        assertThat(value("SELECT status FROM offers WHERE id = ?", o.offerId())).isEqualTo("TIMED_OUT");
     }
 }

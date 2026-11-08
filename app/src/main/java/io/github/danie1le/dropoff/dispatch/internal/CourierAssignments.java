@@ -27,26 +27,33 @@ class CourierAssignments {
         this.events = events;
     }
 
-    /** Whether the courier has picked up an order that is not delivered yet. */
+    /**
+     * Whether the courier has picked up an order that is not delivered yet. Locks the courier's open {@code
+     * dispatch_orders} rows first, so a pickup still in flight is waited for and then seen, not missed (ticket #85).
+     */
     @Transactional(propagation = Propagation.MANDATORY)
     boolean hasActiveDelivery(long courierId) {
-        return jdbc.sql("SELECT EXISTS (SELECT 1 FROM dispatch_orders WHERE courier_id = ? AND status = 'PICKED_UP')")
+        return jdbc.sql(
+                        "SELECT status FROM dispatch_orders WHERE courier_id = ? AND status IN ('ASSIGNED', 'PICKED_UP')"
+                                + " FOR UPDATE")
                 .param(courierId)
-                .query(Boolean.class)
-                .single();
+                .query(String.class)
+                .list()
+                .contains("PICKED_UP");
     }
 
     /**
-     * Releases what a courier going OFFLINE holds. An open offer closes as DECLINED, expired or not, since the courier
-     * has said they will not take it. An ASSIGNED order goes back to WAITING with no courier, and {@link
+     * Releases what a courier going OFFLINE holds. An open offer closes as DECLINED, since the courier has said they
+     * will not take it, or as TIMED_OUT if it had already expired, the status the timeout job would give it. An ASSIGNED order goes back to WAITING with no courier, and {@link
      * CourierUnassigned} is published for the order module, carrying the accepted offer it undoes.
      *
      * @return the orders to dispatch again once the caller's transaction commits
      */
     @Transactional(propagation = Propagation.MANDATORY)
     List<Long> releaseForOffline(long courierId, Instant now) {
-        List<Long> released = new ArrayList<>(jdbc.sql("UPDATE offers SET status = 'DECLINED', responded_at = now()"
-                        + " WHERE courier_id = ? AND status = 'OFFERED' RETURNING order_id")
+        List<Long> released = new ArrayList<>(jdbc.sql("UPDATE offers"
+                        + " SET status = CASE WHEN expires_at > now() THEN 'DECLINED' ELSE 'TIMED_OUT' END,"
+                        + " responded_at = now() WHERE courier_id = ? AND status = 'OFFERED' RETURNING order_id")
                 .param(courierId)
                 .query(Long.class)
                 .list());

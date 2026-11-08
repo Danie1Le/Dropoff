@@ -40,7 +40,7 @@ class CourierAssignedListenerIT {
 
     @AfterEach
     void deleteCreatedRows() {
-        deleteByIds("orders", orderIds);
+        OrderFixtures.deleteOrders(jdbc, orderIds);
         deleteByIds("couriers", courierIds);
         deleteByIds("customers", customerIds);
         deleteByIds("merchants", merchantIds);
@@ -85,8 +85,11 @@ class CourierAssignedListenerIT {
                 .get(0);
     }
 
-    private void assign(long orderId, long courierId) {
-        assign(orderId, courierId, 1);
+    /** Assigns the courier for a new accepted offer, and returns its id. */
+    private long assign(long orderId, long courierId) {
+        long offerId = OrderFixtures.acceptedOffer(jdbc, orderId, courierId);
+        assign(orderId, courierId, offerId);
+        return offerId;
     }
 
     private void assign(long orderId, long courierId, long offerId) {
@@ -106,11 +109,11 @@ class CourierAssignedListenerIT {
         long orderId = order("READY");
         long courierId = courier();
 
-        assign(orderId, courierId);
-        assign(orderId, courierId);
+        long offerId = assign(orderId, courierId);
+        assign(orderId, courierId, offerId);
 
         assertThat(courierOf(orderId)).isEqualTo(courierId);
-        assertThat(assignedOfferOf(orderId)).isEqualTo(1L);
+        assertThat(assignedOfferOf(orderId)).isEqualTo(offerId);
         assertThat(jdbc.sql("SELECT status FROM orders WHERE id = ?")
                         .param(orderId)
                         .query(String.class)
@@ -137,10 +140,13 @@ class CourierAssignedListenerIT {
         long first = courier();
         long second = courier();
 
-        assign(orderId, second, 2);
-        assign(orderId, first, 1);
+        long older = OrderFixtures.acceptedOffer(jdbc, orderId, first);
+        long newer = OrderFixtures.acceptedOffer(jdbc, orderId, second);
+
+        assign(orderId, second, newer);
+        assign(orderId, first, older);
 
         assertThat(courierOf(orderId)).isEqualTo(second);
-        assertThat(assignedOfferOf(orderId)).isEqualTo(2L);
+        assertThat(assignedOfferOf(orderId)).isEqualTo(newer);
     }
 }
