@@ -5,7 +5,7 @@
 // a service picks the configs up by component scan, since they sit under io.github.danie1le.dropoff.
 //
 // Its test fixtures hold the Testcontainers setup (Postgres and the shared Kafka broker) and KafkaTestSupport, so the
-// ITs of every service start the same images.
+// ITs of every service start the same images, plus the ArchUnit rules each service applies to its own code.
 import net.ltgt.gradle.errorprone.errorprone
 
 plugins {

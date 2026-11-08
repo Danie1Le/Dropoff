@@ -27,5 +27,7 @@ include("libs:web-common")
 include("libs:service-common")
 // dispatch-service on port 8083 with its own dispatch_db (M5-4, ADR-0007): couriers, offers and dispatch_orders.
 include("services:dispatch")
+// merchant-service on port 8081 with its own merchant_db (M5-5, ADR-0007): merchants and menu items.
+include("services:merchant")
 // Demo data seeder and courier/merchant/customer bots (M3-6, ticket #33). Plain Java, no Spring.
 include("tools:simulator")
