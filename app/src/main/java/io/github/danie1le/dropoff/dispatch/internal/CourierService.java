@@ -61,7 +61,10 @@ class CourierService {
         return lockedOrThrow(id);
     }
 
-    /** Frees a courier locked with {@link #lock} after they decline an offer, and puts them back in the geo set. */
+    /**
+     * Frees a courier locked with {@link #lock} after they decline an offer or deliver an order, and puts them back in
+     * the geo set.
+     */
     @Transactional(propagation = Propagation.MANDATORY)
     void release(Courier courier) {
         courier.release(DbClock.now(clock));
