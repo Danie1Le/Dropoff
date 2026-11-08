@@ -31,7 +31,7 @@ class ContractsPackageTest {
                 .and()
                 .doNotHaveSimpleName("package-info")
                 .and()
-                .areNotNestedClasses()
+                .areNotAnonymousClasses()
                 .should()
                 .beRecords()
                 .orShould()

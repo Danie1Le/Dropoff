@@ -76,12 +76,17 @@ class OfferService {
 
     /**
      * Accepts the offer: the order becomes ASSIGNED to the courier, who stays BUSY, and {@link CourierAssigned} is
-     * published for the order module.
+     * published for the order module. Only a BUSY courier can accept: one who went OFFLINE while the offer was open
+     * gets a 409 {@code COURIER_NOT_BUSY} and the offer stays open.
+     *
+     * <p>Locks the courier, then the offer, then {@code dispatch_orders}: the lock order every offer command uses.
      */
     @Transactional
     OfferResponse accept(long courierId, long offerId) {
-        couriers.get(courierId);
-        Optional<OfferResponse> accepted = respond(courierId, offerId, OfferStatus.ACCEPTED);
+        Courier courier = couriers.lock(courierId);
+        Optional<OfferResponse> accepted = courier.status() == CourierStatus.BUSY
+                ? respond(courierId, offerId, OfferStatus.ACCEPTED)
+                : Optional.empty();
         if (accepted.isEmpty()) {
             return repeatOrClosed(courierId, offerId, OfferStatus.ACCEPTED);
         }
@@ -146,19 +151,28 @@ class OfferService {
                 .optional();
     }
 
+    private record OfferState(String status, boolean open) {}
+
     /**
-     * The answer when {@link #respond} matched nothing: the offer as it stands if it already has {@code answer} (a
-     * repeat), otherwise 404 or 409.
+     * The answer when {@link #respond} matched nothing, or was skipped: the offer as it stands if it already has
+     * {@code answer} (a repeat), otherwise 404 or 409. An offer that is still open gets here only when accept skipped
+     * {@code respond} for a courier who is not BUSY.
      */
     private OfferResponse repeatOrClosed(long courierId, long offerId, OfferStatus answer) {
-        String status = jdbc.sql("SELECT status FROM offers WHERE id = ? AND courier_id = ?")
+        OfferState state = jdbc.sql("SELECT status, status = 'OFFERED' AND expires_at > now() AS open"
+                        + " FROM offers WHERE id = ? AND courier_id = ?")
                 .params(offerId, courierId)
-                .query(String.class)
+                .query((rs, row) -> new OfferState(rs.getString("status"), rs.getBoolean("open")))
                 .optional()
                 .orElseThrow(() -> new DomainException(
                         DomainException.Category.NOT_FOUND,
                         "OFFER_NOT_FOUND",
                         "Offer " + offerId + " does not exist for this courier."));
+        String status = state.status();
+        if (!status.equals(answer.name()) && state.open()) {
+            throw new DomainException(
+                    DomainException.Category.CONFLICT, "COURIER_NOT_BUSY", "Only a BUSY courier can accept an offer.");
+        }
         if (!status.equals(answer.name())) {
             throw new DomainException(
                     DomainException.Category.CONFLICT, "OFFER_CLOSED", "The offer is no longer open.");

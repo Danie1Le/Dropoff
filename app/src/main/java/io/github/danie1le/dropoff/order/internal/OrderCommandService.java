@@ -22,7 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Applies path-scoped status commands (ADR-0005). The status write is a conditional {@code UPDATE â€¦
+ * Applies path-scoped status commands (ADR-0005). The status write is a conditional {@code UPDATE …
  * WHERE status IN (sources)}, so of two racing commands only one moves the order; the loser re-reads and becomes a
  * no-op or a 409.
  */

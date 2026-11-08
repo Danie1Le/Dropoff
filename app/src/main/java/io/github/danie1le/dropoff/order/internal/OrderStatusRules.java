@@ -4,7 +4,7 @@ import io.github.danie1le.dropoff.common.DomainException;
 import io.github.danie1le.dropoff.contracts.Actor;
 
 /**
- * The order status rules in pure Java (tickets #3, #10, #13). PLACED â†’ ACCEPTED â†’ PREPARING â†’ READY â†’ PICKED_UP â†’
+ * The order status rules in pure Java (tickets #3, #10, #13). PLACED → ACCEPTED → PREPARING → READY → PICKED_UP →
  * DELIVERED; CANCELLED only from PLACED or ACCEPTED, and the system cancels only orders still PLACED. A command for the
  * status the order is already in is a no-op; any other illegal step is a 409 {@code INVALID_STATUS_TRANSITION}.
  */

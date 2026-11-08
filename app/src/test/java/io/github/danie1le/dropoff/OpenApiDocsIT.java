@@ -150,6 +150,12 @@ class OpenApiDocsIT {
         }
         assertThat(result)
                 .bodyJson()
+                .extractingPath(
+                        "$.paths['/api/v1/couriers/{courierId}/offers/{offerId}/accept'].post.responses.409.description")
+                .asString()
+                .contains("COURIER_NOT_BUSY");
+        assertThat(result)
+                .bodyJson()
                 .extractingPath("$.paths['/api/v1/orders'].post.responses.422.description")
                 .asString()
                 .contains(

@@ -43,7 +43,9 @@ class OfferController {
     @ProblemResponse(
             status = 404,
             codes = {"COURIER_NOT_FOUND", "OFFER_NOT_FOUND"})
-    @ProblemResponse(status = 409, codes = "OFFER_CLOSED")
+    @ProblemResponse(
+            status = 409,
+            codes = {"OFFER_CLOSED", "COURIER_NOT_BUSY"})
     @PostMapping("/{offerId}/accept")
     OfferResponse accept(@PathVariable long courierId, @PathVariable long offerId) {
         return service.accept(courierId, offerId);

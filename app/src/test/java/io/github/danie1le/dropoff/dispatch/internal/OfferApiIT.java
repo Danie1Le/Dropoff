@@ -242,10 +242,7 @@ class OfferApiIT {
     @Test
     void aLateAcceptIsClosed() {
         Offered o = offered();
-        jdbc.sql("UPDATE offers SET offered_at = now() - interval '31 seconds', expires_at = now() - interval"
-                        + " '1 millisecond' WHERE id = ?")
-                .param(o.offerId())
-                .update();
+        expire(o.offerId());
 
         assertThat(command(o.courierId(), o.offerId(), "accept"))
                 .hasStatus(HttpStatus.CONFLICT)
@@ -255,6 +252,75 @@ class OfferApiIT {
         assertThat(value("SELECT status FROM offers WHERE id = ?", o.offerId())).isEqualTo("OFFERED");
         assertThat(value("SELECT status FROM dispatch_orders WHERE order_id = ?", o.orderId()))
                 .isEqualTo("WAITING");
+    }
+
+    private void expire(long offerId) {
+        jdbc.sql("UPDATE offers SET offered_at = now() - interval '31 seconds', expires_at = now() - interval"
+                        + " '1 millisecond' WHERE id = ?")
+                .param(offerId)
+                .update();
+    }
+
+    @Test
+    void anExpiredOfferThatIsStillOfferedIsNotCurrent() {
+        Offered o = offered();
+        expire(o.offerId());
+
+        assertThat(mvc.get()
+                        .uri("/api/v1/couriers/{c}/offers/current", o.courierId())
+                        .exchange())
+                .hasStatus(HttpStatus.NO_CONTENT);
+        assertThat(value("SELECT status FROM offers WHERE id = ?", o.offerId())).isEqualTo("OFFERED");
+    }
+
+    @Test
+    void aLateDeclineIsClosedAndChangesNothing() {
+        Offered o = offered();
+        availableCourierAt(30.2849, -97.7341);
+        expire(o.offerId());
+
+        assertThat(command(o.courierId(), o.offerId(), "decline"))
+                .hasStatus(HttpStatus.CONFLICT)
+                .bodyJson()
+                .extractingPath("$.code")
+                .isEqualTo("OFFER_CLOSED");
+        assertThat(value("SELECT status FROM offers WHERE id = ?", o.offerId())).isEqualTo("OFFERED");
+        assertThat(value("SELECT status FROM couriers WHERE id = ?", o.courierId()))
+                .isEqualTo("BUSY");
+        assertThat(value("SELECT count(*)::text FROM offers WHERE order_id = ?", o.orderId()))
+                .isEqualTo("1");
+    }
+
+    @Test
+    void aCourierWhoWentOfflineStaysOfflineAfterDeclining() {
+        Offered o = offered();
+        couriers.changeStatus(o.courierId(), CourierStatus.OFFLINE);
+
+        assertThat(command(o.courierId(), o.offerId(), "decline"))
+                .hasStatusOk()
+                .bodyJson()
+                .extractingPath("$.status")
+                .isEqualTo("DECLINED");
+        assertThat(value("SELECT status FROM couriers WHERE id = ?", o.courierId()))
+                .isEqualTo("OFFLINE");
+        assertThat(inGeoSet(o.courierId())).isFalse();
+    }
+
+    @Test
+    void aCourierWhoIsNotBusyCannotAccept() {
+        Offered o = offered();
+        couriers.changeStatus(o.courierId(), CourierStatus.OFFLINE);
+
+        assertThat(command(o.courierId(), o.offerId(), "accept"))
+                .hasStatus(HttpStatus.CONFLICT)
+                .bodyJson()
+                .extractingPath("$.code")
+                .isEqualTo("COURIER_NOT_BUSY");
+        assertThat(value("SELECT status FROM offers WHERE id = ?", o.offerId())).isEqualTo("OFFERED");
+        assertThat(value("SELECT status FROM dispatch_orders WHERE order_id = ?", o.orderId()))
+                .isEqualTo("WAITING");
+        assertThat(value("SELECT status FROM couriers WHERE id = ?", o.courierId()))
+                .isEqualTo("OFFLINE");
     }
 
     @Test
