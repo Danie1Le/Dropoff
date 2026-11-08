@@ -256,6 +256,8 @@ Build order, issues (#50–#56) and quiz points: `docs/milestones/M2.md`.
 
 Goal: ready orders get the nearest available courier, with reassignment. The dispatch module never reads `orders`; it keeps its own `dispatch_orders`.
 
+Build order, issues (#82–#87) and quiz points: `docs/milestones/M3.md`.
+
 **M3-1 Couriers and location.**
 - Scope:
   - Migration `couriers`, plus the `orders.courier_id → couriers` FK (ADR-0003).
