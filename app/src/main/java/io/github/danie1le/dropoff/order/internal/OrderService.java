@@ -26,7 +26,6 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,7 +35,7 @@ class OrderService {
     private final OrderRepository orders;
     private final CustomerRepository customers;
     private final MerchantDirectory merchants;
-    private final JdbcClient jdbc;
+    private final OrderEventLog eventLog;
     private final ApplicationEventPublisher events;
     private final Clock clock;
 
@@ -44,13 +43,13 @@ class OrderService {
             OrderRepository orders,
             CustomerRepository customers,
             MerchantDirectory merchants,
-            JdbcClient jdbc,
+            OrderEventLog eventLog,
             ApplicationEventPublisher events,
             Clock clock) {
         this.orders = orders;
         this.customers = customers;
         this.merchants = merchants;
-        this.jdbc = jdbc;
+        this.eventLog = eventLog;
         this.events = events;
         this.clock = clock;
     }
@@ -116,7 +115,7 @@ class OrderService {
         Instant now = DbClock.now(clock);
         Order order = orders.save(
                 new Order(customerId, merchantId, customer.location(), lines, idempotencyKey, requestHash, now));
-        OrderEventLog.record(jdbc, order.id(), null, OrderStatus.PLACED, Actor.CUSTOMER, now);
+        eventLog.record(order.id(), null, OrderStatus.PLACED, Actor.CUSTOMER, now);
         events.publishEvent(
                 new OrderPlaced(UUID.randomUUID(), order.id(), customerId, merchantId, order.totalCents(), now));
         return new Placement(order.id(), OrderResponse.of(order), false);

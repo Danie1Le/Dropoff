@@ -5,14 +5,25 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.stereotype.Component;
 
-/** Writes {@code order_events} rows, the audit trail of every status change (ticket #10). */
-final class OrderEventLog {
+/**
+ * Writes {@code order_events} rows, the audit trail of every status change (ticket #10), and pushes each change as a
+ * STOMP {@code STATUS} message after commit (M4-1). Every status change goes through here, so the two never disagree.
+ */
+@Component
+class OrderEventLog {
 
-    private OrderEventLog() {}
+    private final JdbcClient jdbc;
+    private final OrderUpdates updates;
+
+    OrderEventLog(JdbcClient jdbc, OrderUpdates updates) {
+        this.jdbc = jdbc;
+        this.updates = updates;
+    }
 
     /** Records that the order moved from {@code from} (null for a new order) to {@code to}. */
-    static void record(JdbcClient jdbc, long orderId, @Nullable String from, OrderStatus to, Actor actor, Instant at) {
+    void record(long orderId, @Nullable String from, OrderStatus to, Actor actor, Instant at) {
         jdbc.sql("INSERT INTO order_events (order_id, from_status, to_status, actor, created_at)"
                         + " VALUES (:id, :from, :to, :actor, :at)")
                 .param("id", orderId)
@@ -21,5 +32,6 @@ final class OrderEventLog {
                 .param("actor", actor.name())
                 .param("at", Timestamp.from(at))
                 .update();
+        updates.statusAfterCommit(new OrderStatusMessage(orderId, to, actor, at));
     }
 }
