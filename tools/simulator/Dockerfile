@@ -2,7 +2,7 @@
 #   ./gradlew :tools:simulator:installDist
 #   docker build -t ghcr.io/danie1le/dropoff-simulator:local tools/simulator
 # `docker compose --profile demo build` does the second step; `docker compose --profile demo up` runs it.
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:21-jre-alpine-3.24
 RUN addgroup -S dropoff && adduser -S -G dropoff dropoff \
     && mkdir /data && chown dropoff:dropoff /data
 WORKDIR /simulator

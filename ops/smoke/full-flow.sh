@@ -4,9 +4,12 @@
 # courier bots.
 #
 # Needs every service up on its port (merchant 8081, only needed to seed; order 8082; dispatch 8083), either as
-# containers (M6-3: build the jars, then `docker compose up -d --build`) or with `./gradlew :services:<name>:bootRun`.
-# `docker compose --profile demo run --rm simulator smoke` runs the same check inside Compose.
-# On fresh databases (after `docker compose down -v`), delete .simulator/state.json first: its ids are gone.
+# containers (M6-3: build the jars, then `docker compose --profile services up -d --build`) or with
+# `./gradlew :services:<name>:bootRun` next to a plain `docker compose up -d`.
+# This script runs the simulator on the host, so its state is .simulator/state.json in the repo. On fresh databases
+# (after `docker compose down -v`), delete that file first: its ids are gone.
+# `docker compose --profile demo run --rm simulator smoke` runs the same check inside Compose instead, with its state in
+# /data/smoke-state.json on the simulator-data volume (the demo bots use /data/state.json); `down -v` drops both.
 #
 # Override the service URLs with MERCHANT_URL, ORDER_URL and DISPATCH_URL, and the run with ORDERS and TIMEOUT.
 set -euo pipefail
