@@ -28,6 +28,7 @@ dependencies {
     runtimeOnly(libs.postgresql)
 
     testImplementation(testFixtures(project(":libs:service-common")))
+    testImplementation(testFixtures(project(":libs:web-common")))
     testImplementation(libs.spring.boot.starter.test)
     testImplementation(libs.spring.boot.starter.webmvc.test)
     testImplementation(libs.spring.modulith.starter.test)

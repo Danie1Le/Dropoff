@@ -36,9 +36,6 @@ dependencies {
     testFixturesImplementation(libs.jspecify)
     testFixturesImplementation(libs.spring.boot.starter.jdbc)
     testFixturesImplementation(libs.spring.boot.starter.kafka)
-    // PageParamsRule checks controllers that take web-common's PageParams.
-    testFixturesImplementation(project(":libs:web-common"))
-    testFixturesImplementation(libs.spring.boot.starter.webmvc)
 }
 
 // Test fixtures are test code: like compileTestJava, they are not null-checked.

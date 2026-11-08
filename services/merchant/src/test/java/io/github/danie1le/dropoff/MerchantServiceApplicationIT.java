@@ -32,7 +32,8 @@ class MerchantServiceApplicationIT {
                         + " AND table_name <> 'flyway_schema_history'")
                 .query(String.class)
                 .list();
-        assertThat(tables).containsExactlyInAnyOrder("merchants", "menu_items", "event_publication");
+        assertThat(tables)
+                .containsExactlyInAnyOrder("merchants", "menu_items", "event_publication", "processed_events");
     }
 
     /** Only menu_items points at merchants; nothing points at another service's tables (ADR-0003). */
