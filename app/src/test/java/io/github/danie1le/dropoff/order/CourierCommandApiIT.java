@@ -42,7 +42,6 @@ class CourierCommandApiIT {
     @AfterEach
     void cleanUp() {
         OrderCommandApiIT.deleteAll(jdbc);
-        jdbc.sql("DELETE FROM couriers").update();
     }
 
     private record Assigned(long courierId, long orderId) {}
@@ -63,10 +62,9 @@ class CourierCommandApiIT {
         return new Assigned(courierId, orderId);
     }
 
-    private long courier() {
-        return jdbc.sql("INSERT INTO couriers (name, status) VALUES ('Carla', 'BUSY') RETURNING id")
-                .query(Long.class)
-                .single();
+    /** Couriers live in dispatch-service since M5-4; the order only stores the id. */
+    private static long courier() {
+        return OrderFixtures.courierId();
     }
 
     private MvcTestResult command(long courierId, long orderId, String command) {
@@ -99,7 +97,7 @@ class CourierCommandApiIT {
 
         MvcTestResult pickedUp = command(a.courierId(), a.orderId(), "pick-up");
         assertStatus(pickedUp, "PICKED_UP");
-        assertThat(pickedUp).bodyJson().extractingPath("$.courierId").isEqualTo((int) a.courierId());
+        assertThat(pickedUp).bodyJson().extractingPath("$.courierId").isEqualTo(a.courierId());
         assertStatus(command(a.courierId(), a.orderId(), "deliver"), "DELIVERED");
 
         assertThat(events(a.orderId())).containsExactly("READY>PICKED_UP:COURIER", "PICKED_UP>DELIVERED:COURIER");

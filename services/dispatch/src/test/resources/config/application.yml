@@ -1,0 +1,13 @@
+# Test-only overrides. Spring Boot loads classpath:/config/application.yml on top of the main
+# classpath:/application.yml, so this file adds to the main config instead of replacing it.
+#
+# No @Scheduled job fires in full-app test contexts. Tests that need a job call it directly (e.g. AutoCancelJobIT).
+dropoff:
+  scheduling:
+    enabled: false
+spring:
+  modulith:
+    moments:
+      # spring-modulith-moments comes in only on the test classpath (via the Modulith test starter). Its
+      # auto-configuration adds @EnableScheduling, which would schedule every @Scheduled job despite the flag above.
+      enabled: false

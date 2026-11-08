@@ -1,5 +1,6 @@
 package io.github.danie1le.dropoff.simulator;
 
+import java.nio.file.Files;
 import java.time.Clock;
 import java.util.Objects;
 import java.util.concurrent.CompletionException;
@@ -7,10 +8,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Entry point: {@code ./gradlew :tools:simulator:run --args="seed"}, then {@code --args="run"}, with the app running
- * on {@code --base-url} (default {@code http://localhost:8080}). {@code --args="watch 7"} prints order 7's live
- * {@code STATUS} and {@code LOCATION} messages until it is delivered or cancelled (M4-3), and exits at once if it already is. The simulator is a separate program: nothing runs
- * unless it is started by hand, and the app's tests never start it.
+ * Entry point: {@code ./gradlew :tools:simulator:run --args="seed"}, then {@code --args="run"}, with the services
+ * running on {@code --merchant-url}, {@code --order-url} and {@code --dispatch-url} (see {@link ServiceUrls} for the
+ * defaults). {@code --args="watch 7"} prints order 7's live {@code STATUS} and {@code LOCATION} messages until it is
+ * delivered or cancelled (M4-3), and exits at once if it already is. {@code --args="smoke --orders 5 --timeout 5m"}
+ * seeds if there is no state file, then exits 0 only if every order it places is DELIVERED in time (M5-4). The
+ * simulator is a separate program: nothing runs unless it is started by hand, and the services' tests never start it.
  */
 public final class Simulator {
 
@@ -27,21 +30,25 @@ public final class Simulator {
             System.exit(2);
             return;
         }
-        DropoffApi api = new HttpDropoffApi(options.baseUrl());
+        DropoffApi api = new HttpDropoffApi(options.urls());
         switch (options.command()) {
-            case SEED -> {
-                SimState state = new Seeder(api).seed(options.seed());
-                StateFile.write(options.stateFile(), state);
-                log.info("Seeded with seed {}; ids written to {}", options.seed(), options.stateFile());
-            }
+            case SEED -> seed(options, api);
             case RUN -> {
                 SimState state = StateFile.read(options.stateFile());
                 Simulation.of(state, options.ordersPerMinute(), options.speedKmh(), options.seed(), api)
                         .run(Clock.systemUTC(), options.duration());
             }
+            case SMOKE -> {
+                SimState state =
+                        Files.exists(options.stateFile()) ? StateFile.read(options.stateFile()) : seed(options, api);
+                boolean passed = new Smoke(state, options.smokeOrders(), options.speedKmh(), options.seed(), api)
+                        .run(Clock.systemUTC(), options.smokeTimeout());
+                System.exit(passed ? 0 : 1);
+            }
             case WATCH -> {
                 long orderId = Objects.requireNonNull(options.orderId(), "watch needs an order id");
-                OrderWatch watch = WebSocketTransport.open(orderId, options.baseUrl(), api, System.out::println);
+                OrderWatch watch =
+                        WebSocketTransport.open(orderId, options.urls().order(), api, System.out::println);
                 try {
                     watch.done().join();
                 } catch (CompletionException e) {
@@ -49,5 +56,12 @@ public final class Simulator {
                 }
             }
         }
+    }
+
+    private static SimState seed(Options options, DropoffApi api) {
+        SimState state = new Seeder(api).seed(options.seed());
+        StateFile.write(options.stateFile(), state);
+        log.info("Seeded with seed {}; ids written to {}", options.seed(), options.stateFile());
+        return state;
     }
 }

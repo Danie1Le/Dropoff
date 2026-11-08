@@ -12,12 +12,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/** {@link DropoffApi} over {@code java.net.http.HttpClient}, against {@code <baseUrl>/api/v1}. */
+/**
+ * {@link DropoffApi} over {@code java.net.http.HttpClient}. Each call goes to {@code <service>/api/v1} of the service
+ * that owns it (M5-4, {@link ServiceUrls}).
+ */
 final class HttpDropoffApi implements DropoffApi {
 
     private static final Duration TIMEOUT = Duration.ofSeconds(10);
@@ -25,44 +27,61 @@ final class HttpDropoffApi implements DropoffApi {
     private final HttpClient http =
             HttpClient.newBuilder().connectTimeout(TIMEOUT).build();
     private final JsonMapper json = JsonMapper.builder().build();
-    private final URI api;
+    private final URI merchant;
+    private final URI order;
+    private final URI dispatch;
 
-    HttpDropoffApi(URI baseUrl) {
+    HttpDropoffApi(ServiceUrls urls) {
+        this.merchant = api(urls.merchant());
+        this.order = api(urls.order());
+        this.dispatch = api(urls.dispatch());
+    }
+
+    private static URI api(URI baseUrl) {
         String base = baseUrl.toString();
-        this.api = URI.create((base.endsWith("/") ? base : base + "/") + "api/v1/");
+        return URI.create((base.endsWith("/") ? base : base + "/") + "api/v1/");
     }
 
     @Override
     public long createMerchant(String name, String address, LatLng at) {
-        return id(
-                send("POST", "merchants", Map.of("name", name, "address", address, "lat", at.lat(), "lng", at.lng())));
+        return id(send(
+                merchant,
+                "POST",
+                "merchants",
+                Map.of("name", name, "address", address, "lat", at.lat(), "lng", at.lng())));
     }
 
     @Override
     public long createMenuItem(long merchantId, String name, long priceCents) {
         return id(send(
-                "POST", "merchants/" + merchantId + "/menu-items", Map.of("name", name, "priceCents", priceCents)));
+                merchant,
+                "POST",
+                "merchants/" + merchantId + "/menu-items",
+                Map.of("name", name, "priceCents", priceCents)));
     }
 
     @Override
     public long createCustomer(String name, String address, LatLng at) {
-        return id(
-                send("POST", "customers", Map.of("name", name, "address", address, "lat", at.lat(), "lng", at.lng())));
+        return id(send(
+                order,
+                "POST",
+                "customers",
+                Map.of("name", name, "address", address, "lat", at.lat(), "lng", at.lng())));
     }
 
     @Override
     public long createCourier(String name) {
-        return id(send("POST", "couriers", Map.of("name", name)));
+        return id(send(dispatch, "POST", "couriers", Map.of("name", name)));
     }
 
     @Override
     public void updateLocation(long courierId, LatLng at) {
-        send("PUT", "couriers/" + courierId + "/location", Map.of("lat", at.lat(), "lng", at.lng()));
+        send(dispatch, "PUT", "couriers/" + courierId + "/location", Map.of("lat", at.lat(), "lng", at.lng()));
     }
 
     @Override
     public CourierView courier(long courierId) {
-        JsonNode body = required(send("GET", "couriers/" + courierId, null));
+        JsonNode body = required(send(dispatch, "GET", "couriers/" + courierId, null));
         JsonNode lat = body.path("lat");
         JsonNode lng = body.path("lng");
         @Nullable
@@ -72,12 +91,12 @@ final class HttpDropoffApi implements DropoffApi {
 
     @Override
     public void changeStatus(long courierId, CourierStatus status) {
-        send("PATCH", "couriers/" + courierId + "/status", Map.of("status", status.name()));
+        send(dispatch, "PATCH", "couriers/" + courierId + "/status", Map.of("status", status.name()));
     }
 
     @Override
     public Optional<Offer> currentOffer(long courierId) {
-        @Nullable JsonNode body = send("GET", "couriers/" + courierId + "/offers/current", null);
+        @Nullable JsonNode body = send(dispatch, "GET", "couriers/" + courierId + "/offers/current", null);
         if (body == null) {
             return Optional.empty();
         }
@@ -95,37 +114,39 @@ final class HttpDropoffApi implements DropoffApi {
 
     @Override
     public void acceptOffer(long courierId, long offerId) {
-        send("POST", "couriers/" + courierId + "/offers/" + offerId + "/accept", null);
+        send(dispatch, "POST", "couriers/" + courierId + "/offers/" + offerId + "/accept", null);
     }
 
     @Override
     public void declineOffer(long courierId, long offerId) {
-        send("POST", "couriers/" + courierId + "/offers/" + offerId + "/decline", null);
+        send(dispatch, "POST", "couriers/" + courierId + "/offers/" + offerId + "/decline", null);
     }
 
     @Override
     public void pickUp(long courierId, long orderId) {
-        send("POST", "couriers/" + courierId + "/orders/" + orderId + "/pick-up", null);
+        send(order, "POST", "couriers/" + courierId + "/orders/" + orderId + "/pick-up", null);
     }
 
     @Override
     public void deliver(long courierId, long orderId) {
-        send("POST", "couriers/" + courierId + "/orders/" + orderId + "/deliver", null);
+        send(order, "POST", "couriers/" + courierId + "/orders/" + orderId + "/deliver", null);
     }
 
     @Override
-    public long placeOrder(long customerId, long merchantId, List<OrderLine> lines) {
-        // The endpoint requires an Idempotency-Key (M2-4). The bot never retries, so each order gets a fresh one.
+    public long placeOrder(long customerId, long merchantId, List<OrderLine> lines, String idempotencyKey) {
+        // The endpoint requires an Idempotency-Key (M2-4). A caller that retries one order passes the same key.
         return id(send(
+                order,
                 "POST",
                 "orders",
                 Map.of("customerId", customerId, "merchantId", merchantId, "lines", lines),
-                Map.of("Idempotency-Key", UUID.randomUUID().toString())));
+                Map.of("Idempotency-Key", idempotencyKey)));
     }
 
     @Override
     public List<Long> placedOrders(long merchantId) {
-        JsonNode body = required(send("GET", "merchants/" + merchantId + "/orders?status=PLACED&size=100", null));
+        JsonNode body =
+                required(send(order, "GET", "merchants/" + merchantId + "/orders?status=PLACED&size=100", null));
         List<Long> ids = new ArrayList<>();
         for (JsonNode order : body.path("content")) {
             ids.add(order.path("id").asLong());
@@ -135,24 +156,27 @@ final class HttpDropoffApi implements DropoffApi {
 
     @Override
     public void merchantStep(long merchantId, long orderId, MerchantStep step) {
-        send("POST", "merchants/" + merchantId + "/orders/" + orderId + "/" + step.path(), null);
+        send(order, "POST", "merchants/" + merchantId + "/orders/" + orderId + "/" + step.path(), null);
     }
 
     @Override
     public String orderStatus(long orderId) {
-        return required(send("GET", "orders/" + orderId, null)).path("status").asString();
+        return required(send(order, "GET", "orders/" + orderId, null))
+                .path("status")
+                .asString();
     }
 
     /** Sends the request; returns the JSON body, or null for an empty one (204). A non-2xx throws ApiException. */
-    private @Nullable JsonNode send(String method, String path, @Nullable Object body) {
-        return send(method, path, body, Map.of());
+    private @Nullable JsonNode send(URI service, String method, String path, @Nullable Object body) {
+        return send(service, method, path, body, Map.of());
     }
 
-    private @Nullable JsonNode send(String method, String path, @Nullable Object body, Map<String, String> headers) {
+    private @Nullable JsonNode send(
+            URI service, String method, String path, @Nullable Object body, Map<String, String> headers) {
         HttpRequest.BodyPublisher publisher = body == null
                 ? HttpRequest.BodyPublishers.noBody()
                 : HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body));
-        HttpRequest.Builder builder = HttpRequest.newBuilder(api.resolve(path))
+        HttpRequest.Builder builder = HttpRequest.newBuilder(service.resolve(path))
                 .timeout(TIMEOUT)
                 .header("Content-Type", "application/json")
                 .header("Accept", "application/json")

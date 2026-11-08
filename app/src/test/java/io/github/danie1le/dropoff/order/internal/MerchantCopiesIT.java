@@ -2,6 +2,7 @@ package io.github.danie1le.dropoff.order.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.github.danie1le.dropoff.Consumers;
 import io.github.danie1le.dropoff.KafkaTestSupport;
 import io.github.danie1le.dropoff.TestcontainersConfiguration;
 import io.github.danie1le.dropoff.common.KafkaTopics;
@@ -64,7 +65,7 @@ class MerchantCopiesIT {
      */
     @AfterEach
     void cleanUp() {
-        KafkaTestSupport.awaitSettled(jdbc);
+        Consumers.awaitSettled(jdbc);
         jdbc.sql("DELETE FROM merchant_copies WHERE merchant_id >= ?")
                 .param(MIN_ID)
                 .update();
@@ -157,7 +158,7 @@ class MerchantCopiesIT {
 
         send(merchant(merchantId, "Taco Shop", true, 1));
         send(item(itemId, merchantId, 399, true, 1));
-        KafkaTestSupport.awaitSettled(jdbc);
+        Consumers.awaitSettled(jdbc);
 
         assertThat(copies.findMerchant(merchantId).orElseThrow().open()).isFalse();
         assertThat(copies.findMenuItems(List.of(itemId)))
@@ -177,7 +178,7 @@ class MerchantCopiesIT {
         send(item(itemId, merchantId, 399, true, 1));
         awaitMerchant(merchantId, false);
         awaitItem(itemId, 399);
-        KafkaTestSupport.awaitSettled(jdbc);
+        Consumers.awaitSettled(jdbc);
 
         List<MessageListenerContainer> containers = List.of(
                 listener(MerchantCopiesConsumer.MERCHANTS_LISTENER),

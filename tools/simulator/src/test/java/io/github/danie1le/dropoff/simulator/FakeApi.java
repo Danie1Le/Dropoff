@@ -14,6 +14,9 @@ final class FakeApi implements DropoffApi {
 
     final List<String> calls = new ArrayList<>();
     final Map<Long, CourierView> couriers = new HashMap<>();
+    /** The Idempotency-Key of every placeOrder call, in order. */
+    final List<String> idempotencyKeys = new ArrayList<>();
+
     final Map<Long, Offer> offers = new HashMap<>();
     final Map<Long, Deque<List<Long>>> placedOrders = new HashMap<>();
     final List<LatLng> locations = new ArrayList<>();
@@ -27,14 +30,14 @@ final class FakeApi implements DropoffApi {
     String failOn;
 
     @Nullable
-    ApiException failure;
+    RuntimeException failure;
 
     private long nextId = 1;
 
     private void record(String call) {
         calls.add(call);
         if (failOn != null && call.startsWith(failOn) && failure != null) {
-            ApiException toThrow = failure;
+            RuntimeException toThrow = failure;
             failOn = null;
             failure = null;
             throw toThrow;
@@ -117,7 +120,8 @@ final class FakeApi implements DropoffApi {
     }
 
     @Override
-    public long placeOrder(long customerId, long merchantId, List<OrderLine> lines) {
+    public long placeOrder(long customerId, long merchantId, List<OrderLine> lines, String idempotencyKey) {
+        idempotencyKeys.add(idempotencyKey);
         record("placeOrder " + customerId + " " + merchantId + " " + lines.size());
         orders.add(new PlacedOrder(customerId, merchantId, List.copyOf(lines)));
         return nextId++;

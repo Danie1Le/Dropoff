@@ -2,7 +2,7 @@ package io.github.danie1le.dropoff.order;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.github.danie1le.dropoff.KafkaTestSupport;
+import io.github.danie1le.dropoff.Consumers;
 import io.github.danie1le.dropoff.TestcontainersConfiguration;
 import java.util.List;
 import java.util.UUID;
@@ -48,19 +48,15 @@ class OrderCommandApiIT {
     }
 
     /**
-     * Deletes every order, customer and merchant, and dispatch's rows for those orders; only for ITs that commit.
+     * Deletes every order, customer and merchant, and the merchant copies; only for ITs that commit.
      *
-     * <p>Marking an order ready sends {@code OrderReady} to dispatch's Kafka consumer (M3-2, M5-1), which inserts a
-     * {@code dispatch_orders} row. It first waits until every event is sent and consumed, so that insert never lands
-     * between the deletes. Failed deliveries are not waited for; their registry rows are dropped with the rest.
+     * <p>It first waits until every event is sent and consumed, so no consumer writes a row between the deletes. Failed
+     * deliveries are not waited for; their registry rows are dropped with the rest.
      */
     static void deleteAll(JdbcClient jdbc) {
-        KafkaTestSupport.awaitSettled(jdbc);
-        jdbc.sql("UPDATE orders SET assigned_offer_id = NULL").update();
+        Consumers.awaitSettled(jdbc);
         for (String table : List.of(
                 "event_publication",
-                "offers",
-                "dispatch_orders",
                 "order_events",
                 "order_lines",
                 "orders",

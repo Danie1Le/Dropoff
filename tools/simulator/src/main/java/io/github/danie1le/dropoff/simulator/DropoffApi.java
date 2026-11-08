@@ -35,7 +35,11 @@ interface DropoffApi {
 
     void deliver(long courierId, long orderId);
 
-    long placeOrder(long customerId, long merchantId, List<OrderLine> lines);
+    /**
+     * Places an order. A retry of one order sends the same {@code idempotencyKey}, so the server answers with the
+     * order it already made instead of making a second.
+     */
+    long placeOrder(long customerId, long merchantId, List<OrderLine> lines, String idempotencyKey);
 
     /** Ids of the merchant's PLACED orders, oldest first (first page only). */
     List<Long> placedOrders(long merchantId);

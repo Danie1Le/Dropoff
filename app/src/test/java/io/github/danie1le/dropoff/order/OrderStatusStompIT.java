@@ -95,7 +95,6 @@ class OrderStatusStompIT {
         }
         client.stop();
         OrderCommandApiIT.deleteAll(jdbc);
-        jdbc.sql("DELETE FROM couriers").update();
     }
 
     /** Collects ERROR frames, the server's answer to a frame it rejects. */
@@ -204,9 +203,7 @@ class OrderStatusStompIT {
         post("/api/v1/merchants/{m}/orders/{o}/start-preparing", f.merchantId(), f.orderId());
         post("/api/v1/merchants/{m}/orders/{o}/ready", f.merchantId(), f.orderId());
         // The courier is written straight to the row, as the CourierAssigned listener leaves it.
-        long courierId = jdbc.sql("INSERT INTO couriers (name, status) VALUES ('Carla', 'BUSY') RETURNING id")
-                .query(Long.class)
-                .single();
+        long courierId = OrderFixtures.courierId();
         jdbc.sql("UPDATE orders SET courier_id = ? WHERE id = ?")
                 .params(courierId, f.orderId())
                 .update();
