@@ -1,10 +1,14 @@
 package io.github.danie1le.dropoff.order.internal;
 
+import io.github.danie1le.dropoff.common.ProblemResponse;
 import io.github.danie1le.dropoff.order.internal.CustomerRequests.CreateCustomer;
 import io.github.danie1le.dropoff.order.internal.CustomerRequests.CustomerResponse;
 import io.github.danie1le.dropoff.order.internal.CustomerRequests.UpdateCustomer;
+import io.swagger.v3.oas.annotations.headers.Header;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
 import java.net.URI;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -26,6 +30,10 @@ class CustomerController {
         this.service = service;
     }
 
+    @ApiResponse(
+            responseCode = "201",
+            description = "Created.",
+            headers = @Header(name = HttpHeaders.LOCATION, description = "URL of the new customer."))
     @PostMapping
     ResponseEntity<CustomerResponse> create(@Valid @RequestBody CreateCustomer request) {
         Customer customer = service.create(request);
@@ -36,11 +44,13 @@ class CustomerController {
         return ResponseEntity.created(location).body(CustomerResponse.of(customer));
     }
 
+    @ProblemResponse(status = 404, codes = "CUSTOMER_NOT_FOUND")
     @GetMapping("/{id}")
     CustomerResponse get(@PathVariable long id) {
         return CustomerResponse.of(service.get(id));
     }
 
+    @ProblemResponse(status = 404, codes = "CUSTOMER_NOT_FOUND")
     @PatchMapping("/{id}")
     CustomerResponse update(@PathVariable long id, @Valid @RequestBody UpdateCustomer request) {
         return CustomerResponse.of(service.update(id, request));
