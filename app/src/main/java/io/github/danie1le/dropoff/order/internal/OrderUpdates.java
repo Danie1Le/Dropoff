@@ -42,4 +42,16 @@ class OrderUpdates {
             }
         });
     }
+
+    /**
+     * Sends {@code message} now. Dispatch publishes the location only after it commits, so there is nothing here to
+     * wait for. A failed send is logged and dropped, like a status: the next location follows within seconds.
+     */
+    void location(OrderLocationMessage message) {
+        try {
+            messaging.convertAndSend(topic(message.orderId()), message);
+        } catch (RuntimeException ex) {
+            log.warn("LOCATION message for order {} failed", message.orderId(), ex);
+        }
+    }
 }

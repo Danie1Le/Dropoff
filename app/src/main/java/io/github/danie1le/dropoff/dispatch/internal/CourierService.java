@@ -23,6 +23,7 @@ class CourierService {
     private final CourierGeoIndex geoIndex;
     private final CourierAssignments assignments;
     private final DispatchService dispatch;
+    private final CourierLocationStream locations;
     private final TransactionTemplate transaction;
     private final Clock clock;
 
@@ -31,12 +32,14 @@ class CourierService {
             CourierGeoIndex geoIndex,
             CourierAssignments assignments,
             DispatchService dispatch,
+            CourierLocationStream locations,
             TransactionTemplate transaction,
             Clock clock) {
         this.couriers = couriers;
         this.geoIndex = geoIndex;
         this.assignments = assignments;
         this.dispatch = dispatch;
+        this.locations = locations;
         this.transaction = transaction;
         this.clock = clock;
     }
@@ -88,13 +91,16 @@ class CourierService {
 
     /**
      * Always saved; also moves the courier in the geo set while AVAILABLE (ticket #12 as amended by #42). Otherwise it
-     * ZREMs the courier, which is idempotent and clears a member left behind by a failed or reordered write.
+     * ZREMs the courier, which is idempotent and clears a member left behind by a failed or reordered write. A courier
+     * delivering an order also streams the location to its customer, throttled (M4-2).
      */
     @Transactional
     Courier moveTo(long id, Position position) {
         Courier courier = lockedOrThrow(id);
-        courier.moveTo(position, DbClock.now(clock));
+        Instant now = DbClock.now(clock);
+        courier.moveTo(position, now);
         syncGeoIndex(courier);
+        locations.publishAfterCommit(id, position, now);
         return courier;
     }
 
