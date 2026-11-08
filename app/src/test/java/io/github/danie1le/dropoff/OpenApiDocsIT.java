@@ -46,7 +46,9 @@ class OpenApiDocsIT {
             Map.entry("/api/v1/couriers/{id}/location", List.of("put")),
             Map.entry("/api/v1/couriers/{courierId}/offers/current", List.of("get")),
             Map.entry("/api/v1/couriers/{courierId}/offers/{offerId}/accept", List.of("post")),
-            Map.entry("/api/v1/couriers/{courierId}/offers/{offerId}/decline", List.of("post")));
+            Map.entry("/api/v1/couriers/{courierId}/offers/{offerId}/decline", List.of("post")),
+            Map.entry("/api/v1/couriers/{courierId}/orders/{orderId}/pick-up", List.of("post")),
+            Map.entry("/api/v1/couriers/{courierId}/orders/{orderId}/deliver", List.of("post")));
 
     private final MockMvcTester mvc;
 

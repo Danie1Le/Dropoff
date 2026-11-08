@@ -83,8 +83,8 @@ class Courier {
     }
 
     /**
-     * Frees the courier after they decline an offer (ticket #11, point 8): BUSY becomes AVAILABLE. Any other status is
-     * left as it is.
+     * Frees the courier after they decline an offer (ticket #11, point 8) or deliver an order (M3-5): BUSY becomes
+     * AVAILABLE. Any other status is left as it is.
      */
     void release(Instant now) {
         if (status == CourierStatus.BUSY) {

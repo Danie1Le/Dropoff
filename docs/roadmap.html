@@ -554,7 +554,7 @@ const MILESTONES = [
     { t: 'Migrations: couriers, offers, dispatch_orders (filled from OrderReady; WAITING → ASSIGNED → PICKED_UP → DONE)', done: true },
     { t: 'New couriers start OFFLINE; location updates allowed in any status (GEOADD only while AVAILABLE, after commit); AVAILABLE needs a location (409 COURIER_LOCATION_UNKNOWN), not while BUSY (409 COURIER_BUSY); geo key couriers:available', done: true },
     { t: 'POST /api/v1/couriers, PATCH /api/v1/couriers/{id}/status, PUT /api/v1/couriers/{id}/location', done: true },
-    { t: 'Courier commands: POST /api/v1/couriers/{id}/orders/{orderId}/pick-up and deliver' },
+    { t: 'Courier commands: POST /api/v1/couriers/{id}/orders/{orderId}/pick-up and deliver', done: true },
     { t: 'Redis GEO index of AVAILABLE couriers', done: true },
     { t: 'On READY: GEOSEARCH 5 km dispatch radius, nearest first', done: true },
     { t: 'Claim with UPDATE … WHERE status = AVAILABLE', done: true },

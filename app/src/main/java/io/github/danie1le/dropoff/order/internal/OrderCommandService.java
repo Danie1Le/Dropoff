@@ -4,15 +4,19 @@ import io.github.danie1le.dropoff.common.DbClock;
 import io.github.danie1le.dropoff.common.DomainException;
 import io.github.danie1le.dropoff.contracts.Actor;
 import io.github.danie1le.dropoff.contracts.OrderCancelled;
+import io.github.danie1le.dropoff.contracts.OrderDelivered;
+import io.github.danie1le.dropoff.contracts.OrderPickedUp;
 import io.github.danie1le.dropoff.contracts.OrderReady;
 import io.github.danie1le.dropoff.merchant.MerchantDirectory;
 import io.github.danie1le.dropoff.merchant.MerchantDirectory.MerchantView;
 import io.github.danie1le.dropoff.order.internal.OrderRequests.OrderResponse;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -69,6 +73,21 @@ class OrderCommandService {
             throw notFound(orderId);
         }
         return OrderResponse.of(apply(order, command, Actor.CUSTOMER));
+    }
+
+    /**
+     * A courier command on an order assigned to that courier; any other order, including one with no courier yet, is a
+     * 404. The order row is locked before the courier check, so an unassignment (M3-4) cannot slip in between the check
+     * and the status write.
+     */
+    @Transactional
+    OrderResponse byCourier(long courierId, long orderId, OrderCommand command) {
+        Order order = Optional.ofNullable(entityManager.find(Order.class, orderId, LockModeType.PESSIMISTIC_WRITE))
+                .orElseThrow(() -> notFound(orderId));
+        if (!Objects.equals(order.courierId(), courierId)) {
+            throw notFound(orderId);
+        }
+        return OrderResponse.of(apply(order, command, Actor.COURIER));
     }
 
     /**
@@ -155,8 +174,17 @@ class OrderCommandService {
                         now,
                         now));
             }
+            case PICK_UP ->
+                events.publishEvent(new OrderPickedUp(UUID.randomUUID(), order.id(), courierOf(order), now));
+            case DELIVER ->
+                events.publishEvent(new OrderDelivered(UUID.randomUUID(), order.id(), courierOf(order), now));
             default -> {}
         }
+    }
+
+    /** The courier of an order a courier command just moved; {@link #byCourier} checked it is set. */
+    private static long courierOf(Order order) {
+        return Objects.requireNonNull(order.courierId(), "a courier command moved an order with no courier");
     }
 
     static DomainException notFound(long orderId) {
