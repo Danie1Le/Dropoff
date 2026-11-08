@@ -1,9 +1,9 @@
 package io.github.danie1le.dropoff.dispatch.internal;
 
-import io.github.danie1le.dropoff.common.DomainException;
 import io.github.danie1le.dropoff.contracts.CourierAssigned;
 import io.github.danie1le.dropoff.dispatch.internal.OfferResponses.CurrentOffer;
 import io.github.danie1le.dropoff.dispatch.internal.OfferResponses.OfferResponse;
+import io.github.danie1le.dropoff.web.DomainException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;

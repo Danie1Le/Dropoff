@@ -1,8 +1,8 @@
 package io.github.danie1le.dropoff.dispatch.internal;
 
-import io.github.danie1le.dropoff.common.ProblemResponse;
 import io.github.danie1le.dropoff.dispatch.internal.OfferResponses.CurrentOffer;
 import io.github.danie1le.dropoff.dispatch.internal.OfferResponses.OfferResponse;
+import io.github.danie1le.dropoff.web.ProblemResponse;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

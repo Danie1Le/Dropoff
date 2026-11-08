@@ -4,6 +4,10 @@ plugins {
 }
 
 dependencies {
+    // Shared modules (M5-2): the event records and the web building blocks every service will use.
+    implementation(project(":contracts"))
+    implementation(project(":libs:web-common"))
+
     implementation(platform(libs.spring.boot.bom))
     implementation(platform(libs.spring.modulith.bom))
 

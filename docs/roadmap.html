@@ -588,7 +588,7 @@ const MILESTONES = [
     { t: 'M5-1 spring-modulith-events-kafka relays the registry to Kafka, routes set in an EventExternalizationConfiguration bean (ADR-0006); CourierLocationUpdated via KafkaTemplate; JSON with logical type names', done: true },
     { t: 'M5-1 cross-module listeners become Kafka consumers (groups order-service, dispatch-service); processed_events per consumer group', done: true },
     { t: 'M5-1 consumer errors: 3 redelivery attempts (1 s, 2 s, 4 s), then <topic>.DLT (14 d); ops/kafka/replay-dlt.sh', done: true },
-    { t: 'M5-2 the contracts package (from M3-3, ADR-0008) becomes a Gradle module (event records only, no Spring, additive changes only) and libs/web-common' },
+    { t: 'M5-2 the contracts package (from M3-3, ADR-0008) becomes a Gradle module (event records only, no Spring, additive changes only) and libs/web-common', done: true },
     { t: 'M5-3 order module validates from merchant_copies / menu_item_copies fed by MerchantChanged / MenuItemChanged; rebuild by replay; local databases reset and reseeded' },
     { t: 'M5-4 extract dispatch-service (8083, dispatch_db + Redis); Postgres init script for three databases; simulator base URLs; simulator smoke mode + ops/smoke/full-flow.sh; dispatch↔order FKs dropped' },
     { t: 'M5-5 extract merchant-service (8081, merchant_db); ordering works while it is down' },

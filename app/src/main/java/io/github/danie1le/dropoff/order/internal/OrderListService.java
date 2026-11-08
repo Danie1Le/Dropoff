@@ -1,8 +1,8 @@
 package io.github.danie1le.dropoff.order.internal;
 
-import io.github.danie1le.dropoff.common.PageParams;
 import io.github.danie1le.dropoff.merchant.MerchantDirectory;
 import io.github.danie1le.dropoff.order.internal.OrderRequests.OrderResponse;
+import io.github.danie1le.dropoff.web.PageParams;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

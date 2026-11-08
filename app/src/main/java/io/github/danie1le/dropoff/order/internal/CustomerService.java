@@ -1,8 +1,8 @@
 package io.github.danie1le.dropoff.order.internal;
 
-import io.github.danie1le.dropoff.common.DomainException;
 import io.github.danie1le.dropoff.order.internal.CustomerRequests.CreateCustomer;
 import io.github.danie1le.dropoff.order.internal.CustomerRequests.UpdateCustomer;
+import io.github.danie1le.dropoff.web.DomainException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

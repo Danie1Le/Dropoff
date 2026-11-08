@@ -1,10 +1,10 @@
 package io.github.danie1le.dropoff.merchant.internal;
 
-import io.github.danie1le.dropoff.common.PageParams;
-import io.github.danie1le.dropoff.common.ProblemResponse;
 import io.github.danie1le.dropoff.merchant.internal.MerchantRequests.CreateMerchant;
 import io.github.danie1le.dropoff.merchant.internal.MerchantRequests.MerchantResponse;
 import io.github.danie1le.dropoff.merchant.internal.MerchantRequests.UpdateMerchant;
+import io.github.danie1le.dropoff.web.PageParams;
+import io.github.danie1le.dropoff.web.ProblemResponse;
 import io.swagger.v3.oas.annotations.headers.Header;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;

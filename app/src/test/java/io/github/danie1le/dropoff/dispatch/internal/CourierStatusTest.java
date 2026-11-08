@@ -3,7 +3,7 @@ package io.github.danie1le.dropoff.dispatch.internal;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import io.github.danie1le.dropoff.common.DomainException;
+import io.github.danie1le.dropoff.web.DomainException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
