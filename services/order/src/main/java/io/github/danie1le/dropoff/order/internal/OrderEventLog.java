@@ -9,17 +9,20 @@ import org.springframework.stereotype.Component;
 
 /**
  * Writes {@code order_events} rows, the audit trail of every status change (ticket #10), and pushes each change as a
- * STOMP {@code STATUS} message after commit (M4-1). Every status change goes through here, so the two never disagree.
+ * STOMP {@code STATUS} message after commit (M4-1). Every status change goes through here, so the two never disagree,
+ * and the order counters (M6-1) move here too.
  */
 @Component
 class OrderEventLog {
 
     private final JdbcClient jdbc;
     private final OrderUpdates updates;
+    private final OrderMetrics metrics;
 
-    OrderEventLog(JdbcClient jdbc, OrderUpdates updates) {
+    OrderEventLog(JdbcClient jdbc, OrderUpdates updates, OrderMetrics metrics) {
         this.jdbc = jdbc;
         this.updates = updates;
+        this.metrics = metrics;
     }
 
     /** Records that the order moved from {@code from} (null for a new order) to {@code to}. */
@@ -33,5 +36,6 @@ class OrderEventLog {
                 .param("at", Timestamp.from(at))
                 .update();
         updates.statusAfterCommit(new OrderStatusMessage(orderId, to, actor, at));
+        metrics.statusChanged(to, actor);
     }
 }

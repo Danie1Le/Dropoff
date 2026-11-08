@@ -5,6 +5,9 @@
 dropoff:
   scheduling:
     enabled: false
+  metrics:
+    # Gauges reload on every read, so a test sees the rows it just wrote (main config: 15 s).
+    gauge-max-age: 0s
 spring:
   modulith:
     moments:

@@ -1,0 +1,22 @@
+# Prometheus scrape config (M6-1, ticket #34). Every service exposes /actuator/prometheus; Prometheus pulls it every
+# 15 s, the same interval the services cache their gauge queries for.
+#
+# Until M6-3 the services run on the host with bootRun, so Prometheus (in Compose) reaches them through
+# host.docker.internal. The `service` label names each one for the M6-2 dashboard.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: dropoff
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:8081"]
+        labels:
+          service: merchant-service
+      - targets: ["host.docker.internal:8082"]
+        labels:
+          service: order-service
+      - targets: ["host.docker.internal:8083"]
+        labels:
+          service: dispatch-service

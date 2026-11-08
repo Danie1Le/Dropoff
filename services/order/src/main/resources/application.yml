@@ -38,6 +38,17 @@ spring:
       jdbc:
         schema-initialization:
           enabled: false
+management:
+  # Prometheus scrapes /actuator/prometheus every 15 s (M6-1, ticket #34); health stays for Compose and smoke checks.
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  metrics:
+    distribution:
+      # Buckets on request latency, so Grafana can compute p50/p95/p99 per endpoint across instances.
+      percentiles-histogram:
+        http.server.requests: true
 springdoc:
   # Swagger UI (/swagger-ui.html) shows one group, v1, served at /v3/api-docs/v1: only the versioned REST API
   # (M1-4, ticket #5). Actuator stays out.

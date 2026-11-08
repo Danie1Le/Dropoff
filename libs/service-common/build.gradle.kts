@@ -22,6 +22,7 @@ dependencies {
     implementation(libs.spring.boot.starter.jdbc)
     implementation(libs.spring.modulith.events.api)
     implementation(libs.jackson.databind)
+    implementation(libs.micrometer.core)
 
     testImplementation(libs.spring.boot.starter.test)
     testRuntimeOnly(libs.junit.platform.launcher)

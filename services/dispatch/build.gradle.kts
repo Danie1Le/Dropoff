@@ -17,6 +17,8 @@ dependencies {
     implementation(libs.spring.boot.starter.webmvc)
     implementation(libs.spring.boot.starter.validation)
     implementation(libs.spring.boot.starter.actuator)
+    // /actuator/prometheus (M6-1, ticket #34)
+    runtimeOnly(libs.micrometer.registry.prometheus)
     implementation(libs.springdoc.openapi.starter.webmvc.ui)
     implementation(libs.spring.modulith.starter.core)
     implementation(libs.spring.modulith.starter.jdbc)
