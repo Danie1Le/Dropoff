@@ -53,4 +53,18 @@ class OrderCommandController {
     OrderResponse customerCancel(@PathVariable long customerId, @PathVariable long orderId) {
         return service.byCustomer(customerId, orderId, OrderCommand.CANCEL);
     }
+
+    @ProblemResponse(status = 404, codes = "ORDER_NOT_FOUND")
+    @ProblemResponse(status = 409, codes = "INVALID_STATUS_TRANSITION")
+    @PostMapping("/couriers/{courierId}/orders/{orderId}/pick-up")
+    OrderResponse pickUp(@PathVariable long courierId, @PathVariable long orderId) {
+        return service.byCourier(courierId, orderId, OrderCommand.PICK_UP);
+    }
+
+    @ProblemResponse(status = 404, codes = "ORDER_NOT_FOUND")
+    @ProblemResponse(status = 409, codes = "INVALID_STATUS_TRANSITION")
+    @PostMapping("/couriers/{courierId}/orders/{orderId}/deliver")
+    OrderResponse deliver(@PathVariable long courierId, @PathVariable long orderId) {
+        return service.byCourier(courierId, orderId, OrderCommand.DELIVER);
+    }
 }
