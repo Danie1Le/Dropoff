@@ -12,8 +12,10 @@ enum CourierStatus {
     BUSY;
 
     /**
-     * The status after the courier asks for {@code requested} (ticket #42, point 10). OFFLINE is always allowed;
-     * AVAILABLE needs a known location and is refused while BUSY. Asking for the current status is a no-op.
+     * The status after the courier asks for {@code requested} (ticket #42, point 10). OFFLINE is always allowed for
+     * now, since nothing sets BUSY before M3-2; M3-4 (ticket #85) narrows it so a courier with a picked-up delivery gets
+     * 409 COURIER_HAS_ACTIVE_DELIVERY. AVAILABLE needs a known location and is refused while BUSY. Asking for the
+     * current status is a no-op.
      *
      * @throws IllegalArgumentException if {@code requested} is BUSY: the request validation lets only AVAILABLE and
      *     OFFLINE through

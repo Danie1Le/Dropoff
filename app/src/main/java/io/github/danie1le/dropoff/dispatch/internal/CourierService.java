@@ -39,14 +39,15 @@ class CourierService {
         return courier;
     }
 
-    /** Always saved; also moves the courier in the geo set while AVAILABLE (ticket #12 as amended by #42). */
+    /**
+     * Always saved; also moves the courier in the geo set while AVAILABLE (ticket #12 as amended by #42). Otherwise it
+     * ZREMs the courier, which is idempotent and clears a member left behind by a failed or reordered write.
+     */
     @Transactional
     Courier moveTo(long id, Position position) {
         Courier courier = lockedOrThrow(id);
         courier.moveTo(position, DbClock.now(clock));
-        if (courier.status() == CourierStatus.AVAILABLE) {
-            syncGeoIndex(courier);
-        }
+        syncGeoIndex(courier);
         return courier;
     }
 

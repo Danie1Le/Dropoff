@@ -6,8 +6,10 @@ import static org.assertj.core.api.Assertions.within;
 
 import io.github.danie1le.dropoff.TestcontainersConfiguration;
 import io.github.danie1le.dropoff.order.OrderFixtures;
+import java.util.ArrayList;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -26,7 +28,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Courier endpoints end to end, against real Postgres and Redis (M3-1, tickets #12, #42). The Redis writes run after
- * commit, so these tests commit for real; each one makes its own courier, so they don't see each other's rows.
+ * commit, so these tests commit for real; each one makes its own courier, so they don't see each other's rows. Each
+ * test deletes its couriers afterwards and takes them out of the geo set, so later IT classes never find them.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -39,6 +42,7 @@ class CourierApiIT {
     private final StringRedisTemplate redis;
     private final JdbcClient jdbc;
     private final TransactionTemplate transaction;
+    private final List<Long> createdIds = new ArrayList<>();
 
     CourierApiIT(
             @Autowired MockMvcTester mvc,
@@ -51,12 +55,31 @@ class CourierApiIT {
         this.transaction = transaction;
     }
 
+    @AfterEach
+    void deleteCreatedCouriers() {
+        if (createdIds.isEmpty()) {
+            return;
+        }
+        redis.opsForGeo()
+                .remove(GEO_KEY, createdIds.stream().map(String::valueOf).toArray(String[]::new));
+        jdbc.sql("DELETE FROM couriers WHERE id IN (:ids)")
+                .param("ids", createdIds)
+                .update();
+        createdIds.clear();
+    }
+
+    /** POSTs a courier and remembers its id for {@link #deleteCreatedCouriers()} when it is created. */
     private MvcTestResult create(String json) {
-        return mvc.post()
+        MvcTestResult result = mvc.post()
                 .uri("/api/v1/couriers")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json)
                 .exchange();
+        String location = result.getResponse().getHeader(HttpHeaders.LOCATION);
+        if (location != null) {
+            createdIds.add(Long.parseLong(location.substring(location.lastIndexOf('/') + 1)));
+        }
+        return result;
     }
 
     private long newCourier() {
@@ -64,9 +87,7 @@ class CourierApiIT {
                 {"name":"Carla"}
                 """);
         assertThat(result).hasStatus(HttpStatus.CREATED);
-        String location = result.getResponse().getHeader(HttpHeaders.LOCATION);
-        assertThat(location).isNotNull();
-        return Long.parseLong(location.substring(location.lastIndexOf('/') + 1));
+        return createdIds.get(createdIds.size() - 1);
     }
 
     private MvcTestResult status(long id, String status) {
@@ -268,6 +289,18 @@ class CourierApiIT {
 
         assertThat(result).hasStatusOk();
         assertThat(result).bodyJson().extractingPath("$.lat").isEqualTo(30.2849);
+        assertThat(geoPosition(id)).isNull();
+    }
+
+    @Test
+    void aLocationUpdateClearsAStaleGeoMemberWhileNotAvailable() {
+        long id = newCourier();
+        // A failed or reordered after-commit ZREM can leave an OFFLINE courier in the set; the test plants one.
+        redis.opsForGeo().add(GEO_KEY, new Point(-97.7431, 30.2672), Long.toString(id));
+
+        MvcTestResult result = location(id, 30.2849, -97.7341);
+
+        assertThat(result).hasStatusOk();
         assertThat(geoPosition(id)).isNull();
     }
 

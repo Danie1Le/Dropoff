@@ -13,7 +13,13 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  *
  * <p>Every write is queued until the surrounding Postgres transaction commits (ticket #42, second gate pass), so a
  * rollback never leaves Redis and Postgres disagreeing. A failed Redis write is logged, not thrown: Postgres has
- * already committed and stays the source of truth, and the courier's next location update writes the set again.
+ * already committed and stays the source of truth.
+ *
+ * <p>The set can still go stale. A failed write leaves it behind Postgres, and two requests can run their after-commit
+ * writes in the opposite order to their commits, since the row lock is released at commit. Each location update writes
+ * the set again (GEOADD while AVAILABLE, ZREM otherwise), which heals most of this on the courier's next ping. The set is
+ * only a search hint: dispatch claims a courier with {@code UPDATE ... WHERE status = 'AVAILABLE'} in Postgres, and must
+ * ZREM a member whose claim fails (ticket #83).
  */
 @Component
 class CourierGeoIndex {
