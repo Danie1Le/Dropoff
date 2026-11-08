@@ -3,6 +3,7 @@ package io.github.danie1le.dropoff.dispatch.internal;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
+import io.github.danie1le.dropoff.KafkaTestSupport;
 import io.github.danie1le.dropoff.TestcontainersConfiguration;
 import io.github.danie1le.dropoff.order.OrderFixtures;
 import java.time.Duration;
@@ -61,14 +62,8 @@ class DeliveryIT {
 
     @AfterEach
     void deleteCreatedRows() {
-        // The API test's events reach their listeners asynchronously; let them finish before deleting their rows.
-        await().pollDelay(Duration.ZERO)
-                .atMost(Duration.ofSeconds(10))
-                .until(() -> jdbc.sql("SELECT count(*) FROM event_publication WHERE completion_date IS NULL"
-                                        + " AND status IS DISTINCT FROM 'FAILED'")
-                                .query(Long.class)
-                                .single()
-                        == 0);
+        // The API test's events reach their Kafka consumers asynchronously; let them finish before deleting their rows.
+        KafkaTestSupport.awaitSettled(jdbc);
         if (!courierIds.isEmpty()) {
             redis.opsForGeo()
                     .remove(

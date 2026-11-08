@@ -7,12 +7,12 @@ import java.time.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Component;
 
 /**
- * Clears the courier from the order once dispatch unassigns them (M3-4, tickets #11 point 10, #85). Runs after
- * dispatch's commit, through the Modulith event registry, which retries an unfinished delivery (ADR-0006).
+ * Clears the courier from the order once dispatch unassigns them (M3-4, tickets #11 point 10, #85). {@link
+ * CourierEventsConsumer} calls it for each {@code CourierUnassigned} read from Kafka, inside the transaction that
+ * records the event as processed (M5-1, ADR-0006).
  *
  * <p>Only the assignment the event undoes is cleared: the order must still be READY, with this courier, recorded from
  * this offer ({@code assigned_offer_id}). A late event that arrives after a newer courier was assigned, or a
@@ -32,7 +32,6 @@ class CourierUnassignedListener {
         this.clock = clock;
     }
 
-    @ApplicationModuleListener
     void on(CourierUnassigned event) {
         int updated = jdbc.sql("UPDATE orders SET courier_id = NULL, updated_at = :now"
                         + " WHERE id = :id AND courier_id = :courierId AND assigned_offer_id = :offerId"

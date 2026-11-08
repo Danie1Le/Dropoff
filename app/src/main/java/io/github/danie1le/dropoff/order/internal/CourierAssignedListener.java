@@ -7,12 +7,12 @@ import java.time.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Component;
 
 /**
- * Records the courier on the order once dispatch assigns one (M3-3, ticket #11, point 4). Runs after dispatch's
- * commit, through the Modulith event registry, which retries an unfinished delivery (ADR-0006).
+ * Records the courier on the order once dispatch assigns one (M3-3, ticket #11, point 4). {@link
+ * CourierEventsConsumer} calls it for each {@code CourierAssigned} read from Kafka, inside the transaction that records
+ * the event as processed (M5-1, ADR-0006).
  *
  * <p>Only a READY order takes a courier: a cancelled order, or one already past READY, is left alone. Since M3-4 an
  * order can go assign A, unassign A, assign B while READY, so the guard also holds an offer-id high-water mark
@@ -33,7 +33,6 @@ class CourierAssignedListener {
         this.clock = clock;
     }
 
-    @ApplicationModuleListener
     void on(CourierAssigned event) {
         int updated = jdbc.sql("UPDATE orders SET courier_id = :courierId, assigned_offer_id = :offerId,"
                         + " updated_at = :now WHERE id = :id AND status = 'READY'"

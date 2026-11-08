@@ -1,5 +1,6 @@
 package io.github.danie1le.dropoff.dispatch.internal;
 
+import io.github.danie1le.dropoff.common.KafkaTopics;
 import io.github.danie1le.dropoff.contracts.CourierLocationUpdated;
 import java.time.Duration;
 import java.time.Instant;
@@ -7,9 +8,11 @@ import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.kafka.core.KafkaOperations;
+import org.springframework.kafka.support.KafkaHeaders;
+import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,9 +31,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * <p>The throttle, the order lookup and the publish all run after the location commits. A rolled-back update neither
  * opens the window nor reaches a customer, and the lookup runs only for the update that wins the window, outside the
  * transaction that holds the courier row lock. An idle courier also opens the window, which only means their first
- * update after accepting an order may wait up to 5 s. The event goes to plain {@code @EventListener}s, not the event
- * registry: it is high-volume and fine to lose. A failed Redis call, lookup or listener is logged and dropped; the
- * location is already saved.
+ * update after accepting an order may wait up to 5 s. The event goes straight to the {@code courier-locations} topic
+ * with {@code KafkaTemplate}, keyed by orderId, not through the event registry (M5-1, ticket #15): it is high-volume
+ * and fine to lose. A failed Redis call, lookup or send is logged and dropped; the location is already saved.
  */
 @Component
 class CourierLocationStream {
@@ -41,12 +44,12 @@ class CourierLocationStream {
 
     private final JdbcClient jdbc;
     private final StringRedisTemplate redis;
-    private final ApplicationEventPublisher events;
+    private final KafkaOperations<?, ?> kafka;
 
-    CourierLocationStream(JdbcClient jdbc, StringRedisTemplate redis, ApplicationEventPublisher events) {
+    CourierLocationStream(JdbcClient jdbc, StringRedisTemplate redis, KafkaOperations<?, ?> kafka) {
         this.jdbc = jdbc;
         this.redis = redis;
-        this.events = events;
+        this.kafka = kafka;
     }
 
     static String throttleKey(long courierId) {
@@ -62,7 +65,7 @@ class CourierLocationStream {
                 try {
                     if (Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(throttleKey(courierId), "1", WINDOW))) {
                         for (long orderId : deliveringOrders(courierId)) {
-                            events.publishEvent(new CourierLocationUpdated(
+                            send(new CourierLocationUpdated(
                                     UUID.randomUUID(), courierId, orderId, position.lat(), position.lng(), at, at));
                         }
                     }
@@ -71,6 +74,20 @@ class CourierLocationStream {
                 }
             }
         });
+    }
+
+    /** Fire and forget: the callback logs a failed send, and nothing waits for it. */
+    @SuppressWarnings("FutureReturnValueIgnored")
+    private void send(CourierLocationUpdated event) {
+        kafka.send(MessageBuilder.withPayload(event)
+                        .setHeader(KafkaHeaders.TOPIC, KafkaTopics.COURIER_LOCATIONS)
+                        .setHeader(KafkaHeaders.KEY, Long.toString(event.orderId()))
+                        .build())
+                .whenComplete((result, ex) -> {
+                    if (ex != null) {
+                        log.warn("CourierLocationUpdated for courier {} was dropped", event.courierId(), ex);
+                    }
+                });
     }
 
     /**
