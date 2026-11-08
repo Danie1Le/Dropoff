@@ -1,0 +1,45 @@
+server:
+  # Service ports (ADR-0007): merchant 8081, order 8082, dispatch 8083. No gateway.
+  port: 8081
+spring:
+  application:
+    name: merchant-service
+  datasource:
+    # Its own database and user, created by ops/postgres/init (M5-4). Containers override these with DB_URL,
+    # DB_USERNAME and DB_PASSWORD.
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/merchant_db}
+    username: ${DB_USERNAME:merchant_user}
+    password: ${DB_PASSWORD:merchant_user}
+  kafka:
+    # Default matches compose.yaml; containers override it with KAFKA_BOOTSTRAP_SERVERS.
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    # Keys are merchant and menu item ids as text. Values are bytes on the wire: the shared KafkaConfig's message
+    # converter turns events into JSON, typed by the __TypeId__ header. merchant-service only produces; it reads no topic.
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
+  jpa:
+    # Flyway owns the schema; Hibernate only checks entities match it (ADR-0002).
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  modulith:
+    events:
+      # Outbox settings (ticket #42, ADR-0006): delete completed publications, retry outstanding ones on restart,
+      # and let Flyway (V1) own the event_publication table.
+      completion-mode: delete
+      republish-outstanding-events-on-restart: true
+      jdbc:
+        schema-initialization:
+          enabled: false
+springdoc:
+  # Swagger UI (/swagger-ui.html) shows one group, v1, served at /v3/api-docs/v1: only the versioned REST API.
+  group-configs:
+    - group: v1
+      paths-to-match: /api/v1/**
+  # Error responses come from ProblemDetailsOpenApi, not from scanning ApiExceptionHandler.
+  override-with-generic-response: false
+  default-produces-media-type: application/json

@@ -2,6 +2,7 @@ package io.github.danie1le.dropoff;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationInfo;
 import org.junit.jupiter.api.Test;
@@ -31,21 +32,27 @@ class DropoffApplicationIT {
     }
 
     /**
-     * Couriers, offers and dispatch_orders moved to dispatch-service's database in M5-4 (V16), so their tables are gone
-     * here, and orders.courier_id and assigned_offer_id hold ids that no FK checks (ADR-0003).
+     * Couriers, offers and dispatch_orders moved to dispatch-service's database in M5-4 (V16), and merchants and
+     * menu_items to merchant-service's in M5-5 (V17), so their tables are gone here. orders.courier_id,
+     * assigned_offer_id and merchant_id, and order_lines.menu_item_id, hold ids that no FK checks (ADR-0003).
      */
     @Test
-    void holdsNoDispatchTablesAndNoForeignKeyToThem() {
+    void holdsNoDispatchOrMerchantTablesAndNoForeignKeyToThem() {
         assertThat(jdbc.sql("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'")
                         .query(String.class)
                         .list())
-                .doesNotContain("couriers", "offers", "dispatch_orders");
-        assertThat(jdbc.sql("SELECT kcu.column_name FROM information_schema.table_constraints tc"
-                                + " JOIN information_schema.key_column_usage kcu"
-                                + " ON tc.constraint_name = kcu.constraint_name"
-                                + " WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_name = 'orders'")
-                        .query(String.class)
-                        .list())
-                .containsExactlyInAnyOrder("customer_id", "merchant_id");
+                .doesNotContain("couriers", "offers", "dispatch_orders", "merchants", "menu_items");
+        assertThat(foreignKeyColumns("orders")).containsExactly("customer_id");
+        assertThat(foreignKeyColumns("order_lines")).containsExactly("order_id");
+    }
+
+    private List<String> foreignKeyColumns(String table) {
+        return jdbc.sql("SELECT kcu.column_name FROM information_schema.table_constraints tc"
+                        + " JOIN information_schema.key_column_usage kcu"
+                        + " ON tc.constraint_name = kcu.constraint_name"
+                        + " WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_name = ?")
+                .param(table)
+                .query(String.class)
+                .list();
     }
 }

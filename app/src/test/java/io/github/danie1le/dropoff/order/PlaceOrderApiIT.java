@@ -73,7 +73,7 @@ class PlaceOrderApiIT {
                 .isEqualTo("200 Lavaca St");
         assertThat(result).bodyJson().extractingPath("$.deliveryAddress.lat").isEqualTo(30.2669);
         assertThat(result).bodyJson().extractingPath("$.deliveryAddress.lng").isEqualTo(-97.7466);
-        assertThat(result).bodyJson().extractingPath("$.lines[0].menuItemId").isEqualTo((int) taco);
+        assertThat(result).bodyJson().extractingPath("$.lines[0].menuItemId").isEqualTo(taco);
         assertThat(result).bodyJson().extractingPath("$.lines[0].quantity").isEqualTo(2);
         assertThat(result).bodyJson().extractingPath("$.lines[0].priceCents").isEqualTo(399);
         assertThat(result).bodyJson().extractingPath("$.lines[1].priceCents").isEqualTo(150);
@@ -210,14 +210,30 @@ class PlaceOrderApiIT {
         jdbc.sql("UPDATE merchant_copies SET open = false WHERE merchant_id = ?")
                 .param(closedInCopy)
                 .update();
-        long openInCopy = merchant(jdbc, true);
-        long soda = item(jdbc, openInCopy, 150, true);
-        jdbc.sql("UPDATE merchants SET is_open = false WHERE id = ?")
-                .param(openInCopy)
-                .update();
 
         assertRejected(place(customerId, closedInCopy, "[" + line(taco, 1) + "]"), "MERCHANT_CLOSED");
-        assertThat(place(customerId, openInCopy, "[" + line(soda, 1) + "]")).hasStatus(HttpStatus.CREATED);
+    }
+
+    /**
+     * Ordering reads only the order module's copies (ADR-0007). This app has no merchants or menu_items table since
+     * M5-5 and no merchant-service runs in this test, yet the order is validated, priced and placed: ordering keeps
+     * working while merchant-service is stopped.
+     */
+    @Test
+    void placesAnOrderWhileMerchantServiceIsStopped() {
+        assertThat(jdbc.sql("SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public'"
+                                + " AND table_name IN ('merchants', 'menu_items')")
+                        .query(Long.class)
+                        .single())
+                .isZero();
+        long customerId = customer(jdbc);
+        long merchantId = merchant(jdbc, true);
+        long taco = item(jdbc, merchantId, 399, true);
+
+        MvcTestResult result = place(customerId, merchantId, "[" + line(taco, 2) + "]");
+
+        assertThat(result).hasStatus(HttpStatus.CREATED);
+        assertThat(result).bodyJson().extractingPath("$.totalCents").isEqualTo(798);
     }
 
     @Test

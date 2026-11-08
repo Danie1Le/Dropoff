@@ -5,7 +5,7 @@
 // a service picks the configs up by component scan, since they sit under io.github.danie1le.dropoff.
 //
 // Its test fixtures hold the Testcontainers setup (Postgres and the shared Kafka broker) and KafkaTestSupport, so the
-// ITs of every service start the same images.
+// ITs of every service start the same images, plus the ArchUnit rules each service applies to its own code.
 import net.ltgt.gradle.errorprone.errorprone
 
 plugins {
@@ -36,6 +36,9 @@ dependencies {
     testFixturesImplementation(libs.jspecify)
     testFixturesImplementation(libs.spring.boot.starter.jdbc)
     testFixturesImplementation(libs.spring.boot.starter.kafka)
+    // PageParamsRule checks controllers that take web-common's PageParams.
+    testFixturesImplementation(project(":libs:web-common"))
+    testFixturesImplementation(libs.spring.boot.starter.webmvc)
 }
 
 // Test fixtures are test code: like compileTestJava, they are not null-checked.

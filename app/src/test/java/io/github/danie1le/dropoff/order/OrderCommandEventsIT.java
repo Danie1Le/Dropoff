@@ -57,8 +57,8 @@ class OrderCommandEventsIT {
     }
 
     /**
-     * The merchant fields come from the order module's copy (M5-3, ADR-0007). The copy is changed here and the
-     * merchants row is not, so the event shows which one was read.
+     * The merchant fields come from the order module's copy (M5-3, ADR-0007). The copy is changed here after the
+     * order was placed, so the event shows the copy is read when the order is ready.
      */
     @Test
     void publishesOrderReadyWithThePickupFromTheMerchantCopy(Scenario scenario) {

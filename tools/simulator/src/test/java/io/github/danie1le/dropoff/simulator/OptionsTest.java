@@ -17,7 +17,7 @@ class OptionsTest {
         assertThat(options.command()).isEqualTo(Options.Command.RUN);
         assertThat(options.urls())
                 .isEqualTo(new ServiceUrls(
-                        URI.create("http://localhost:8080"),
+                        URI.create("http://localhost:8081"),
                         URI.create("http://localhost:8080"),
                         URI.create("http://localhost:8083")));
         assertThat(options.seed()).isEqualTo(42);

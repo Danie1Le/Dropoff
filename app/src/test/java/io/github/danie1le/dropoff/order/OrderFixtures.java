@@ -34,49 +34,38 @@ public final class OrderFixtures {
     }
 
     /**
-     * A merchant, plus the order module's copy of it, as the {@code MerchantChanged} consumer would write it (M5-3).
-     * The merchants row is still needed for the foreign key from {@code orders}.
+     * The order module's copy of a merchant, as the {@code MerchantChanged} consumer would write it (M5-3). Merchants
+     * live in merchant-service since M5-5, with no FK from {@code orders}, so the copy is all the order side has.
      */
     public static long merchant(JdbcClient jdbc, boolean open) {
-        long id = jdbc.sql("INSERT INTO merchants (name, address, lat, lng, is_open) VALUES ('Taco Shop', '100 Congress"
-                        + " Ave', 30.2672, -97.7431, ?) RETURNING id")
-                .param(open)
-                .query(Long.class)
-                .single();
+        long id = TestIds.next();
         jdbc.sql("INSERT INTO merchant_copies (merchant_id, name, address, open, lat, lng)"
-                        + " SELECT id, name, address, is_open, lat, lng FROM merchants WHERE id = ?")
-                .param(id)
+                        + " VALUES (?, 'Taco Shop', '100 Congress Ave', ?, 30.2672, -97.7431)")
+                .params(id, open)
                 .update();
         return id;
     }
 
-    /** A menu item, plus the order module's copy of it (M5-3); the menu_items row backs the FK from order lines. */
+    /** The order module's copy of a menu item (M5-3). No FK from order lines since M5-5. */
     public static long item(JdbcClient jdbc, long merchantId, long priceCents, boolean available) {
-        long id = jdbc.sql("INSERT INTO menu_items (merchant_id, name, price_cents, is_available) VALUES (?, 'Taco', ?,"
-                        + " ?) RETURNING id")
-                .params(merchantId, priceCents, available)
-                .query(Long.class)
-                .single();
+        long id = TestIds.next();
         jdbc.sql("INSERT INTO menu_item_copies (menu_item_id, merchant_id, name, price_cents, available)"
-                        + " SELECT id, merchant_id, name, price_cents, is_available FROM menu_items WHERE id = ?")
-                .param(id)
+                        + " VALUES (?, ?, 'Taco', ?, ?)")
+                .params(id, merchantId, priceCents, available)
                 .update();
         return id;
     }
 
-    /** Deletes the merchants with their menu items, and the order module's copies of both. */
+    /** Deletes the order module's copies of the merchants and their menu items. */
     public static void deleteMerchants(JdbcClient jdbc, List<Long> merchantIds) {
         if (merchantIds.isEmpty()) {
             return;
         }
-        for (String table : List.of("menu_item_copies", "merchant_copies", "menu_items")) {
+        for (String table : List.of("menu_item_copies", "merchant_copies")) {
             jdbc.sql("DELETE FROM " + table + " WHERE merchant_id IN (:ids)")
                     .param("ids", merchantIds)
                     .update();
         }
-        jdbc.sql("DELETE FROM merchants WHERE id IN (:ids)")
-                .param("ids", merchantIds)
-                .update();
     }
 
     /** An order with no lines, in {@code status}, placed at {@code createdAt} (ISO-8601). */

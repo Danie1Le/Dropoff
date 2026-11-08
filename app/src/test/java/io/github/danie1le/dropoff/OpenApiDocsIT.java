@@ -24,14 +24,11 @@ class OpenApiDocsIT {
 
     /**
      * Every endpoint of the app, path to HTTP methods. Test-only controllers are left out. Courier, location and offer
-     * endpoints moved to dispatch-service in M5-4 (its own OpenApiDocsIT); a courier's pick-up and deliver stay here.
+     * endpoints moved to dispatch-service in M5-4, and merchant and menu item endpoints to merchant-service in M5-5
+     * (each with its own OpenApiDocsIT). A courier's pick-up and deliver, and a merchant's order list and order
+     * commands, stay here.
      */
     private static final Map<String, List<String>> OPERATIONS = Map.ofEntries(
-            Map.entry("/api/v1/merchants", List.of("get", "post")),
-            Map.entry("/api/v1/merchants/{id}", List.of("get", "patch")),
-            Map.entry("/api/v1/merchants/{id}/menu-items", List.of("post")),
-            Map.entry("/api/v1/merchants/{id}/menu", List.of("get")),
-            Map.entry("/api/v1/menu-items/{id}", List.of("get", "patch")),
             Map.entry("/api/v1/customers", List.of("post")),
             Map.entry("/api/v1/customers/{id}", List.of("get", "patch")),
             Map.entry("/api/v1/orders", List.of("post")),
@@ -114,9 +111,9 @@ class OpenApiDocsIT {
 
         assertThat(result)
                 .bodyJson()
-                .extractingPath("$.paths['/api/v1/merchants/{id}'].get.responses.404.description")
+                .extractingPath("$.paths['/api/v1/orders/{id}'].get.responses.404.description")
                 .asString()
-                .contains("MERCHANT_NOT_FOUND");
+                .contains("ORDER_NOT_FOUND");
         assertThat(result)
                 .bodyJson()
                 .extractingPath("$.paths['/api/v1/merchants/{merchantId}/orders/{orderId}/accept'].post.responses")
@@ -141,7 +138,7 @@ class OpenApiDocsIT {
                 .contains("IDEMPOTENCY_KEY_REQUIRED", "VALIDATION_FAILED", "MALFORMED_REQUEST");
         assertThat(result)
                 .bodyJson()
-                .extractingPath("$.paths['/api/v1/merchants/{id}'].get.responses.400.description")
+                .extractingPath("$.paths['/api/v1/orders/{id}'].get.responses.400.description")
                 .asString()
                 .contains("VALIDATION_FAILED")
                 .doesNotContain("MALFORMED_REQUEST");
@@ -162,8 +159,7 @@ class OpenApiDocsIT {
     void documentsCreatesAs201() {
         MvcTestResult result = apiDocs();
 
-        for (String path : List.of(
-                "/api/v1/merchants", "/api/v1/merchants/{id}/menu-items", "/api/v1/customers", "/api/v1/orders")) {
+        for (String path : List.of("/api/v1/customers", "/api/v1/orders")) {
             assertThat(result)
                     .bodyJson()
                     .extractingPath("$.paths['" + path + "'].post.responses")
@@ -192,7 +188,7 @@ class OpenApiDocsIT {
     void flattensPagingIntoQueryParameters() {
         assertThat(apiDocs())
                 .bodyJson()
-                .extractingPath("$.paths['/api/v1/merchants'].get.parameters[*].name")
+                .extractingPath("$.paths['/api/v1/customers/{id}/orders'].get.parameters[*].name")
                 .asArray()
                 .contains("page", "size");
     }

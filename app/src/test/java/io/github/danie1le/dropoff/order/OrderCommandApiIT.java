@@ -61,8 +61,6 @@ class OrderCommandApiIT {
                 "order_lines",
                 "orders",
                 "customers",
-                "menu_items",
-                "merchants",
                 "menu_item_copies",
                 "merchant_copies")) {
             jdbc.sql("DELETE FROM " + table).update();

@@ -1,6 +1,7 @@
 # Local infrastructure for development (ticket #6 picks the images).
-# Start with `docker compose up -d`; the app runs with `./gradlew :app:bootRun` (port 8080) and dispatch-service with
-# `./gradlew :services:dispatch:bootRun` (port 8083).
+# Start with `docker compose up -d`; the app runs with `./gradlew :app:bootRun` (port 8080), merchant-service with
+# `./gradlew :services:merchant:bootRun` (port 8081) and dispatch-service with `./gradlew :services:dispatch:bootRun`
+# (port 8083).
 services:
   postgres:
     # Keep in sync with TestcontainersConfiguration (integration tests use the same image).

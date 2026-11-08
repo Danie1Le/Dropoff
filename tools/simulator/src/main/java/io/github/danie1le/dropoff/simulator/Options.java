@@ -31,7 +31,7 @@ record Options(
         WATCH
     }
 
-    static final String USAGE = "Usage: seed|run|smoke|watch <orderId> [--merchant-url http://localhost:8080]"
+    static final String USAGE = "Usage: seed|run|smoke|watch <orderId> [--merchant-url http://localhost:8081]"
             + " [--order-url http://localhost:8080] [--dispatch-url http://localhost:8083] [--seed 42]"
             + " [--state .simulator/state.json] [--orders-per-minute 6] [--speed-kmh 30] [--duration 10m]"
             + " [--orders 5] [--timeout 5m]";
