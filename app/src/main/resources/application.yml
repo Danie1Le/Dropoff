@@ -14,8 +14,9 @@ spring:
   kafka:
     # Default matches compose.yaml; containers override it with KAFKA_BOOTSTRAP_SERVERS.
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-    # Keys are orderIds as text. Values are bytes on the wire: KafkaConfig's message converter turns events into JSON
-    # and back, typed by the __TypeId__ header. A dead-lettered record keeps its original bytes.
+    # Keys are ids as text: orderIds, or merchantIds and menuItemIds on the compacted topics. Values are bytes on the
+    # wire: KafkaConfig's message converter turns events into JSON and back, typed by the __TypeId__ header. A
+    # dead-lettered record keeps its original bytes.
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer

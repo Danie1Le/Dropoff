@@ -101,7 +101,7 @@ class PlaceOrderApiIT {
         MvcTestResult placed = place(customerId, merchantId, "[" + line(taco, 1) + "]");
         assertThat(placed).hasStatus(HttpStatus.CREATED);
 
-        jdbc.sql("UPDATE menu_items SET price_cents = 999 WHERE id = ?")
+        jdbc.sql("UPDATE menu_item_copies SET price_cents = 999 WHERE menu_item_id = ?")
                 .param(taco)
                 .update();
         jdbc.sql("UPDATE customers SET address = 'Elsewhere' WHERE id = ?")
@@ -185,6 +185,79 @@ class PlaceOrderApiIT {
         long taco = item(jdbc, merchantId, 399, true);
 
         assertRejected(place(customerId, merchantId, "[" + line(taco, 1) + "]"), "MERCHANT_CLOSED");
+    }
+
+    // Validation reads the order module's copies, not the merchant tables (M5-3, ADR-0007). Each test below makes the
+    // two disagree, and the copy wins.
+
+    @Test
+    void rejectsAMerchantWithNoCopyAsUnknown() {
+        long customerId = customer(jdbc);
+        long merchantId = merchant(jdbc, true);
+        long taco = item(jdbc, merchantId, 399, true);
+        jdbc.sql("DELETE FROM merchant_copies WHERE merchant_id = ?")
+                .param(merchantId)
+                .update();
+
+        assertRejected(place(customerId, merchantId, "[" + line(taco, 1) + "]"), "MERCHANT_UNKNOWN");
+    }
+
+    @Test
+    void readsOpenFromTheMerchantCopy() {
+        long customerId = customer(jdbc);
+        long closedInCopy = merchant(jdbc, true);
+        long taco = item(jdbc, closedInCopy, 399, true);
+        jdbc.sql("UPDATE merchant_copies SET open = false WHERE merchant_id = ?")
+                .param(closedInCopy)
+                .update();
+        long openInCopy = merchant(jdbc, true);
+        long soda = item(jdbc, openInCopy, 150, true);
+        jdbc.sql("UPDATE merchants SET is_open = false WHERE id = ?")
+                .param(openInCopy)
+                .update();
+
+        assertRejected(place(customerId, closedInCopy, "[" + line(taco, 1) + "]"), "MERCHANT_CLOSED");
+        assertThat(place(customerId, openInCopy, "[" + line(soda, 1) + "]")).hasStatus(HttpStatus.CREATED);
+    }
+
+    @Test
+    void rejectsAMenuItemWithNoCopyAsUnknown() {
+        long customerId = customer(jdbc);
+        long merchantId = merchant(jdbc, true);
+        long taco = item(jdbc, merchantId, 399, true);
+        jdbc.sql("DELETE FROM menu_item_copies WHERE menu_item_id = ?")
+                .param(taco)
+                .update();
+
+        assertRejected(place(customerId, merchantId, "[" + line(taco, 1) + "]"), "MENU_ITEM_UNKNOWN");
+    }
+
+    @Test
+    void readsAvailabilityFromTheMenuItemCopy() {
+        long customerId = customer(jdbc);
+        long merchantId = merchant(jdbc, true);
+        long taco = item(jdbc, merchantId, 399, true);
+        jdbc.sql("UPDATE menu_item_copies SET available = false WHERE menu_item_id = ?")
+                .param(taco)
+                .update();
+
+        assertRejected(place(customerId, merchantId, "[" + line(taco, 1) + "]"), "MENU_ITEM_UNAVAILABLE");
+    }
+
+    @Test
+    void pricesLinesFromTheMenuItemCopy() {
+        long customerId = customer(jdbc);
+        long merchantId = merchant(jdbc, true);
+        long taco = item(jdbc, merchantId, 399, true);
+        jdbc.sql("UPDATE menu_item_copies SET price_cents = 450 WHERE menu_item_id = ?")
+                .param(taco)
+                .update();
+
+        MvcTestResult result = place(customerId, merchantId, "[" + line(taco, 2) + "]");
+
+        assertThat(result).hasStatus(HttpStatus.CREATED);
+        assertThat(result).bodyJson().extractingPath("$.lines[0].priceCents").isEqualTo(450);
+        assertThat(result).bodyJson().extractingPath("$.totalCents").isEqualTo(900);
     }
 
     @Test

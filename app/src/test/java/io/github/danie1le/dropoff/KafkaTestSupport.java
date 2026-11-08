@@ -37,8 +37,14 @@ public final class KafkaTestSupport {
 
     /** The topics each consumer group of the app reads. */
     private static final Map<String, List<String>> CONSUMED = Map.of(
-            "dispatch-service", List.of(KafkaTopics.ORDER_EVENTS),
-            "order-service", List.of(KafkaTopics.COURIER_EVENTS, KafkaTopics.COURIER_LOCATIONS));
+            "dispatch-service",
+            List.of(KafkaTopics.ORDER_EVENTS),
+            "order-service",
+            List.of(
+                    KafkaTopics.COURIER_EVENTS,
+                    KafkaTopics.COURIER_LOCATIONS,
+                    KafkaTopics.MERCHANTS,
+                    KafkaTopics.MENU_ITEMS));
 
     private static final Duration WAIT = Duration.ofSeconds(15);
 

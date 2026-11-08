@@ -3,6 +3,7 @@ package io.github.danie1le.dropoff.merchant;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.danie1le.dropoff.TestcontainersConfiguration;
+import io.github.danie1le.dropoff.contracts.MerchantChanged;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -11,6 +12,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
 @Transactional
+@RecordApplicationEvents
 class MerchantApiIT {
 
     private static final String TACO_SHOP = """
@@ -65,6 +69,40 @@ class MerchantApiIT {
         assertThat(result).bodyJson().extractingPath("$.lat").isEqualTo(30.2672);
         assertThat(result).bodyJson().extractingPath("$.lng").isEqualTo(-97.7431);
         assertThat(result).bodyJson().extractingPath("$.open").isEqualTo(true);
+    }
+
+    /** The order module keeps its merchant copies from this event (ADR-0007), so it carries the whole merchant. */
+    @Test
+    void publishesTheNewMerchant(ApplicationEvents events) {
+        long id = createdId(create(TACO_SHOP));
+
+        assertThat(events.stream(MerchantChanged.class)).singleElement().satisfies(e -> {
+            assertThat(e.merchantId()).isEqualTo(id);
+            assertThat(e.name()).isEqualTo("Taco Shop");
+            assertThat(e.address()).isEqualTo("100 Congress Ave");
+            assertThat(e.open()).isTrue();
+            assertThat(e.lat()).isEqualTo(30.2672);
+            assertThat(e.lng()).isEqualTo(-97.7431);
+            assertThat(e.eventId()).isNotNull();
+            assertThat(e.occurredAt()).isNotNull();
+        });
+    }
+
+    @Test
+    void publishesTheWholeMerchantAfterAnUpdate(ApplicationEvents events) {
+        long id = createdId(create(TACO_SHOP));
+
+        assertThat(patch(id, "{\"open\":false}")).hasStatusOk();
+
+        assertThat(events.stream(MerchantChanged.class).toList())
+                .hasSize(2)
+                .last()
+                .satisfies(e -> {
+                    assertThat(e.merchantId()).isEqualTo(id);
+                    assertThat(e.open()).isFalse();
+                    assertThat(e.name()).isEqualTo("Taco Shop");
+                    assertThat(e.address()).isEqualTo("100 Congress Ave");
+                });
     }
 
     @Test

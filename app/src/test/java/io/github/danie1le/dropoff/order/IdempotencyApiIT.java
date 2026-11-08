@@ -64,10 +64,7 @@ class IdempotencyApiIT {
                     .update();
             jdbc.sql("DELETE FROM orders WHERE idempotency_key = ?").param(key).update();
         }
-        jdbc.sql("DELETE FROM menu_items WHERE merchant_id = ?")
-                .param(merchantId)
-                .update();
-        jdbc.sql("DELETE FROM merchants WHERE id = ?").param(merchantId).update();
+        OrderFixtures.deleteMerchants(jdbc, List.of(merchantId));
         jdbc.sql("DELETE FROM customers WHERE id = ?").param(customerId).update();
     }
 
@@ -128,7 +125,7 @@ class IdempotencyApiIT {
         String key = newKey();
         String body = body("[{\"menuItemId\":%d,\"quantity\":1}]".formatted(taco));
         assertThat(place(key, body)).hasStatus(HttpStatus.CREATED);
-        jdbc.sql("UPDATE merchants SET is_open = false WHERE id = ?")
+        jdbc.sql("UPDATE merchant_copies SET open = false WHERE merchant_id = ?")
                 .param(merchantId)
                 .update();
 

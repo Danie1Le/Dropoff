@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.danie1le.dropoff.TestcontainersConfiguration;
+import io.github.danie1le.dropoff.contracts.MenuItemChanged;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -14,6 +15,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
 @Transactional
+@RecordApplicationEvents
 class MenuItemApiIT {
 
     private static final String TACO_SHOP = """
@@ -289,6 +293,45 @@ class MenuItemApiIT {
                 .bodyJson()
                 .extractingPath("$.name")
                 .isEqualTo("Large Horchata");
+    }
+
+    /** The order module validates and prices orders from its copy of each item (ADR-0007). */
+    @Test
+    void publishesTheNewItem(ApplicationEvents events) {
+        long merchantId = merchant();
+
+        long itemId = idFromLocation(addItem(merchantId, """
+                {"name":"Horchata","priceCents":250}
+                """));
+
+        assertThat(events.stream(MenuItemChanged.class)).singleElement().satisfies(e -> {
+            assertThat(e.menuItemId()).isEqualTo(itemId);
+            assertThat(e.merchantId()).isEqualTo(merchantId);
+            assertThat(e.name()).isEqualTo("Horchata");
+            assertThat(e.priceCents()).isEqualTo(250);
+            assertThat(e.available()).isTrue();
+            assertThat(e.eventId()).isNotNull();
+            assertThat(e.occurredAt()).isNotNull();
+        });
+    }
+
+    @Test
+    void publishesTheWholeItemAfterAnUpdate(ApplicationEvents events) {
+        long itemId = item("""
+                {"name":"Horchata","priceCents":250}
+                """);
+
+        assertThat(patchItem(itemId, "{\"available\":false}")).hasStatusOk();
+
+        assertThat(events.stream(MenuItemChanged.class).toList())
+                .hasSize(2)
+                .last()
+                .satisfies(e -> {
+                    assertThat(e.menuItemId()).isEqualTo(itemId);
+                    assertThat(e.available()).isFalse();
+                    assertThat(e.name()).isEqualTo("Horchata");
+                    assertThat(e.priceCents()).isEqualTo(250);
+                });
     }
 
     @Test

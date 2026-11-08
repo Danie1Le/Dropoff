@@ -1,6 +1,5 @@
 package io.github.danie1le.dropoff.order.internal;
 
-import io.github.danie1le.dropoff.merchant.MerchantDirectory;
 import io.github.danie1le.dropoff.order.internal.OrderRequests.OrderResponse;
 import io.github.danie1le.dropoff.web.PageParams;
 import org.jspecify.annotations.Nullable;
@@ -12,16 +11,17 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Order lists (M2-6). Maps inside a read-only transaction so each page's lines load (batched, see {@link Order}). The
- * SQL owns the sort, so paging is unsorted. An unknown merchant or customer is a 404, as on their other endpoints.
+ * SQL owns the sort, so paging is unsorted. An unknown merchant or customer is a 404, as on their other endpoints; a
+ * merchant is known when the order module has a copy of it (M5-3).
  */
 @Service
 class OrderListService {
 
     private final OrderListRepository orders;
-    private final MerchantDirectory merchants;
+    private final MerchantCopies merchants;
     private final CustomerRepository customers;
 
-    OrderListService(OrderListRepository orders, MerchantDirectory merchants, CustomerRepository customers) {
+    OrderListService(OrderListRepository orders, MerchantCopies merchants, CustomerRepository customers) {
         this.orders = orders;
         this.merchants = merchants;
         this.customers = customers;
@@ -29,8 +29,8 @@ class OrderListService {
 
     @Transactional(readOnly = true)
     PagedModel<OrderResponse> forMerchant(long merchantId, @Nullable OrderStatus status, PageParams params) {
-        if (merchants.findMerchant(merchantId).isEmpty()) {
-            throw MerchantDirectory.notFound(merchantId);
+        if (!merchants.merchantExists(merchantId)) {
+            throw MerchantCopies.notFound(merchantId);
         }
         Pageable page = params.toPageable();
         Page<Order> found = status == null
