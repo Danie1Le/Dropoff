@@ -475,7 +475,7 @@ footer { padding: 40px 0 48px; color: var(--muted); font-size: 13px; }
 </section>
 
 <footer>
-  Sources: <code>PROJECT_OVERVIEW.md</code>, <code>GLOSSARY.md</code>, <code>docs/adr/</code>, and the <a href="https://github.com/Danie1Le/Dropoff/issues/2">wayfinder map</a>. Data last synced 2026-11-05. Update the arrays at the bottom of this file when tickets close or tasks land.
+  Sources: <code>PROJECT_OVERVIEW.md</code>, <code>GLOSSARY.md</code>, <code>docs/adr/</code>, and the <a href="https://github.com/Danie1Le/Dropoff/issues/2">wayfinder map</a>. Data last synced 2026-11-07. Update the arrays at the bottom of this file when tickets close or tasks land.
 </footer>
 </div>
 
@@ -544,8 +544,8 @@ const MILESTONES = [
     { t: 'Merchant commands: POST /api/v1/merchants/{id}/orders/{orderId}/accept, start-preparing, ready, cancel', done: true },
     { t: 'Customer cancel: POST /api/v1/customers/{id}/orders/{orderId}/cancel', done: true },
     { t: 'Cancellation only from PLACED or ACCEPTED', done: true },
-    { t: 'Auto-cancel job every 30 s: PLACED for 10 min → CANCELLED, actor SYSTEM (limit is a config property)' },
-    { t: 'Auto-cancel job safe on N instances: FOR UPDATE SKIP LOCKED, one row per transaction, at most 50 rows per run' },
+    { t: 'Auto-cancel job every 30 s: PLACED for 10 min → CANCELLED, actor SYSTEM (limit is a config property)', done: true },
+    { t: 'Auto-cancel job safe on N instances: FOR UPDATE SKIP LOCKED, one row per transaction, at most 50 rows per run', done: true },
     { t: 'Idempotency-Key: same key → same order; changed body → 422', done: true },
     { t: 'order_events row for every status change, with its actor (CHECK-guarded)', done: true },
     { t: 'TDD unit tests for the state machine', done: true },
