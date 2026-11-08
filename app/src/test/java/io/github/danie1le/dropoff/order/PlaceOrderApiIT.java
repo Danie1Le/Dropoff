@@ -1,5 +1,8 @@
 package io.github.danie1le.dropoff.order;
 
+import static io.github.danie1le.dropoff.order.OrderFixtures.customer;
+import static io.github.danie1le.dropoff.order.OrderFixtures.item;
+import static io.github.danie1le.dropoff.order.OrderFixtures.merchant;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.danie1le.dropoff.TestcontainersConfiguration;
@@ -30,29 +33,6 @@ class PlaceOrderApiIT {
     PlaceOrderApiIT(@Autowired MockMvcTester mvc, @Autowired JdbcClient jdbc) {
         this.mvc = mvc;
         this.jdbc = jdbc;
-    }
-
-    static long customer(JdbcClient jdbc) {
-        return jdbc.sql("INSERT INTO customers (name, address, lat, lng) VALUES ('Alice', '200 Lavaca St', 30.2669,"
-                        + " -97.7466) RETURNING id")
-                .query(Long.class)
-                .single();
-    }
-
-    static long merchant(JdbcClient jdbc, boolean open) {
-        return jdbc.sql("INSERT INTO merchants (name, address, lat, lng, is_open) VALUES ('Taco Shop', '100 Congress"
-                        + " Ave', 30.2672, -97.7431, ?) RETURNING id")
-                .param(open)
-                .query(Long.class)
-                .single();
-    }
-
-    static long item(JdbcClient jdbc, long merchantId, long priceCents, boolean available) {
-        return jdbc.sql("INSERT INTO menu_items (merchant_id, name, price_cents, is_available) VALUES (?, 'Taco', ?, ?)"
-                        + " RETURNING id")
-                .params(merchantId, priceCents, available)
-                .query(Long.class)
-                .single();
     }
 
     private MvcTestResult place(long customerId, long merchantId, String lines) {

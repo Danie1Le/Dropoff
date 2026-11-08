@@ -3,6 +3,7 @@ package io.github.danie1le.dropoff.order.internal;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.danie1le.dropoff.TestcontainersConfiguration;
+import io.github.danie1le.dropoff.order.OrderFixtures;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,27 +29,15 @@ class OrderListRepositoryIT {
     }
 
     private long customer() {
-        return jdbc.sql("INSERT INTO customers (name, address, lat, lng) VALUES ('Alice', '200 Lavaca St', 30.2669,"
-                        + " -97.7466) RETURNING id")
-                .query(Long.class)
-                .single();
+        return OrderFixtures.customer(jdbc);
     }
 
     private long merchant() {
-        return jdbc.sql("INSERT INTO merchants (name, address, lat, lng, is_open) VALUES ('Taco Shop', '100 Congress"
-                        + " Ave', 30.2672, -97.7431, true) RETURNING id")
-                .query(Long.class)
-                .single();
+        return OrderFixtures.merchant(jdbc, true);
     }
 
     private long order(long customerId, long merchantId, String status, String createdAt) {
-        return jdbc.sql("INSERT INTO orders (customer_id, merchant_id, status, total_cents, delivery_address,"
-                        + " delivery_lat, delivery_lng, idempotency_key, request_hash, created_at, updated_at)"
-                        + " VALUES (?, ?, ?, 0, '200 Lavaca St', 30.2669, -97.7466, gen_random_uuid()::text,"
-                        + " repeat('a', 64), ?::timestamptz, ?::timestamptz) RETURNING id")
-                .params(customerId, merchantId, status, createdAt, createdAt)
-                .query(Long.class)
-                .single();
+        return OrderFixtures.order(jdbc, customerId, merchantId, status, 0, createdAt);
     }
 
     private static List<Long> ids(Page<Order> page) {
@@ -64,7 +53,7 @@ class OrderListRepositoryIT {
         long older = order(c, m, "ACCEPTED", "2026-01-01T10:00:00Z");
         order(c, other, "PLACED", "2026-01-01T09:00:00Z");
 
-        Page<Order> page = orders.findForMerchant(m, null, PageRequest.of(0, 20));
+        Page<Order> page = orders.findForMerchant(m, PageRequest.of(0, 20));
 
         assertThat(ids(page)).containsExactly(older, newer);
         assertThat(page.getTotalElements()).isEqualTo(2);
@@ -77,7 +66,7 @@ class OrderListRepositoryIT {
         long placed = order(c, m, "PLACED", "2026-01-01T12:00:00Z");
         order(c, m, "ACCEPTED", "2026-01-01T10:00:00Z");
 
-        Page<Order> page = orders.findForMerchant(m, OrderStatus.PLACED, PageRequest.of(0, 20));
+        Page<Order> page = orders.findForMerchantInStatus(m, OrderStatus.PLACED, PageRequest.of(0, 20));
 
         assertThat(ids(page)).containsExactly(placed);
         assertThat(page.getTotalElements()).isEqualTo(1);
@@ -105,8 +94,8 @@ class OrderListRepositoryIT {
         long second = order(c, m, "PLACED", "2026-01-01T11:00:00Z");
         long third = order(c, m, "PLACED", "2026-01-01T12:00:00Z");
 
-        Page<Order> page0 = orders.findForMerchant(m, null, PageRequest.of(0, 2));
-        Page<Order> page1 = orders.findForMerchant(m, null, PageRequest.of(1, 2));
+        Page<Order> page0 = orders.findForMerchant(m, PageRequest.of(0, 2));
+        Page<Order> page1 = orders.findForMerchant(m, PageRequest.of(1, 2));
         Page<Order> customerPage1 = orders.findForCustomer(c, PageRequest.of(1, 2));
 
         assertThat(ids(page0)).containsExactly(first, second);

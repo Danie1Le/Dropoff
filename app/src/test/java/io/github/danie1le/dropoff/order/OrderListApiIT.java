@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
+import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Order list endpoints (M2-6) end to end. Each test rolls back. */
@@ -29,28 +30,20 @@ class OrderListApiIT {
     }
 
     private long order(long customerId, long merchantId, long itemId, String status, String createdAt) {
-        long id = jdbc.sql("INSERT INTO orders (customer_id, merchant_id, status, total_cents, delivery_address,"
-                        + " delivery_lat, delivery_lng, idempotency_key, request_hash, created_at, updated_at)"
-                        + " VALUES (?, ?, ?, 399, '200 Lavaca St', 30.2669, -97.7466, gen_random_uuid()::text,"
-                        + " repeat('a', 64), ?::timestamptz, ?::timestamptz) RETURNING id")
-                .params(customerId, merchantId, status, createdAt, createdAt)
-                .query(Long.class)
-                .single();
-        jdbc.sql("INSERT INTO order_lines (order_id, menu_item_id, quantity, price_cents) VALUES (?, ?, 1, 399)")
-                .params(id, itemId)
-                .update();
+        long id = OrderFixtures.order(jdbc, customerId, merchantId, status, 399, createdAt);
+        OrderFixtures.line(jdbc, id, itemId, 399);
         return id;
     }
 
     @Test
     void merchantListFiltersByStatusAndReturnsOrderBodies() {
-        long c = PlaceOrderApiIT.customer(jdbc);
-        long m = PlaceOrderApiIT.merchant(jdbc, true);
-        long item = PlaceOrderApiIT.item(jdbc, m, 399, true);
+        long c = OrderFixtures.customer(jdbc);
+        long m = OrderFixtures.merchant(jdbc, true);
+        long item = OrderFixtures.item(jdbc, m, 399, true);
         long placed = order(c, m, item, "PLACED", "2026-01-01T12:00:00Z");
         order(c, m, item, "ACCEPTED", "2026-01-01T10:00:00Z");
 
-        var result =
+        MvcTestResult result =
                 mvc.get().uri("/api/v1/merchants/{id}/orders?status=PLACED", m).exchange();
 
         assertThat(result).hasStatusOk();
@@ -73,13 +66,13 @@ class OrderListApiIT {
 
     @Test
     void customerListIsNewestFirst() {
-        long c = PlaceOrderApiIT.customer(jdbc);
-        long m = PlaceOrderApiIT.merchant(jdbc, true);
-        long item = PlaceOrderApiIT.item(jdbc, m, 399, true);
+        long c = OrderFixtures.customer(jdbc);
+        long m = OrderFixtures.merchant(jdbc, true);
+        long item = OrderFixtures.item(jdbc, m, 399, true);
         order(c, m, item, "PLACED", "2026-01-01T10:00:00Z");
         long newer = order(c, m, item, "PLACED", "2026-01-01T12:00:00Z");
 
-        var result = mvc.get().uri("/api/v1/customers/{id}/orders", c).exchange();
+        MvcTestResult result = mvc.get().uri("/api/v1/customers/{id}/orders", c).exchange();
 
         assertThat(result).hasStatusOk();
         assertThat(result)
@@ -91,14 +84,16 @@ class OrderListApiIT {
 
     @Test
     void oversizedPageIsRejected() {
-        var result = mvc.get().uri("/api/v1/customers/1/orders?size=101").exchange();
+        MvcTestResult result =
+                mvc.get().uri("/api/v1/customers/1/orders?size=101").exchange();
 
         assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
     }
 
     @Test
     void unknownMerchantIsNotFound() {
-        var result = mvc.get().uri("/api/v1/merchants/999999999/orders").exchange();
+        MvcTestResult result =
+                mvc.get().uri("/api/v1/merchants/999999999/orders").exchange();
 
         assertThat(result).hasStatus(HttpStatus.NOT_FOUND);
         assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("MERCHANT_NOT_FOUND");
@@ -106,7 +101,8 @@ class OrderListApiIT {
 
     @Test
     void unknownCustomerIsNotFound() {
-        var result = mvc.get().uri("/api/v1/customers/999999999/orders").exchange();
+        MvcTestResult result =
+                mvc.get().uri("/api/v1/customers/999999999/orders").exchange();
 
         assertThat(result).hasStatus(HttpStatus.NOT_FOUND);
         assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("CUSTOMER_NOT_FOUND");
@@ -114,9 +110,9 @@ class OrderListApiIT {
 
     @Test
     void invalidStatusIsAValidationProblem() {
-        long m = PlaceOrderApiIT.merchant(jdbc, true);
+        long m = OrderFixtures.merchant(jdbc, true);
 
-        var result =
+        MvcTestResult result =
                 mvc.get().uri("/api/v1/merchants/{id}/orders?status=BOGUS", m).exchange();
 
         assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);

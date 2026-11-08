@@ -18,6 +18,15 @@ class PageParamsTest {
     }
 
     @Test
+    void noArgFormIsUnsortedForQueriesThatOwnTheirOrder() {
+        Pageable pageable = new PageParams(2, 30).toPageable();
+
+        assertThat(pageable.getPageNumber()).isEqualTo(2);
+        assertThat(pageable.getPageSize()).isEqualTo(30);
+        assertThat(pageable.getSort().isUnsorted()).isTrue();
+    }
+
+    @Test
     void usesTheRequestedPageAndSize() {
         Pageable pageable = new PageParams(3, 50).toPageable(Sort.unsorted());
 

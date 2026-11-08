@@ -4,7 +4,8 @@ import io.github.danie1le.dropoff.common.PageParams;
 import io.github.danie1le.dropoff.merchant.MerchantDirectory;
 import io.github.danie1le.dropoff.order.internal.OrderRequests.OrderResponse;
 import org.jspecify.annotations.Nullable;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PagedModel;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,8 +32,11 @@ class OrderListService {
         if (merchants.findMerchant(merchantId).isEmpty()) {
             throw MerchantDirectory.notFound(merchantId);
         }
-        return new PagedModel<>(orders.findForMerchant(merchantId, status, params.toPageable(Sort.unsorted()))
-                .map(OrderResponse::of));
+        Pageable page = params.toPageable();
+        Page<Order> found = status == null
+                ? orders.findForMerchant(merchantId, page)
+                : orders.findForMerchantInStatus(merchantId, status, page);
+        return new PagedModel<>(found.map(OrderResponse::of));
     }
 
     @Transactional(readOnly = true)
@@ -40,7 +44,7 @@ class OrderListService {
         if (!customers.existsById(customerId)) {
             throw CustomerService.notFound(customerId);
         }
-        return new PagedModel<>(orders.findForCustomer(customerId, params.toPageable(Sort.unsorted()))
-                .map(OrderResponse::of));
+        return new PagedModel<>(
+                orders.findForCustomer(customerId, params.toPageable()).map(OrderResponse::of));
     }
 }

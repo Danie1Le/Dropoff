@@ -20,12 +20,21 @@ public record PageParams(
     public static final int MAX_SIZE = 100;
 
     /**
-     * List endpoints must pass a sort (for example {@code Sort.by("id")}) so pages are stable: a page holds the same rows
-     * each time it is requested.
+     * Pages must be stable: a page holds the same rows each time it is requested. Pass a sort (for example
+     * {@code Sort.by("id")}), or use {@link #toPageable()} when the query's own {@code ORDER BY} already makes pages
+     * stable.
      */
     public Pageable toPageable(Sort sort) {
         int number = page == null ? 0 : page;
         int pageSize = size == null ? DEFAULT_SIZE : size;
         return PageRequest.of(number, pageSize, sort);
+    }
+
+    /**
+     * An unsorted page, for a query whose own {@code ORDER BY} ends in a unique column (for example
+     * {@code ORDER BY created_at, id}), so pages are stable without a sort here.
+     */
+    public Pageable toPageable() {
+        return toPageable(Sort.unsorted());
     }
 }

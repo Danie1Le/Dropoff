@@ -1,6 +1,5 @@
 package io.github.danie1le.dropoff.order.internal;
 
-import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
@@ -8,25 +7,28 @@ import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
 
 /**
- * Merchant and customer order lists (M2-6). Hand-written SQL (ADR-0002) backed by the V5 indexes. The SQL owns the
- * sort, so callers pass an unsorted {@link Pageable}; {@code id} breaks ties between orders placed at the same instant.
+ * Merchant and customer order lists (M2-6). Hand-written SQL (ADR-0002). The SQL owns the sort, so callers pass an
+ * unsorted {@link Pageable}; {@code id} breaks ties between orders placed at the same instant. The merchant list has
+ * one query per shape, with no {@code IS NULL OR} filter, so each can use its index in a generic plan too:
+ * {@code orders_merchant_id_created_at_idx} (V7) without a status, {@code orders_merchant_id_status_idx} (V5) with one.
  */
 interface OrderListRepository extends Repository<Order, Long> {
 
-    /** A merchant's orders, oldest first, optionally only those in one status. */
-    default Page<Order> findForMerchant(long merchantId, @Nullable OrderStatus status, Pageable page) {
-        return findForMerchantByStatusName(merchantId, status == null ? null : status.name(), page);
-    }
-
+    /** All of a merchant's orders, oldest first. */
     @Query(
-            value = "SELECT * FROM orders WHERE merchant_id = :merchantId"
-                    + " AND (CAST(:status AS varchar) IS NULL OR status = CAST(:status AS varchar))"
-                    + " ORDER BY created_at, id",
-            countQuery = "SELECT count(*) FROM orders WHERE merchant_id = :merchantId"
-                    + " AND (CAST(:status AS varchar) IS NULL OR status = CAST(:status AS varchar))",
+            value = "SELECT * FROM orders WHERE merchant_id = :merchantId ORDER BY created_at, id",
+            countQuery = "SELECT count(*) FROM orders WHERE merchant_id = :merchantId",
             nativeQuery = true)
-    Page<Order> findForMerchantByStatusName(
-            @Param("merchantId") long merchantId, @Param("status") @Nullable String status, Pageable page);
+    Page<Order> findForMerchant(@Param("merchantId") long merchantId, Pageable page);
+
+    /** A merchant's orders in one status, oldest first. */
+    @Query(
+            value = "SELECT * FROM orders WHERE merchant_id = :merchantId AND status = :#{#status.name()}"
+                    + " ORDER BY created_at, id",
+            countQuery = "SELECT count(*) FROM orders WHERE merchant_id = :merchantId AND status = :#{#status.name()}",
+            nativeQuery = true)
+    Page<Order> findForMerchantInStatus(
+            @Param("merchantId") long merchantId, @Param("status") OrderStatus status, Pageable page);
 
     /** A customer's orders, newest first. */
     @Query(
