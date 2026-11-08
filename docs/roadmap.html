@@ -576,11 +576,11 @@ const MILESTONES = [
     { t: 'tools/simulator: seed via the public API (Austin; 10 merchants × 8 items, 50 customers, 30 couriers) and run with customer, merchant and courier bots (couriers poll offers every 2 s; accept 80%, decline 15%, ignore 5%); fixed random seed; runs via Gradle until the M6 demo profile', done: true },
   ]},
   { id: 'M4', name: 'Live tracking', gh: 5, needs: [12, 33], goal: 'Customers watch their order and courier move live.', items: [
-    { t: 'STOMP over WebSocket at /ws' },
-    { t: 'Push status changes to /topic/orders/{id}' },
+    { t: 'STOMP over WebSocket at /ws', done: true },
+    { t: 'Push status changes to /topic/orders/{id}', done: true },
     { t: 'Dispatch publishes CourierLocationUpdated for couriers with an accepted, not-yet-delivered offer, at most every 5 s (Redis SET courier:{id}:loc-pub 1 NX EX 5); extra updates are dropped, Postgres still saves every one' },
     { t: 'Order module pushes CourierLocationUpdated to /topic/orders/{id}' },
-    { t: 'Integration test with a STOMP client' },
+    { t: 'Integration test with a STOMP client', done: true },
     { t: 'Simulator watch <orderId>: prints live updates from /topic/orders/{id}' },
   ]},
   { id: 'M5', name: 'Kafka & service split', gh: 6, needs: [15, 16, 31, 32], goal: 'Three services talking through durable events.', items: [

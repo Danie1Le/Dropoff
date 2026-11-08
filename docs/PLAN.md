@@ -334,6 +334,7 @@ Goal: customers watch their order and courier move live.
 - Scope:
   - STOMP over raw WebSocket at `/ws` (order module; no SockJS).
   - Every status change, including SYSTEM cancels, is sent as a `STATUS` message to `/topic/orders/{id}`.
+  - `StompClientGuard`: clients never `SEND`, and may only `SUBSCRIBE` to `/topic/orders/{id}` (no wildcards).
 - Tests: an IT with a STOMP client receiving each status.
 - Decisions: #3, #13, #42.
 

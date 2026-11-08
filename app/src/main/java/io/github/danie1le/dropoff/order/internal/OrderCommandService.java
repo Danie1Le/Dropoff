@@ -36,6 +36,7 @@ class OrderCommandService {
     private final OrderRepository orders;
     private final MerchantDirectory merchants;
     private final JdbcClient jdbc;
+    private final OrderEventLog eventLog;
     private final EntityManager entityManager;
     private final ApplicationEventPublisher events;
     private final Clock clock;
@@ -44,12 +45,14 @@ class OrderCommandService {
             OrderRepository orders,
             MerchantDirectory merchants,
             JdbcClient jdbc,
+            OrderEventLog eventLog,
             EntityManager entityManager,
             ApplicationEventPublisher events,
             Clock clock) {
         this.orders = orders;
         this.merchants = merchants;
         this.jdbc = jdbc;
+        this.eventLog = eventLog;
         this.entityManager = entityManager;
         this.events = events;
         this.clock = clock;
@@ -146,7 +149,7 @@ class OrderCommandService {
             OrderStatusRules.decide(order.status(), command, actor);
             return order;
         }
-        OrderEventLog.record(jdbc, orderId, from.get(), command.target(), actor, now);
+        eventLog.record(orderId, from.get(), command.target(), actor, now);
         publish(order, command, actor, now);
         return order;
     }
