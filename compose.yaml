@@ -6,6 +6,9 @@
 #   docker compose --profile services up -d --build   # plus merchant 8081, order 8082, dispatch 8083
 #   docker compose --profile demo up -d --build       # the same, plus the simulator: seeds once, then runs the bots
 #   docker compose --profile demo down -v             # stop everything, and drop the data and the simulator's state
+# CI publishes the images on pushes to main (M6-4); to run those instead of building, set DROPOFF_TAG and pull first.
+# This works only once the four packages are public (a one-time step, see docs/milestones/M6.md):
+#   DROPOFF_TAG=main docker compose --profile demo pull merchant order dispatch simulator
 # Each service logs in as its own user to its own database (ADR-0007). Prometheus scrapes all three by service name
 # (M6-1); Grafana charts them (M6-2). Their targets show as down while only the infrastructure runs.
 #

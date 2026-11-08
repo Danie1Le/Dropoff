@@ -3,6 +3,9 @@
 #   docker build -t ghcr.io/danie1le/dropoff-simulator:local tools/simulator
 # `docker compose --profile demo build` does the second step; `docker compose --profile demo up` runs it.
 FROM eclipse-temurin:21-jre-alpine-3.24
+# Links the package on GHCR to this repository (M6-4), so it shows on the repo page and the workflow's GITHUB_TOKEN can
+# push to it.
+LABEL org.opencontainers.image.source=https://github.com/Danie1Le/Dropoff
 RUN addgroup -S dropoff && adduser -S -G dropoff dropoff \
     && mkdir /data && chown dropoff:dropoff /data
 WORKDIR /simulator

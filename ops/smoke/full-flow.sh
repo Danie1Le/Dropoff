@@ -8,10 +8,14 @@
 # `./gradlew :services:<name>:bootRun` next to a plain `docker compose up -d`.
 # This script runs the simulator on the host, so its state is .simulator/state.json in the repo. On fresh databases
 # (after `docker compose down -v`), delete that file first: its ids are gone.
-# `docker compose --profile demo run --rm simulator smoke` runs the same check inside Compose instead, with its state in
+# `ops/smoke/full-flow.sh --compose` runs the same check inside Compose instead (M6-4; CI runs it this way after it
+# builds the images): `docker compose --profile demo run --rm simulator smoke` starts the three service containers,
+# waits for their healthchecks and runs the simulator image against them by service name. Its state is
 # /data/smoke-state.json on the simulator-data volume (the demo bots use /data/state.json); `down -v` drops both.
+# Build the jars and images first (see compose.yaml).
 #
-# Override the service URLs with MERCHANT_URL, ORDER_URL and DISPATCH_URL, and the run with ORDERS and TIMEOUT.
+# Override the service URLs with MERCHANT_URL, ORDER_URL and DISPATCH_URL (host mode only), and the run with ORDERS and
+# TIMEOUT.
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."
@@ -21,6 +25,11 @@ TIMEOUT="${TIMEOUT:-5m}"
 MERCHANT_URL="${MERCHANT_URL:-http://localhost:8081}"
 ORDER_URL="${ORDER_URL:-http://localhost:8082}"
 DISPATCH_URL="${DISPATCH_URL:-http://localhost:8083}"
+
+if [ "${1:-}" = --compose ]; then
+    # -T: no TTY, so it also runs in CI. The exit code is the simulator's.
+    exec docker compose --profile demo run --rm -T simulator smoke --orders "${ORDERS}" --timeout "${TIMEOUT}"
+fi
 
 exec ./gradlew --quiet :tools:simulator:run --args="smoke --orders ${ORDERS} --timeout ${TIMEOUT} \
 --merchant-url ${MERCHANT_URL} --order-url ${ORDER_URL} --dispatch-url ${DISPATCH_URL}"

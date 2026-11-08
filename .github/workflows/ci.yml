@@ -1,10 +1,12 @@
-# Builds and tests every push to main and every pull request (PLAN M0-4).
+# Builds and tests every push to main, every v* tag and every pull request (PLAN M0-4). Pushes to main and v* tags then
+# publish the images to GHCR (M6-4, decision #36); pull requests never do.
 # The `build` job is a required check on main (ruleset "protect-main").
 name: CI
 
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
 
 permissions:
@@ -17,7 +19,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # The smoke test adds about 3 min and saving the images about 1 min to the 8 min a run took before M6-4; 30 leaves
+    # room for a slow runner.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
         with:
@@ -34,23 +38,26 @@ jobs:
       - name: Format, static checks and unit tests
         run: ./gradlew build -x integrationTest
 
-      # The build step made the boot jars; the Dockerfiles copy them (M6-3, ticket #114). Images are built, not pushed.
+      # The build step made the boot jars; the Dockerfiles copy them (M6-3, ticket #114). This is the only image build in
+      # the run: the smoke test runs these images, and the publish job pushes them.
       - name: Build images and check their size
         run: |
           ./gradlew :tools:simulator:installDist
           docker compose --profile demo build
           ops/docker/check-image-sizes.sh
 
-      # Boots the three service images and waits for their healthchecks, so a jlink module missing at runtime, a bad
-      # healthcheck or a too-small memory limit fails here. Torn down before the integration tests.
-      - name: Start the service images
-        run: docker compose --profile services up -d --wait --wait-timeout 300
+      # Full-flow smoke test against the images just built (M6-4): Compose boots the three services, waits for their
+      # healthchecks (so a jlink module missing at runtime, a bad healthcheck or a too-small memory limit fails here),
+      # then the simulator image places 5 orders and exits non-zero unless all are DELIVERED within 5 minutes.
+      - name: Smoke test (Compose)
+        run: ops/smoke/full-flow.sh --compose
 
+      # Torn down before the integration tests, which start their own containers.
       - name: Stop the service images
         if: always()
         run: |
-          docker compose --profile services logs --tail 50 merchant order dispatch || true
-          docker compose --profile services down -v
+          docker compose --profile demo logs --tail 50 merchant order dispatch || true
+          docker compose --profile demo down -v
 
       # Integration tests (*IT) use Testcontainers on the runner's Docker.
       - name: Integration tests (Testcontainers)
@@ -62,3 +69,84 @@ jobs:
         with:
           name: test-reports
           path: "**/build/reports/tests/"
+
+      # Hands the tested images to the publish job, so it pushes exactly what was smoke-tested instead of building
+      # again. Pull requests skip this: they never publish.
+      - name: Save the images
+        if: github.event_name == 'push'
+        run: |
+          docker save -o images.tar $(docker compose --profile demo config --images | grep '^ghcr.io/danie1le/dropoff-')
+
+      - name: Upload the images
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v5
+        with:
+          name: images
+          path: images.tar
+          retention-days: 1
+          compression-level: 1
+
+  # Pushes the images to ghcr.io/danie1le/dropoff-<service> once build, smoke and integration tests pass: sha-<short>
+  # and main on main, <version> and latest on v* tags (ops/docker/push-images.sh). Only this job can write packages,
+  # and it uses the run's GITHUB_TOKEN, so there is no stored secret. Pull requests never get here.
+  publish:
+    needs: build
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: images
+
+      - name: Load the images
+        run: docker load -i images.tar
+
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push the images
+        run: ops/docker/push-images.sh
+
+      # Keeps the newest 5 sha-* versions of each package. main, latest and the x.y.z release tags are never deleted.
+      - name: Prune old sha-* versions (merchant)
+        uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55 # v5.0.0
+        with:
+          package-name: dropoff-merchant
+          package-type: container
+          min-versions-to-keep: 5
+          ignore-versions: '^(main|latest|\d+\.\d+\.\d+)$'
+
+      - name: Prune old sha-* versions (order)
+        uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55 # v5.0.0
+        with:
+          package-name: dropoff-order
+          package-type: container
+          min-versions-to-keep: 5
+          ignore-versions: '^(main|latest|\d+\.\d+\.\d+)$'
+
+      - name: Prune old sha-* versions (dispatch)
+        uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55 # v5.0.0
+        with:
+          package-name: dropoff-dispatch
+          package-type: container
+          min-versions-to-keep: 5
+          ignore-versions: '^(main|latest|\d+\.\d+\.\d+)$'
+
+      - name: Prune old sha-* versions (simulator)
+        uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55 # v5.0.0
+        with:
+          package-name: dropoff-simulator
+          package-type: container
+          min-versions-to-keep: 5
+          ignore-versions: '^(main|latest|\d+\.\d+\.\d+)$'

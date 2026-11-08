@@ -601,8 +601,8 @@ const MILESTONES = [
     { t: 'Grafana 13.3.0 provisioned as code: datasource, dashboard JSON (9 panels), 3 alert rules (oldest waiting > 15 min, any DLT message in 5 min, p95 > 500 ms for 5 min), shown in the Grafana UI only', done: true },
     { t: 'One shared service Dockerfile: layered jar on Alpine with a jlink Temurin 21 runtime (the full eclipse-temurin:21-jre-alpine is too big, #36 amended), non-root, < 300 MB and booted in CI; simulator Dockerfile; Compose profiles services and demo', done: true },
     { t: 'dropoff_dlt_messages_total{topic} from each dead-letter recoverer', done: true },
-    { t: 'CI runs ops/smoke/full-flow.sh against Compose' },
-    { t: 'CI publishes after build and test pass to ghcr.io/danie1le/dropoff-<service> (dropoff-app before M5): sha-* and main on main, version and latest on v* tags; PRs build only; linux/amd64; public images' },
+    { t: 'CI runs ops/smoke/full-flow.sh against Compose', done: true },
+    { t: 'CI publishes after build and test pass to ghcr.io/danie1le/dropoff-<service> (dropoff-app before M5): sha-* and main on main, version and latest on v* tags; PRs build only; linux/amd64; public images', done: false },
   ]},
   { id: 'M7', name: 'Performance', gh: 8, needs: [33, 34, 35], goal: 'Measured load and one or two measured wins.', items: [
     { t: 'k6 2.3.0 scripts in ops/k6 (Compose profile load): place-orders (5→50 orders/s over 10 min), browse (100 req/s), order-history; p95 < 300 ms, errors < 1%' },
