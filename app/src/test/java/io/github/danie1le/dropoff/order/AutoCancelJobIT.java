@@ -22,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
@@ -29,11 +30,12 @@ import org.springframework.context.event.EventListener;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.modulith.test.EnableScenarios;
 import org.springframework.modulith.test.Scenario;
+import org.springframework.scheduling.annotation.ScheduledAnnotationBeanPostProcessor;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /** PLACED orders older than the auto-cancel limit become CANCELLED by SYSTEM (M2-7, decisions #13, #14). */
-@SpringBootTest(properties = "dropoff.scheduling.enabled=false")
+@SpringBootTest
 @AutoConfigureMockMvc
 @EnableScenarios
 @Import({TestcontainersConfiguration.class, AutoCancelJobIT.ClockFixture.class, AutoCancelJobIT.FailingOrder.class})
@@ -141,6 +143,13 @@ class AutoCancelJobIT {
                 .param(orderId)
                 .query(Integer.class)
                 .single();
+    }
+
+    /** The test config (config/application.yml) turns scheduling off, so only these tests drive {@code run()}. */
+    @Test
+    void schedulingIsOffInTests(@Autowired ApplicationContext context) {
+        assertThat(context.getBeanNamesForType(ScheduledAnnotationBeanPostProcessor.class))
+                .isEmpty();
     }
 
     @Test

@@ -6,7 +6,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
-/** The system clock for jobs, and {@code @Scheduled} jobs on unless {@code dropoff.scheduling.enabled=false}. */
+/**
+ * The system clock, injected wherever code reads the current time so tests can swap it. {@code @Scheduled} jobs run
+ * unless {@code dropoff.scheduling.enabled=false}.
+ */
 @Configuration(proxyBeanMethods = false)
 class SchedulingConfig {
 
