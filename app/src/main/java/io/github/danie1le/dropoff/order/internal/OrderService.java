@@ -1,6 +1,6 @@
 package io.github.danie1le.dropoff.order.internal;
 
-import static io.github.danie1le.dropoff.common.Validated.required;
+import static io.github.danie1le.dropoff.web.Validated.required;
 
 import io.github.danie1le.dropoff.common.DbClock;
 import io.github.danie1le.dropoff.contracts.Actor;

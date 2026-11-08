@@ -1,10 +1,10 @@
 package io.github.danie1le.dropoff.dispatch.internal;
 
-import static io.github.danie1le.dropoff.common.Validated.required;
+import static io.github.danie1le.dropoff.web.Validated.required;
 
-import io.github.danie1le.dropoff.common.Latitude;
-import io.github.danie1le.dropoff.common.Longitude;
-import io.github.danie1le.dropoff.common.NotBlankIfPresent;
+import io.github.danie1le.dropoff.web.Latitude;
+import io.github.danie1le.dropoff.web.Longitude;
+import io.github.danie1le.dropoff.web.NotBlankIfPresent;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;

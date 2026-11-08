@@ -1,4 +1,4 @@
-package io.github.danie1le.dropoff.common;
+package io.github.danie1le.dropoff.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

@@ -1,8 +1,8 @@
 package io.github.danie1le.dropoff.merchant.internal;
 
-import static io.github.danie1le.dropoff.common.Validated.required;
+import static io.github.danie1le.dropoff.web.Validated.required;
 
-import io.github.danie1le.dropoff.common.NotBlankIfPresent;
+import io.github.danie1le.dropoff.web.NotBlankIfPresent;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
