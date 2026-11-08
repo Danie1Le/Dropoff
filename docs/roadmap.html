@@ -572,8 +572,8 @@ const MILESTONES = [
     { t: 'Partial unique index one_open_offer_per_order (offers.order_id WHERE status = OFFERED): a second open offer rolls back with its courier claim', done: true },
     { t: 'Job tries dispatch again every 10 s when no courier is found; READY orders retry forever and are never cancelled', done: true },
     { t: 'Courier offline before pickup → auto-reassign; after pickup → 409 COURIER_HAS_ACTIVE_DELIVERY', done: true },
-    { t: 'Testcontainers integration tests (Postgres + Redis)' },
-    { t: 'tools/simulator: seed via the public API (Austin; 10 merchants × 8 items, 50 customers, 30 couriers) and run with customer, merchant and courier bots (couriers poll offers every 2 s; accept 80%, decline 15%, ignore 5%); fixed random seed; runs via Gradle until the M6 demo profile' },
+    { t: 'Testcontainers integration tests (Postgres + Redis)', done: true },
+    { t: 'tools/simulator: seed via the public API (Austin; 10 merchants × 8 items, 50 customers, 30 couriers) and run with customer, merchant and courier bots (couriers poll offers every 2 s; accept 80%, decline 15%, ignore 5%); fixed random seed; runs via Gradle until the M6 demo profile', done: true },
   ]},
   { id: 'M4', name: 'Live tracking', gh: 5, needs: [12, 33], goal: 'Customers watch their order and courier move live.', items: [
     { t: 'STOMP over WebSocket at /ws' },
