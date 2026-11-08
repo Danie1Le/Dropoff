@@ -46,6 +46,26 @@ class StompFrameTest {
     }
 
     @Test
+    void anUndefinedEscapeIsAFatalError() {
+        assertThatThrownBy(() -> StompFrame.decode("ERROR\nmessage:a\\tb\n\n\0"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Undefined STOMP header escape \\t");
+    }
+
+    @Test
+    void aTrailingBackslashIsAFatalError() {
+        assertThatThrownBy(() -> StompFrame.decode("ERROR\nmessage:ab\\\n\n\0"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void leavesConnectedHeadersUnescaped() {
+        StompFrame frame = StompFrame.decode("CONNECTED\nversion:1.2\nserver:a\\cb\\t\n\n\0");
+
+        assertThat(frame.headers()).containsEntry("server", "a\\cb\\t");
+    }
+
+    @Test
     void rejectsAFrameWithoutAHeaderBlock() {
         assertThatThrownBy(() -> StompFrame.decode("CONNECTED\0")).isInstanceOf(IllegalArgumentException.class);
     }

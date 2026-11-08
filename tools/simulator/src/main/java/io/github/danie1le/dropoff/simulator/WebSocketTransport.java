@@ -16,25 +16,29 @@ import org.jspecify.annotations.Nullable;
 final class WebSocketTransport implements OrderWatch.Transport, WebSocket.Listener {
 
     private static final Duration TIMEOUT = Duration.ofSeconds(10);
+    // RFC 6455 abnormal closure: the connection dropped without a close frame. The JDK has no constant for it.
+    private static final int ABNORMAL_CLOSURE = 1006;
 
     private final OrderWatch watch;
     private @Nullable WebSocket socket;
     // The JDK allows one outstanding send at a time, so each send waits for the one before.
     private CompletableFuture<?> lastSend = CompletableFuture.completedFuture(null);
 
-    private WebSocketTransport(long orderId, URI baseUrl, Consumer<String> out) {
-        this.watch = new OrderWatch(orderId, baseUrl.getHost(), this, out);
+    private WebSocketTransport(long orderId, URI baseUrl, DropoffApi api, Consumer<String> out) {
+        this.watch = new OrderWatch(orderId, baseUrl.getHost(), this, api, out);
     }
 
     /** Connects to {@code baseUrl}'s {@code /ws}, starts the watch and returns it. */
-    static OrderWatch open(long orderId, URI baseUrl, Consumer<String> out) {
-        WebSocketTransport transport = new WebSocketTransport(orderId, baseUrl, out);
-        HttpClient.newBuilder()
+    static OrderWatch open(long orderId, URI baseUrl, DropoffApi api, Consumer<String> out) {
+        WebSocketTransport transport = new WebSocketTransport(orderId, baseUrl, api, out);
+        // Take the socket from buildAsync: the JDK may call onOpen later, on another thread, after join() returns.
+        WebSocket webSocket = HttpClient.newBuilder()
                 .connectTimeout(TIMEOUT)
                 .build()
                 .newWebSocketBuilder()
                 .buildAsync(wsUri(baseUrl), transport)
                 .join();
+        transport.attach(webSocket);
         transport.watch.start();
         return transport.watch;
     }
@@ -47,7 +51,6 @@ final class WebSocketTransport implements OrderWatch.Transport, WebSocket.Listen
 
     @Override
     public void onOpen(WebSocket webSocket) {
-        this.socket = webSocket;
         webSocket.request(1);
     }
 
@@ -66,7 +69,7 @@ final class WebSocketTransport implements OrderWatch.Transport, WebSocket.Listen
 
     @Override
     public void onError(WebSocket webSocket, Throwable error) {
-        watch.closed(WebSocket.NORMAL_CLOSURE, String.valueOf(error.getMessage()));
+        watch.closed(ABNORMAL_CLOSURE, String.valueOf(error.getMessage()));
     }
 
     @Override
@@ -76,12 +79,17 @@ final class WebSocketTransport implements OrderWatch.Transport, WebSocket.Listen
     }
 
     @Override
-    public synchronized void close() {
+    public synchronized CompletableFuture<?> close() {
         WebSocket ws = connected();
         lastSend = lastSend.thenCompose(ignored -> ws.sendClose(WebSocket.NORMAL_CLOSURE, "watch done"));
+        return lastSend;
     }
 
-    private WebSocket connected() {
+    private synchronized void attach(WebSocket webSocket) {
+        this.socket = webSocket;
+    }
+
+    private synchronized WebSocket connected() {
         WebSocket ws = socket;
         if (ws == null) {
             throw new IllegalStateException("WebSocket is not open yet");

@@ -12,7 +12,8 @@ import java.util.Map;
  */
 record StompFrame(String command, Map<String, String> headers, String body) {
 
-    private static final char NUL = '\0';
+    /** The byte that ends every frame. */
+    static final char NUL = '\0';
 
     StompFrame {
         headers = Collections.unmodifiableMap(new LinkedHashMap<>(headers));
@@ -37,7 +38,11 @@ record StompFrame(String command, Map<String, String> headers, String body) {
         return text.append('\n').append(body).append(NUL).toString();
     }
 
-    /** Parses one frame. Lines may end in {@code \n} or {@code \r\n}; a repeated header keeps its first value. */
+    /**
+     * Parses one frame. Lines may end in {@code \n} or {@code \r\n}; a repeated header keeps its first value. Header
+     * values are unescaped, except in {@code CONNECTED}: STOMP 1.2 says the CONNECT and CONNECTED frames do not
+     * escape. An undefined escape is a fatal protocol error and throws {@link IllegalArgumentException}.
+     */
     static StompFrame decode(String text) {
         String frame = text.indexOf(NUL) >= 0 ? text.substring(0, text.indexOf(NUL)) : text;
         int blank = frame.indexOf("\n\n");
@@ -54,29 +59,39 @@ record StompFrame(String command, Map<String, String> headers, String body) {
             throw new IllegalArgumentException("STOMP frame has no blank line after its headers");
         }
         List<String> lines = frame.substring(0, headEnd).lines().toList();
+        String command = lines.get(0);
+        boolean escaped = !command.equals("CONNECTED");
         Map<String, String> headers = new LinkedHashMap<>();
         for (String line : lines.subList(1, lines.size())) {
             int colon = line.indexOf(':');
             if (colon > 0) {
-                headers.putIfAbsent(line.substring(0, colon), unescape(line.substring(colon + 1)));
+                String value = line.substring(colon + 1);
+                headers.putIfAbsent(line.substring(0, colon), escaped ? unescape(value) : value);
             }
         }
-        return new StompFrame(lines.get(0), headers, frame.substring(bodyStart));
+        return new StompFrame(command, headers, frame.substring(bodyStart));
     }
 
-    /** STOMP 1.2 header escapes: {@code \\c} is a colon, {@code \\n} a newline, {@code \\r} a CR, {@code \\\\} a backslash. */
+    /**
+     * STOMP 1.2 header escapes: {@code \\c} is a colon, {@code \\n} a newline, {@code \\r} a CR, {@code \\\\} a backslash.
+     * Any other escape, or a backslash at the end, is a fatal protocol error.
+     */
     private static String unescape(String value) {
         StringBuilder out = new StringBuilder(value.length());
         for (int i = 0; i < value.length(); i++) {
             char c = value.charAt(i);
-            if (c == '\\' && i + 1 < value.length()) {
+            if (c == '\\') {
+                if (i + 1 >= value.length()) {
+                    throw new IllegalArgumentException("STOMP header value ends in a lone backslash");
+                }
                 char next = value.charAt(++i);
                 out.append(
                         switch (next) {
                             case 'c' -> ':';
                             case 'n' -> '\n';
                             case 'r' -> '\r';
-                            default -> next;
+                            case '\\' -> '\\';
+                            default -> throw new IllegalArgumentException("Undefined STOMP header escape \\" + next);
                         });
             } else {
                 out.append(c);

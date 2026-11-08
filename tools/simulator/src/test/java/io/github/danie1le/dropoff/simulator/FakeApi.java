@@ -18,6 +18,7 @@ final class FakeApi implements DropoffApi {
     final Map<Long, Deque<List<Long>>> placedOrders = new HashMap<>();
     final List<LatLng> locations = new ArrayList<>();
     final List<PlacedOrder> orders = new ArrayList<>();
+    final Map<Long, String> orderStatuses = new HashMap<>();
 
     record PlacedOrder(long customerId, long merchantId, List<OrderLine> lines) {}
 
@@ -133,6 +134,16 @@ final class FakeApi implements DropoffApi {
     @Override
     public void merchantStep(long merchantId, long orderId, MerchantStep step) {
         record(step + " " + merchantId + " " + orderId);
+    }
+
+    @Override
+    public String orderStatus(long orderId) {
+        record("orderStatus " + orderId);
+        String status = orderStatuses.get(orderId);
+        if (status == null) {
+            throw new ApiException(404, "ORDER_NOT_FOUND");
+        }
+        return status;
     }
 
     /** Calls recorded so far that start with the prefix. */
