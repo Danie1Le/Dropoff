@@ -57,6 +57,7 @@ class OrderCommandApiIT {
      */
     static void deleteAll(JdbcClient jdbc) {
         Awaitility.await()
+                .pollDelay(Duration.ZERO)
                 .atMost(Duration.ofSeconds(10))
                 .until(() -> jdbc.sql("SELECT count(*) FROM event_publication WHERE completion_date IS NULL"
                                         + " AND status IS DISTINCT FROM 'FAILED'")
