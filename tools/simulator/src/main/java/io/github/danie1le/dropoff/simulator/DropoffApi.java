@@ -21,8 +21,8 @@ interface DropoffApi {
 
     CourierView courier(long courierId);
 
-    /** {@code AVAILABLE} or {@code OFFLINE}. */
-    void changeStatus(long courierId, String status);
+    /** {@link CourierStatus#AVAILABLE} or {@link CourierStatus#OFFLINE}; the server sets BUSY itself. */
+    void changeStatus(long courierId, CourierStatus status);
 
     /** The courier's open offer, or empty on 204. */
     Optional<Offer> currentOffer(long courierId);

@@ -26,7 +26,7 @@ class CourierBotTest {
 
     @BeforeEach
     void offlineCourierAtHome() {
-        api.couriers.put(COURIER, new CourierView("OFFLINE", HOME));
+        api.couriers.put(COURIER, new CourierView(CourierStatus.OFFLINE, HOME));
     }
 
     private static Instant at(double seconds) {
@@ -47,7 +47,7 @@ class CourierBotTest {
     @Test
     void goesAvailableAtItsServerPositionOnTheFirstTick() {
         LatLng elsewhere = new LatLng(30.25, -97.75);
-        api.couriers.put(COURIER, new CourierView("OFFLINE", elsewhere));
+        api.couriers.put(COURIER, new CourierView(CourierStatus.OFFLINE, elsewhere));
 
         bot.tick(T0);
 
@@ -58,7 +58,7 @@ class CourierBotTest {
 
     @Test
     void anAlreadyAvailableCourierIsNotPatchedAgain() {
-        api.couriers.put(COURIER, new CourierView("AVAILABLE", HOME));
+        api.couriers.put(COURIER, new CourierView(CourierStatus.AVAILABLE, HOME));
 
         bot.tick(T0);
 
@@ -156,13 +156,13 @@ class CourierBotTest {
         assertThat(api.calls).isEmpty();
 
         // The timeout job has not run yet at 31 s, so the courier is still BUSY.
-        api.couriers.put(COURIER, new CourierView("BUSY", HOME));
+        api.couriers.put(COURIER, new CourierView(CourierStatus.BUSY, HOME));
         bot.tick(at(31));
         assertThat(bot.state()).isEqualTo(CourierBot.State.AWAITING_TIMEOUT);
 
         // The job sets it OFFLINE; the bot sees that on its next check and waits 30 s.
         api.offers.remove(COURIER);
-        api.couriers.put(COURIER, new CourierView("OFFLINE", HOME));
+        api.couriers.put(COURIER, new CourierView(CourierStatus.OFFLINE, HOME));
         tickEverySecond(32, 33);
         assertThat(bot.state()).isEqualTo(CourierBot.State.COOLING_DOWN);
 
@@ -180,7 +180,7 @@ class CourierBotTest {
         decisions.add(OfferDecision.ACCEPT);
         api.failOn = "accept";
         api.failure = new ApiException(409, "OFFER_CLOSED");
-        api.couriers.put(COURIER, new CourierView("OFFLINE", HOME));
+        api.couriers.put(COURIER, new CourierView(CourierStatus.OFFLINE, HOME));
 
         bot.tick(at(1));
         tickEverySecond(2, 3);
@@ -190,9 +190,49 @@ class CourierBotTest {
     }
 
     @Test
+    void aFailedPickUpKeepsTheJobAndRetriesUntilItDelivers() {
+        bot.tick(T0);
+        api.offers.put(COURIER, offer(1, at(31)));
+        decisions.add(OfferDecision.ACCEPT);
+        bot.tick(at(1));
+        // The async assign has not landed yet when the courier arrives at 121 s.
+        api.failOn = "pickUp";
+        api.failure = new ApiException(404, "ORDER_NOT_FOUND");
+
+        tickEverySecond(2, 122);
+        assertThat(api.callsStartingWith("pickUp")).hasSize(1);
+        assertThat(bot.state()).isEqualTo(CourierBot.State.TO_PICKUP);
+
+        // Retried 2 s after the failure, then on to the delivery address.
+        bot.tick(at(123));
+        assertThat(api.callsStartingWith("pickUp")).containsExactly("pickUp 7 101", "pickUp 7 101");
+        assertThat(bot.state()).isEqualTo(CourierBot.State.TO_DROPOFF);
+
+        tickEverySecond(124, 183);
+        assertThat(api.calls).contains("deliver 7 101");
+        assertThat(api.callsStartingWith("courier")).hasSize(1);
+        assertThat(bot.state()).isEqualTo(CourierBot.State.IDLE);
+    }
+
+    @Test
+    void aFailedDeliverIsRetriedRatherThanDropped() {
+        bot.tick(T0);
+        api.offers.put(COURIER, offer(1, at(31)));
+        decisions.add(OfferDecision.ACCEPT);
+        bot.tick(at(1));
+        api.failOn = "deliver";
+        api.failure = new ApiException(503, null);
+
+        tickEverySecond(2, 185);
+
+        assertThat(api.callsStartingWith("deliver")).containsExactly("deliver 7 101", "deliver 7 101");
+        assertThat(bot.state()).isEqualTo(CourierBot.State.IDLE);
+    }
+
+    @Test
     void anIdleCourierFarFromDowntownDriftsBackUntilWithinOneKilometre() {
         LatLng edge = Austin.DOWNTOWN.moveToward(new LatLng(30.3672, -97.7431), 3_000);
-        api.couriers.put(COURIER, new CourierView("OFFLINE", edge));
+        api.couriers.put(COURIER, new CourierView(CourierStatus.OFFLINE, edge));
 
         bot.tick(T0);
         tickEverySecond(1, 60);
@@ -218,7 +258,7 @@ class CourierBotTest {
 
     private static List<String> runScript() {
         FakeApi fake = new FakeApi();
-        fake.couriers.put(COURIER, new CourierView("OFFLINE", HOME));
+        fake.couriers.put(COURIER, new CourierView(CourierStatus.OFFLINE, HOME));
         java.util.Random random = new java.util.Random(42);
         CourierBot seeded = new CourierBot(COURIER, HOME, fake, () -> OfferDecision.roll(random), new Stats());
         for (int s = 0; s <= 600; s++) {

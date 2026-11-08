@@ -71,7 +71,7 @@ class MerchantBotTest {
     }
 
     @Test
-    void dropsAnOrderWhenAStepFailsSuchAsWhenItWasCancelled() {
+    void dropsAnOrderWhenAStepGetsAConflictSuchAsWhenItWasCancelled() {
         api.placedOrders.put(MERCHANT, new ArrayDeque<>(List.of(List.of(50L))));
         api.failOn = "ACCEPT";
         api.failure = new ApiException(409, "ORDER_STATUS_CONFLICT");
@@ -83,5 +83,20 @@ class MerchantBotTest {
 
         assertThat(api.callsStartingWith("START_PREPARING")).isEmpty();
         assertThat(api.callsStartingWith("ACCEPT")).hasSize(1);
+    }
+
+    @Test
+    void retriesAStepAfterAnyOtherFailure() {
+        api.placedOrders.put(MERCHANT, new ArrayDeque<>(List.of(List.of(50L))));
+        api.failOn = "START_PREPARING";
+        api.failure = new ApiException(503, null);
+        MerchantBot bot = new MerchantBot(MERCHANT, api, shortestDelays(), new Stats());
+
+        for (int s = 0; s <= 30; s++) {
+            bot.tick(at(s));
+        }
+
+        assertThat(api.callsStartingWith("START_PREPARING")).hasSize(2);
+        assertThat(api.callsStartingWith("READY")).containsExactly("READY 3 50");
     }
 }

@@ -67,12 +67,12 @@ final class HttpDropoffApi implements DropoffApi {
         JsonNode lng = body.path("lng");
         @Nullable
         LatLng position = lat.isNumber() && lng.isNumber() ? new LatLng(lat.asDouble(), lng.asDouble()) : null;
-        return new CourierView(body.path("status").asString(), position);
+        return new CourierView(CourierStatus.valueOf(body.path("status").asString()), position);
     }
 
     @Override
-    public void changeStatus(long courierId, String status) {
-        send("PATCH", "couriers/" + courierId + "/status", Map.of("status", status));
+    public void changeStatus(long courierId, CourierStatus status) {
+        send("PATCH", "couriers/" + courierId + "/status", Map.of("status", status.name()));
     }
 
     @Override

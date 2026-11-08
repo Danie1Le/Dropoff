@@ -42,6 +42,12 @@ final class CourierBot implements Bot {
     /** An idle courier drifts toward downtown until it is this close. */
     static final double IDLE_WITHIN_METERS = 1_000;
 
+    /**
+     * A failed pick-up, delivery or location send on the way is retried this many times, one {@link #POLL_INTERVAL}
+     * apart, before the bot gives up on the job and reads its status again.
+     */
+    static final int MAX_STEP_RETRIES = 30;
+
     /** Closer than this counts as arrived, so rounding in the distance maths never costs an extra tick. */
     private static final double ARRIVED_WITHIN_METERS = 1;
 
@@ -60,6 +66,7 @@ final class CourierBot implements Bot {
     private Instant nextLocationAt = Instant.MIN;
     private Instant lastMovedAt = Instant.MIN;
     private @Nullable Offer job;
+    private int stepFailures;
 
     CourierBot(long courierId, LatLng home, DropoffApi api, Supplier<OfferDecision> decisions, Stats stats) {
         this(courierId, home, api, decisions, stats, DEFAULT_SPEED_KMH);
@@ -116,12 +123,56 @@ final class CourierBot implements Bot {
                 }
             }
         } catch (RuntimeException e) {
-            // A late accept, a lost connection or a restart leaves the bot unsure; read the server state next tick.
             stats.errors++;
+            if (job != null && (state == State.TO_PICKUP || state == State.TO_DROPOFF) && retryStep(now, e)) {
+                return;
+            }
+            // A late accept, a lost connection or a restart leaves the bot unsure; read the server state next tick.
             log.warn("Courier {} in {}: {}; checking its status again", courierId, state, e.getMessage());
             state = State.STARTING;
             nextCheckAt = now;
         }
+    }
+
+    /**
+     * Keeps the job after a failed step on the way, such as a 404 on pick-up while the async courier assignment has not
+     * landed yet, or a dropped connection on deliver. Resetting to STARTING here would strand the courier BUSY with an
+     * accepted offer that {@code offers/current} no longer returns.
+     *
+     * @return false once the retries run out
+     */
+    private boolean retryStep(Instant now, RuntimeException e) {
+        long orderId = requireJob().orderId();
+        stepFailures++;
+        if (stepFailures > MAX_STEP_RETRIES) {
+            log.error(
+                    "Courier {} gave up on order {} in {} after {} retries: {}",
+                    courierId,
+                    orderId,
+                    state,
+                    MAX_STEP_RETRIES,
+                    e.getMessage());
+            stepFailures = 0;
+            return false;
+        }
+        log.warn(
+                "Courier {} in {} for order {}: {}; retrying in {} s",
+                courierId,
+                state,
+                orderId,
+                e.getMessage(),
+                POLL_INTERVAL.toSeconds());
+        nextCheckAt = now.plus(POLL_INTERVAL);
+        nextLocationAt = nextCheckAt;
+        return true;
+    }
+
+    private Offer requireJob() {
+        Offer current = job;
+        if (current == null) {
+            throw new IllegalStateException("moving without a job");
+        }
+        return current;
     }
 
     private boolean isDue(Instant now) {
@@ -134,7 +185,7 @@ final class CourierBot implements Bot {
         if (serverPosition != null) {
             position = serverPosition;
         }
-        if (!courier.status().equals("OFFLINE")) {
+        if (courier.status() != CourierStatus.OFFLINE) {
             // AVAILABLE, or BUSY with an offer the next poll will find.
             idle(now);
         } else if (started) {
@@ -150,7 +201,7 @@ final class CourierBot implements Bot {
     }
 
     private void goAvailable(Instant now) {
-        api.changeStatus(courierId, "AVAILABLE");
+        api.changeStatus(courierId, CourierStatus.AVAILABLE);
         idle(now);
     }
 
@@ -198,6 +249,8 @@ final class CourierBot implements Bot {
                 log.info("Courier {} accepted order {}", courierId, offer.orderId());
                 job = offer;
                 state = State.TO_PICKUP;
+                stepFailures = 0;
+                nextCheckAt = now;
                 lastMovedAt = now;
                 nextLocationAt = now.plus(LOCATION_INTERVAL);
             }
@@ -214,10 +267,7 @@ final class CourierBot implements Bot {
     }
 
     private void move(Instant now) {
-        Offer current = job;
-        if (current == null) {
-            throw new IllegalStateException("moving without a job");
-        }
+        Offer current = requireJob();
         LatLng target = state == State.TO_PICKUP ? current.pickup() : current.delivery();
         double seconds = Duration.between(lastMovedAt, now).toMillis() / 1_000.0;
         lastMovedAt = now;
@@ -225,6 +275,10 @@ final class CourierBot implements Bot {
         boolean arrived = position.distanceMeters(target) < ARRIVED_WITHIN_METERS;
         if (arrived) {
             position = target;
+            if (!isDue(now)) {
+                // Waiting to retry a failed step.
+                return;
+            }
         }
         if (arrived || !now.isBefore(nextLocationAt)) {
             api.updateLocation(courierId, position);
@@ -235,10 +289,12 @@ final class CourierBot implements Bot {
         }
         if (state == State.TO_PICKUP) {
             api.pickUp(courierId, current.orderId());
+            stepFailures = 0;
             stats.pickedUp++;
             state = State.TO_DROPOFF;
         } else {
             api.deliver(courierId, current.orderId());
+            stepFailures = 0;
             stats.delivered++;
             log.info("Courier {} delivered order {}", courierId, current.orderId());
             // The server makes the courier AVAILABLE on delivery.
@@ -247,7 +303,7 @@ final class CourierBot implements Bot {
     }
 
     private void checkTimedOut(Instant now) {
-        if (api.courier(courierId).status().equals("OFFLINE")) {
+        if (api.courier(courierId).status() == CourierStatus.OFFLINE) {
             coolDown(now);
         } else {
             // The timeout job runs every 5 s; look again shortly.

@@ -81,7 +81,7 @@ final class FakeApi implements DropoffApi {
     }
 
     @Override
-    public void changeStatus(long courierId, String status) {
+    public void changeStatus(long courierId, CourierStatus status) {
         record("status " + courierId + " " + status);
         CourierView old = couriers.get(courierId);
         couriers.put(courierId, new CourierView(status, old == null ? null : old.position()));

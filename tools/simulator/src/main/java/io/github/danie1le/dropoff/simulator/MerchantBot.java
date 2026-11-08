@@ -30,6 +30,8 @@ final class MerchantBot implements Bot {
     /** Orders in progress, by id, in the order they were first seen so a run is repeatable. */
     private final Map<Long, PendingStep> pending = new LinkedHashMap<>();
 
+    private static final int CONFLICT = 409;
+
     private Instant nextPollAt = Instant.MIN;
 
     private record PendingStep(MerchantStep step, Instant dueAt) {}
@@ -81,11 +83,20 @@ final class MerchantBot implements Bot {
             long orderId = entry.getKey();
             try {
                 api.merchantStep(merchantId, orderId, due.step());
-            } catch (RuntimeException e) {
-                // Most often the order was cancelled meanwhile (by the customer or the auto-cancel job).
+            } catch (ApiException e) {
                 stats.errors++;
-                log.warn("Merchant {} dropped order {} at {}: {}", merchantId, orderId, due.step(), e.getMessage());
-                entries.remove();
+                if (e.status() == CONFLICT) {
+                    // The order was cancelled meanwhile (by the customer or the auto-cancel job); it stays 409.
+                    log.warn("Merchant {} dropped order {} at {}: {}", merchantId, orderId, due.step(), e.getMessage());
+                    entries.remove();
+                } else {
+                    retryLater(entry, now, e);
+                }
+                continue;
+            } catch (RuntimeException e) {
+                // A lost connection or a timeout: dropped, the order would stay ACCEPTED or PREPARING forever.
+                stats.errors++;
+                retryLater(entry, now, e);
                 continue;
             }
             MerchantStep next = due.step().next();
@@ -96,5 +107,17 @@ final class MerchantBot implements Bot {
                 entry.setValue(new PendingStep(next, now.plus(stepDelay(random))));
             }
         }
+    }
+
+    private void retryLater(Map.Entry<Long, PendingStep> entry, Instant now, RuntimeException e) {
+        PendingStep due = entry.getValue();
+        log.warn(
+                "Merchant {} will retry order {} at {} in {} s: {}",
+                merchantId,
+                entry.getKey(),
+                due.step(),
+                POLL_INTERVAL.toSeconds(),
+                e.getMessage());
+        entry.setValue(new PendingStep(due.step(), now.plus(POLL_INTERVAL)));
     }
 }
