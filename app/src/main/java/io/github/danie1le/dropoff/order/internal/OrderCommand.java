@@ -1,6 +1,6 @@
 package io.github.danie1le.dropoff.order.internal;
 
-import io.github.danie1le.dropoff.order.Actor;
+import io.github.danie1le.dropoff.contracts.Actor;
 import java.util.Set;
 
 /**

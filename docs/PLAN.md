@@ -32,7 +32,7 @@ Each PR lists its **scope**, **tests** and **decisions** (`#n` = ticket on the m
 | Background jobs (`SKIP LOCKED`) | #14 |
 | Outbox | #15, ADR-0006 |
 | Service split | #16 (amended twice), ADR-0007 |
-| Gradle layout | #31 |
+| Gradle layout, shared event contracts | #31, ADR-0008 |
 | Kafka topics | #32 |
 | Demo data and simulator | #33 |
 | Metrics and Grafana | #34 |
@@ -45,7 +45,7 @@ Each PR lists its **scope**, **tests** and **decisions** (`#n` = ticket on the m
 
 These apply across many PRs, and #42 is the source for all of them.
 
-**Events.** Every event is a Java record with `eventId` (UUID) and `occurredAt`, plus:
+**Events.** Every event is a Java record with `eventId` (UUID) and `occurredAt`, plus the fields below. From M3-3 the records live in the top-level `io.github.danie1le.dropoff.contracts` package (records and enums only, no Spring, no dependency on another module, additive changes only), so a publisher and its listeners never depend on each other (ADR-0008):
 
 | Event | Fields | Published by | From |
 |---|---|---|---|
@@ -63,7 +63,7 @@ These apply across many PRs, and #42 is the source for all of them.
 **Error codes** (Problem Details `code` field):
 - 400: `VALIDATION_FAILED`, `MALFORMED_REQUEST`, `IDEMPOTENCY_KEY_REQUIRED`.
 - 404 (resource in the URL path): `MERCHANT_NOT_FOUND`, `MENU_ITEM_NOT_FOUND`, `CUSTOMER_NOT_FOUND`, `ORDER_NOT_FOUND`, `COURIER_NOT_FOUND`, `OFFER_NOT_FOUND`.
-- 409: `INVALID_STATUS_TRANSITION`, `OFFER_CLOSED`, `COURIER_BUSY`, `COURIER_LOCATION_UNKNOWN`, `COURIER_HAS_ACTIVE_DELIVERY`.
+- 409: `INVALID_STATUS_TRANSITION`, `OFFER_CLOSED`, `COURIER_NOT_BUSY`, `COURIER_BUSY`, `COURIER_LOCATION_UNKNOWN`, `COURIER_HAS_ACTIVE_DELIVERY`.
 - 422 (an id or rule in the body): `CUSTOMER_UNKNOWN`, `MERCHANT_UNKNOWN`, `MENU_ITEM_UNKNOWN`, `MENU_ITEM_UNAVAILABLE`, `MENU_ITEM_WRONG_MERCHANT`, `MERCHANT_CLOSED`, `IDEMPOTENCY_KEY_REUSED`.
 - 500: `INTERNAL_ERROR`.
 - Errors raised by Spring itself (unknown route, wrong method, unsupported media type …) use the HTTP status name as their code, e.g. `NOT_FOUND`, `METHOD_NOT_ALLOWED`.
@@ -290,11 +290,13 @@ Build order, issues (#82–#87) and quiz points: `docs/milestones/M3.md`.
   - `GET /api/v1/couriers/{id}/offers/current`: 200 `{offerId, orderId, merchantName, merchantAddress, pickupLat, pickupLng, deliveryAddress, deliveryLat, deliveryLng, expiresAt}` from `dispatch_orders`, or 204.
   - `POST …/offers/{offerId}/accept` and `decline`.
   - A late accept is blocked by `UPDATE … AND expires_at > now()` and returns 409 `OFFER_CLOSED`. Another courier's offer returns 404 `OFFER_NOT_FOUND`; a repeat returns 200 no-op.
+  - Accept locks the courier, then the offer, then `dispatch_orders`. A courier who is not BUSY (OFFLINE while the offer is open) gets 409 `COURIER_NOT_BUSY` and the offer stays open.
   - Accept sets `dispatch_orders` to `ASSIGNED` and publishes `CourierAssigned`. The order-module listener sets `orders.courier_id`.
   - Decline sends the courier back to AVAILABLE (`GEOADD`) and dispatches again.
+  - The `contracts` package is created: `OrderPlaced`, `OrderCancelled`, `OrderReady` and `Actor` move there from `order`, and `CourierAssigned` is added there, so order and dispatch never depend on each other (ADR-0008).
   - `dropoff_dispatch_duration_seconds` is computed later (M6-1) from `ready_at`.
-- Tests: ITs for accept, decline, a late accept, the wrong courier and a repeat.
-- Decisions: #11, #42.
+- Tests: ITs for accept, decline, a late accept, the wrong courier and a repeat; `ModularityTest`, plus a test that `contracts` holds only records and enums with no Spring.
+- Decisions: #11, #42, ADR-0008.
 
 **M3-4 Timeout, offline and reassignment.**
 - Scope:
@@ -374,11 +376,11 @@ Goal: three services talking through durable events. Each PR leaves a working sy
 
 **M5-2 Contracts and web-common.**
 - Scope:
-  - Event records move to `contracts` (records only, no Spring, additive changes only).
+  - The `contracts` package (created in M3-3, ADR-0008) moves into its own Gradle module `contracts`, with no Spring on its classpath. The rules stay: records only, no Spring, additive changes only.
   - `DomainException`, the advice and the paging limits move to `libs/web-common`.
   - Still one app.
 - Tests: all existing tests stay green.
-- Decisions: #31.
+- Decisions: #31, ADR-0008.
 
 **M5-3 Order module uses merchant copies.**
 - Scope:

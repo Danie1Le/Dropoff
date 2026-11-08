@@ -76,6 +76,17 @@ class Courier {
         this.updatedAt = now;
     }
 
+    /**
+     * Frees the courier after they decline an offer (ticket #11, point 8): BUSY becomes AVAILABLE. A courier who went
+     * OFFLINE while the offer was open stays OFFLINE.
+     */
+    void release(Instant now) {
+        if (status == CourierStatus.BUSY) {
+            this.status = CourierStatus.AVAILABLE;
+            this.updatedAt = now;
+        }
+    }
+
     /** Stores a new location. Allowed in every status (ticket #42, second gate pass). */
     void moveTo(Position position, Instant now) {
         this.lastLat = position.lat();

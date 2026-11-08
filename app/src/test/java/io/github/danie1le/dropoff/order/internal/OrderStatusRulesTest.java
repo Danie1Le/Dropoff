@@ -1,9 +1,9 @@
 package io.github.danie1le.dropoff.order.internal;
 
-import static io.github.danie1le.dropoff.order.Actor.COURIER;
-import static io.github.danie1le.dropoff.order.Actor.CUSTOMER;
-import static io.github.danie1le.dropoff.order.Actor.MERCHANT;
-import static io.github.danie1le.dropoff.order.Actor.SYSTEM;
+import static io.github.danie1le.dropoff.contracts.Actor.COURIER;
+import static io.github.danie1le.dropoff.contracts.Actor.CUSTOMER;
+import static io.github.danie1le.dropoff.contracts.Actor.MERCHANT;
+import static io.github.danie1le.dropoff.contracts.Actor.SYSTEM;
 import static io.github.danie1le.dropoff.order.internal.OrderCommand.ACCEPT;
 import static io.github.danie1le.dropoff.order.internal.OrderCommand.CANCEL;
 import static io.github.danie1le.dropoff.order.internal.OrderCommand.DELIVER;
@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.danie1le.dropoff.common.DomainException;
-import io.github.danie1le.dropoff.order.Actor;
+import io.github.danie1le.dropoff.contracts.Actor;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.stream.Stream;

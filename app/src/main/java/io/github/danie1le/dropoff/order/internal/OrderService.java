@@ -4,11 +4,11 @@ import static io.github.danie1le.dropoff.common.Validated.required;
 
 import io.github.danie1le.dropoff.common.DbClock;
 import io.github.danie1le.dropoff.common.DomainException;
+import io.github.danie1le.dropoff.contracts.Actor;
+import io.github.danie1le.dropoff.contracts.OrderPlaced;
 import io.github.danie1le.dropoff.merchant.MerchantDirectory;
 import io.github.danie1le.dropoff.merchant.MerchantDirectory.MenuItemView;
 import io.github.danie1le.dropoff.merchant.MerchantDirectory.MerchantView;
-import io.github.danie1le.dropoff.order.Actor;
-import io.github.danie1le.dropoff.order.OrderPlaced;
 import io.github.danie1le.dropoff.order.internal.OrderRequests.OrderResponse;
 import io.github.danie1le.dropoff.order.internal.OrderRequests.PlaceOrder;
 import java.nio.charset.StandardCharsets;
