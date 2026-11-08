@@ -43,7 +43,7 @@ final class WebSocketTransport implements OrderWatch.Transport, WebSocket.Listen
         return transport.watch;
     }
 
-    /** {@code http://localhost:8080} becomes {@code ws://localhost:8080/ws}; {@code https} becomes {@code wss}. */
+    /** {@code http://localhost:8082} becomes {@code ws://localhost:8082/ws}; {@code https} becomes {@code wss}. */
     static URI wsUri(URI baseUrl) {
         String base = baseUrl.toString().replaceFirst("^http", "ws");
         return URI.create((base.endsWith("/") ? base : base + "/") + "ws");

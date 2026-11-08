@@ -3,8 +3,8 @@
 -- reseed with the simulator. Local-only passwords: each equals its user name.
 --
 -- Each user owns its database, so its Flyway can create tables in the public schema. CONNECT is revoked from PUBLIC,
--- so no service can log in to, join or write another service's tables. The app keeps the `dropoff` database
--- (POSTGRES_DB) until it becomes order-service in M5-6; merchant_db is used from M5-5.
+-- so no service can log in to, join or write another service's tables. Since M5-6 no service uses the `dropoff`
+-- database (POSTGRES_DB) or the `dropoff` superuser: they are only for admin work by hand.
 CREATE USER dispatch_user WITH PASSWORD 'dispatch_user';
 CREATE USER merchant_user WITH PASSWORD 'merchant_user';
 CREATE USER order_user WITH PASSWORD 'order_user';

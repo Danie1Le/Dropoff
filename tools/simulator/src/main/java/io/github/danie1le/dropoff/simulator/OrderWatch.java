@@ -9,7 +9,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * {@code watch <orderId>} (M4-3, #42): a small STOMP client that subscribes to {@code /topic/orders/{id}} and prints
- * each {@code STATUS} and {@code LOCATION} message. It only reads: the app's {@code StompClientGuard} rejects any
+ * each {@code STATUS} and {@code LOCATION} message. It only reads: order-service's {@code StompClientGuard} rejects any
  * client {@code SEND}. The socket sits behind {@link Transport}, so the protocol is unit-tested without a server.
  *
  * <p>Flow: {@code CONNECT}, wait for {@code CONNECTED}, {@code SUBSCRIBE}, read the current status from

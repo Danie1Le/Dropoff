@@ -9,8 +9,8 @@ class WebSocketTransportTest {
 
     @Test
     void pointsTheBaseUrlAtTheStompEndpoint() {
-        assertThat(WebSocketTransport.wsUri(URI.create("http://localhost:8080")))
-                .isEqualTo(URI.create("ws://localhost:8080/ws"));
+        assertThat(WebSocketTransport.wsUri(URI.create("http://localhost:8082")))
+                .isEqualTo(URI.create("ws://localhost:8082/ws"));
         assertThat(WebSocketTransport.wsUri(URI.create("https://example.test/")))
                 .isEqualTo(URI.create("wss://example.test/ws"));
     }

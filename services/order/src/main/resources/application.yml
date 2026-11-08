@@ -1,0 +1,54 @@
+server:
+  # Service ports (ADR-0007): merchant 8081, order 8082, dispatch 8083. No gateway.
+  port: 8082
+spring:
+  application:
+    name: order-service
+  datasource:
+    # Its own database and user, created by ops/postgres/init (M5-4). order_user is not a superuser and can't connect to
+    # another service's database (M5-6). Containers override these with DB_URL, DB_USERNAME and DB_PASSWORD.
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/order_db}
+    username: ${DB_USERNAME:order_user}
+    password: ${DB_PASSWORD:order_user}
+  kafka:
+    # Default matches compose.yaml; containers override it with KAFKA_BOOTSTRAP_SERVERS.
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    # Keys are ids as text: orderIds, or merchantIds and menuItemIds on the compacted topics. Values are bytes on the
+    # wire: KafkaConfig's message converter turns events into JSON and back, typed by the __TypeId__ header. A
+    # dead-lettered record keeps its original bytes.
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
+      # A new consumer group starts from the oldest record, so events sent before it first joined are not skipped.
+      auto-offset-reset: earliest
+  jpa:
+    # Flyway owns the schema; Hibernate only checks entities match it (ADR-0002).
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  modulith:
+    events:
+      # Outbox settings (ticket #42, ADR-0006): delete completed publications, retry outstanding ones on restart,
+      # and let Flyway (V1) own the event_publication table.
+      completion-mode: delete
+      republish-outstanding-events-on-restart: true
+      jdbc:
+        schema-initialization:
+          enabled: false
+springdoc:
+  # Swagger UI (/swagger-ui.html) shows one group, v1, served at /v3/api-docs/v1: only the versioned REST API
+  # (M1-4, ticket #5). Actuator stays out.
+  group-configs:
+    - group: v1
+      paths-to-match: /api/v1/**
+  # Error responses come from ProblemDetailsOpenApi, not from scanning ApiExceptionHandler.
+  override-with-generic-response: false
+  # The API only returns JSON (errors use application/problem+json via ProblemDetailsOpenApi).
+  default-produces-media-type: application/json
+dropoff:
+  orders:
+    # Decision #13: PLACED orders the merchant has not accepted after this long are cancelled by SYSTEM.
+    auto-cancel-after: 10m

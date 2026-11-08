@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Full-flow smoke test across the services (M5-4, M5-5): places 5 orders and exits non-zero unless all are DELIVERED
-# within 5 minutes. The simulator seeds first if there is no state file, then runs its own merchant and courier bots.
+# Full-flow smoke test across the three services (M5-4 to M5-6): places 5 orders and exits non-zero unless all are
+# DELIVERED within 5 minutes. The simulator seeds first if there is no state file, then runs its own merchant and
+# courier bots.
 #
 # Needs Compose up and every service running:
 #   docker compose up -d
 #   ./gradlew :services:merchant:bootRun      # merchant, port 8081 (only needed to seed)
-#   ./gradlew :app:bootRun                    # order, port 8080
+#   ./gradlew :services:order:bootRun         # order, port 8082
 #   ./gradlew :services:dispatch:bootRun      # dispatch, port 8083
 # On fresh databases (after `docker compose down -v`), delete .simulator/state.json first: its ids are gone.
 #
@@ -17,7 +18,7 @@ cd "$(dirname "$0")/../.."
 ORDERS="${ORDERS:-5}"
 TIMEOUT="${TIMEOUT:-5m}"
 MERCHANT_URL="${MERCHANT_URL:-http://localhost:8081}"
-ORDER_URL="${ORDER_URL:-http://localhost:8080}"
+ORDER_URL="${ORDER_URL:-http://localhost:8082}"
 DISPATCH_URL="${DISPATCH_URL:-http://localhost:8083}"
 
 exec ./gradlew --quiet :tools:simulator:run --args="smoke --orders ${ORDERS} --timeout ${TIMEOUT} \
