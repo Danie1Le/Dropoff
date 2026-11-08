@@ -19,6 +19,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # The smoke test adds about 3 min and saving the images about 1 min to the 8 min a run took before M6-4; 30 leaves
+    # room for a slow runner.
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -73,7 +75,7 @@ jobs:
       - name: Save the images
         if: github.event_name == 'push'
         run: |
-          docker save -o images.tar             ghcr.io/danie1le/dropoff-merchant:local ghcr.io/danie1le/dropoff-order:local             ghcr.io/danie1le/dropoff-dispatch:local ghcr.io/danie1le/dropoff-simulator:local
+          docker save -o images.tar $(docker compose --profile demo config --images | grep '^ghcr.io/danie1le/dropoff-')
 
       - name: Upload the images
         if: github.event_name == 'push'
@@ -107,7 +109,7 @@ jobs:
       - name: Load the images
         run: docker load -i images.tar
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -115,3 +117,36 @@ jobs:
 
       - name: Push the images
         run: ops/docker/push-images.sh
+
+      # Keeps the newest 5 sha-* versions of each package. main, latest and the x.y.z release tags are never deleted.
+      - name: Prune old sha-* versions (merchant)
+        uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55 # v5.0.0
+        with:
+          package-name: dropoff-merchant
+          package-type: container
+          min-versions-to-keep: 5
+          ignore-versions: '^(main|latest|\d+\.\d+\.\d+)$'
+
+      - name: Prune old sha-* versions (order)
+        uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55 # v5.0.0
+        with:
+          package-name: dropoff-order
+          package-type: container
+          min-versions-to-keep: 5
+          ignore-versions: '^(main|latest|\d+\.\d+\.\d+)$'
+
+      - name: Prune old sha-* versions (dispatch)
+        uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55 # v5.0.0
+        with:
+          package-name: dropoff-dispatch
+          package-type: container
+          min-versions-to-keep: 5
+          ignore-versions: '^(main|latest|\d+\.\d+\.\d+)$'
+
+      - name: Prune old sha-* versions (simulator)
+        uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55 # v5.0.0
+        with:
+          package-name: dropoff-simulator
+          package-type: container
+          min-versions-to-keep: 5
+          ignore-versions: '^(main|latest|\d+\.\d+\.\d+)$'
