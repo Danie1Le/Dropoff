@@ -1,9 +1,17 @@
 package io.github.danie1le.dropoff.dispatch.internal;
 
+import io.github.danie1le.dropoff.dispatch.internal.CandidateSelection.NearbyCourier;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.geo.Distance;
+import org.springframework.data.geo.GeoResults;
+import org.springframework.data.geo.Metrics;
 import org.springframework.data.geo.Point;
+import org.springframework.data.redis.connection.RedisGeoCommands.GeoLocation;
+import org.springframework.data.redis.connection.RedisGeoCommands.GeoSearchCommandArgs;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.domain.geo.GeoReference;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -40,6 +48,29 @@ class CourierGeoIndex {
                 "GEOADD",
                 courierId,
                 () -> redis.opsForGeo().add(KEY, new Point(position.lng(), position.lat()), Long.toString(courierId)));
+    }
+
+    /**
+     * {@code GEOSEARCH} for members within {@code radius} of {@code center}, nearest first. A hint only: a courier found
+     * here may no longer be AVAILABLE in Postgres.
+     */
+    List<NearbyCourier> nearest(Position center, Distance radius) {
+        GeoResults<GeoLocation<String>> results = redis.opsForGeo()
+                .search(
+                        KEY,
+                        GeoReference.fromCoordinate(center.lng(), center.lat()),
+                        radius,
+                        GeoSearchCommandArgs.newGeoSearchArgs()
+                                .includeDistance()
+                                .sortAscending());
+        if (results == null) {
+            return List.of();
+        }
+        return results.getContent().stream()
+                .map(result -> new NearbyCourier(
+                        Long.parseLong(result.getContent().getName()),
+                        result.getDistance().in(Metrics.KILOMETERS).getValue()))
+                .toList();
     }
 
     /** {@code ZREM} after commit: the courier is no longer AVAILABLE. */
