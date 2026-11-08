@@ -598,7 +598,7 @@ const MILESTONES = [
   { id: 'M6', name: 'Ops', gh: 7, needs: [34, 36], goal: 'Containers, published images and dashboards.', items: [
     { t: 'Actuator + Micrometer + Prometheus v3.13.5 scraping /actuator/prometheus every 15 s', done: true },
     { t: 'Custom dropoff_* metrics: orders placed/cancelled/delivered, dispatch duration, offer outcomes, waiting and in-preparation gauges with oldest age (no automatic action on slow preparation), couriers by status; gauges from one SQL query cached 15 s', done: true },
-    { t: 'Grafana 13.3.0 provisioned as code: datasource, dashboard JSON (9 panels), 3 alert rules (oldest waiting > 15 min, any DLT message in 5 min, p95 > 500 ms for 5 min), shown in the Grafana UI only' },
+    { t: 'Grafana 13.3.0 provisioned as code: datasource, dashboard JSON (9 panels), 3 alert rules (oldest waiting > 15 min, any DLT message in 5 min, p95 > 500 ms for 5 min), shown in the Grafana UI only', done: true },
     { t: 'Dockerfile per service: layered jar on eclipse-temurin:21-jre-alpine, non-root, < 300 MB; simulator Dockerfile; Compose profile demo' },
     { t: 'dropoff_dlt_messages_total{topic} from each dead-letter recoverer', done: true },
     { t: 'CI runs ops/smoke/full-flow.sh against Compose' },

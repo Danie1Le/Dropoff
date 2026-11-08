@@ -1,0 +1,91 @@
+# Alert rules (M6-2, decision #34). There is no contact point: email or SMS would cost money, so a firing rule
+# shows in the Grafana UI only (Alerting > Alert rules). Each rule runs one instant PromQL query (A), reduces it
+# to a number (B) and compares it with a threshold (C).
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: dropoff
+    folder: Dropoff
+    interval: 1m
+    rules:
+      - uid: dropoff-order-waiting-too-long
+        title: Order waiting for a courier over 15 min
+        condition: C
+        for: 1m
+        noDataState: OK
+        execErrState: Error
+        annotations:
+          summary: The oldest order waiting for a courier is older than 15 minutes (decision #13).
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: max(dropoff_oldest_waiting_order_age_seconds)
+              instant: true
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, expression: A, reducer: last, settings: { mode: dropNN } }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [900] }
+      - uid: dropoff-dead-letter-message
+        title: Dead-letter message in the last 5 min
+        condition: C
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        annotations:
+          summary: A Kafka event went to a dead-letter topic. Inspect it, then replay with ops/kafka/replay-dlt.sh.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: sum(increase(dropoff_dlt_messages_total[5m]))
+              instant: true
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, expression: A, reducer: last, settings: { mode: dropNN } }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+      - uid: dropoff-p95-latency-high
+        title: p95 request latency over 500 ms
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        annotations:
+          summary: p95 of http_server_requests_seconds (all services, actuator excluded) has been above 500 ms for 5 minutes.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{uri!~"/actuator.*"}[5m])))
+              instant: true
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, expression: A, reducer: last, settings: { mode: dropNN } }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0.5] }
