@@ -584,10 +584,10 @@ const MILESTONES = [
     { t: 'Simulator watch <orderId>: prints live updates from /topic/orders/{id}', done: true },
   ]},
   { id: 'M5', name: 'Kafka & service split', gh: 6, needs: [15, 16, 31, 32], goal: 'Three services talking through durable events.', items: [
-    { t: 'M5-1 Kafka inside the app: apache/kafka:4.4.0 (KRaft); NewTopic beans (auto-create off): order-events, courier-events, courier-locations (key orderId; 7 d / 7 d / 1 h), compacted merchants and menu-items; 3 partitions, RF 1' },
-    { t: 'M5-1 spring-modulith-events-kafka @Externalized (ADR-0006); CourierLocationUpdated via KafkaTemplate; JSON with logical type names' },
-    { t: 'M5-1 cross-module listeners become Kafka consumers (groups order-service, dispatch-service); processed_events per consumer group' },
-    { t: 'M5-1 consumer errors: 3 redelivery attempts (1 s, 2 s, 4 s), then <topic>.DLT (14 d); ops/kafka/replay-dlt.sh' },
+    { t: 'M5-1 Kafka inside the app: apache/kafka:4.4.0 (KRaft); NewTopic beans (auto-create off): order-events, courier-events, courier-locations (key orderId; 7 d / 7 d / 1 h), compacted merchants and menu-items; 3 partitions, RF 1', done: true },
+    { t: 'M5-1 spring-modulith-events-kafka relays the registry to Kafka, routes set in an EventExternalizationConfiguration bean (ADR-0006); CourierLocationUpdated via KafkaTemplate; JSON with logical type names', done: true },
+    { t: 'M5-1 cross-module listeners become Kafka consumers (groups order-service, dispatch-service); processed_events per consumer group', done: true },
+    { t: 'M5-1 consumer errors: 3 redelivery attempts (1 s, 2 s, 4 s), then <topic>.DLT (14 d); ops/kafka/replay-dlt.sh', done: true },
     { t: 'M5-2 the contracts package (from M3-3, ADR-0008) becomes a Gradle module (event records only, no Spring, additive changes only) and libs/web-common' },
     { t: 'M5-3 order module validates from merchant_copies / menu_item_copies fed by MerchantChanged / MenuItemChanged; rebuild by replay; local databases reset and reseeded' },
     { t: 'M5-4 extract dispatch-service (8083, dispatch_db + Redis); Postgres init script for three databases; simulator base URLs; simulator smoke mode + ops/smoke/full-flow.sh; dispatch↔order FKs dropped' },
@@ -717,7 +717,7 @@ const ADRS = [
   ['0003', 'Foreign keys across modules until the split', 'Postgres rejects orphaned rows while it is one app. Cross-module FKs are dropped deliberately at the split.', 'docs/adr/0003-foreign-keys-across-modules-until-split.md'],
   ['0004', 'Price snapshot on each order line', 'order_lines.price_cents copies the price at order time so receipts stay correct. A price-history table was rejected.', 'docs/adr/0004-price-snapshot-on-order-lines.md'],
   ['0005', 'Path-scoped command endpoints for order status', 'One POST command per status step, scoped to the caller id in the path; wrong caller 404, wrong status 409, repeat 200 no-op; order_events.actor records who. An actor field in the body was rejected: anyone can fill it, and one endpoint would carry every rule.', 'docs/adr/0005-path-scoped-order-commands.md'],
-  ['0006', 'Spring Modulith event publication registry is the outbox', 'event_publication stores each event in the same transaction and is relayed to Kafka at M5 via @Externalized. A hand-written outbox table and relay job was rejected. order_events stays a separate audit history.', 'docs/adr/0006-modulith-registry-as-outbox.md'],
+  ['0006', 'Spring Modulith event publication registry is the outbox', 'event_publication stores each event in the same transaction and is relayed to Kafka at M5, routed by an EventExternalizationConfiguration bean. A hand-written outbox table and relay job was rejected. order_events stays a separate audit history.', 'docs/adr/0006-modulith-registry-as-outbox.md'],
   ['0007', 'Service split: a database per service and local merchant and menu copies', 'One Postgres container, one database per service. order-service prices orders from merchant and menu-item copies fed by two compacted topics. Synchronous REST per order was rejected: ordering would stop when merchant-service is down.', 'docs/adr/0007-service-split-local-menu-copy.md'],
   ['0008', 'Cross-module events live in a shared contracts package from M3', 'Event records and Actor move to io.github.danie1le.dropoff.contracts (records and enums only, no Spring, no module dependencies), so order and dispatch never depend on each other and ModularityTest finds no cycle. M5-2 only turns the package into a Gradle module. Keeping events in their publisher with a Modulith exception, or putting them in common, was rejected.', 'docs/adr/0008-shared-contracts-package.md'],
 ];
