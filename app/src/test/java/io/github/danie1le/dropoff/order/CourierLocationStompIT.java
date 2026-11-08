@@ -112,6 +112,16 @@ class CourierLocationStompIT {
      * tables as the accept and pickup leave them.
      */
     private Delivery delivery(String dispatchStatus) {
+        long courierId = jdbc.sql("INSERT INTO couriers (name, status, last_lat, last_lng)"
+                        + " VALUES ('Carla', 'BUSY', 30.2672, -97.7431) RETURNING id")
+                .query(Long.class)
+                .single();
+        courierIds.add(courierId);
+        return delivery(courierId, dispatchStatus);
+    }
+
+    /** Another order for an existing courier, so one courier can hold several (ticket #85 take-back). */
+    private Delivery delivery(long courierId, String dispatchStatus) {
         long customerId = OrderFixtures.customer(jdbc);
         customerIds.add(customerId);
         long merchantId = OrderFixtures.merchant(jdbc, true);
@@ -119,11 +129,6 @@ class CourierLocationStompIT {
         long orderId = OrderFixtures.order(
                 jdbc, customerId, merchantId, "READY", 399, Instant.now().toString());
         orderIds.add(orderId);
-        long courierId = jdbc.sql("INSERT INTO couriers (name, status, last_lat, last_lng)"
-                        + " VALUES ('Carla', 'BUSY', 30.2672, -97.7431) RETURNING id")
-                .query(Long.class)
-                .single();
-        courierIds.add(courierId);
         OrderFixtures.acceptedOffer(jdbc, orderId, courierId);
         jdbc.sql("UPDATE dispatch_orders SET status = ?, courier_id = ? WHERE order_id = ?")
                 .params(dispatchStatus, courierId, orderId)
@@ -217,13 +222,29 @@ class CourierLocationStompIT {
     }
 
     @Test
-    void aDeliveredOrderGetsNoLocationsAndKeepsNoWindowOpen() throws Exception {
+    void aDeliveredOrderGetsNoLocations() throws Exception {
         Delivery d = delivery("DONE");
         BlockingQueue<JsonNode> messages = subscribe(d.orderId());
 
         sendLocation(d.courierId(), 30.2680, -97.7440);
 
         assertThat(messages.poll(QUIET.toMillis(), TimeUnit.MILLISECONDS)).isNull();
-        assertThat(redis.hasKey(throttleKey(d.courierId()))).isFalse();
+    }
+
+    /**
+     * A courier given a late order back (ticket #85) can hold a PICKED_UP and an ASSIGNED order at once. The update is
+     * still saved, and both customers get it in the same throttle window.
+     */
+    @Test
+    void aCourierWithTwoActiveOrdersPushesToBoth() throws Exception {
+        Delivery first = delivery("PICKED_UP");
+        Delivery second = delivery(first.courierId(), "ASSIGNED");
+        BlockingQueue<JsonNode> firstMessages = subscribe(first.orderId());
+        BlockingQueue<JsonNode> secondMessages = subscribe(second.orderId());
+
+        sendLocation(first.courierId(), 30.2680, -97.7440);
+
+        assertLocation(next(firstMessages), first, 30.2680, -97.7440);
+        assertLocation(next(secondMessages), second, 30.2680, -97.7440);
     }
 }

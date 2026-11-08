@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 /**
  * Pushes the courier's location to the order's live topic (M4-2, tickets #12, #15). A plain {@code @EventListener}, not
  * {@code @ApplicationModuleListener}: the event skips the registry, since losing one is fine. Dispatch already limits
- * it to one per courier every 5 s, so every event received is sent.
+ * it to one per courier and order every 5 s, so every event received is sent.
  */
 @Component
 class CourierLocationListener {
