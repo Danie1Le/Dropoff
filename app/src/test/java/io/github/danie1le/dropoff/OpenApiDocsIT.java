@@ -43,7 +43,10 @@ class OpenApiDocsIT {
             Map.entry("/api/v1/couriers", List.of("post")),
             Map.entry("/api/v1/couriers/{id}", List.of("get")),
             Map.entry("/api/v1/couriers/{id}/status", List.of("patch")),
-            Map.entry("/api/v1/couriers/{id}/location", List.of("put")));
+            Map.entry("/api/v1/couriers/{id}/location", List.of("put")),
+            Map.entry("/api/v1/couriers/{courierId}/offers/current", List.of("get")),
+            Map.entry("/api/v1/couriers/{courierId}/offers/{offerId}/accept", List.of("post")),
+            Map.entry("/api/v1/couriers/{courierId}/offers/{offerId}/decline", List.of("post")));
 
     private final MockMvcTester mvc;
 
@@ -126,6 +129,25 @@ class OpenApiDocsIT {
                 .extractingPath("$.paths['/api/v1/couriers/{id}/status'].patch.responses.409.description")
                 .asString()
                 .contains("COURIER_LOCATION_UNKNOWN", "COURIER_BUSY");
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.paths['/api/v1/couriers/{courierId}/offers/current'].get.responses")
+                .asMap()
+                .containsKeys("200", "204", "404");
+        for (String command : List.of("accept", "decline")) {
+            String responses =
+                    "$.paths['/api/v1/couriers/{courierId}/offers/{offerId}/%s'].post.responses".formatted(command);
+            assertThat(result)
+                    .bodyJson()
+                    .extractingPath(responses + ".404.description")
+                    .asString()
+                    .contains("COURIER_NOT_FOUND", "OFFER_NOT_FOUND");
+            assertThat(result)
+                    .bodyJson()
+                    .extractingPath(responses + ".409.description")
+                    .asString()
+                    .contains("OFFER_CLOSED");
+        }
         assertThat(result)
                 .bodyJson()
                 .extractingPath("$.paths['/api/v1/orders'].post.responses.422.description")

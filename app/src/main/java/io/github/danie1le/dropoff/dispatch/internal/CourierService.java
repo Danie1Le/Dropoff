@@ -4,6 +4,7 @@ import io.github.danie1le.dropoff.common.DbClock;
 import io.github.danie1le.dropoff.common.DomainException;
 import java.time.Clock;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Couriers, their status and their location (tickets #12, #42). Keeps the Redis geo set in step with Postgres. */
@@ -49,6 +50,22 @@ class CourierService {
         courier.moveTo(position, DbClock.now(clock));
         syncGeoIndex(courier);
         return courier;
+    }
+
+    /**
+     * The courier, locked until the caller's transaction ends. Offer commands lock the courier before the offer, the
+     * same order as dispatch's claim, so the two never deadlock.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    Courier lock(long id) {
+        return lockedOrThrow(id);
+    }
+
+    /** Frees a courier locked with {@link #lock} after they decline an offer, and puts them back in the geo set. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    void release(Courier courier) {
+        courier.release(DbClock.now(clock));
+        syncGeoIndex(courier);
     }
 
     private void syncGeoIndex(Courier courier) {

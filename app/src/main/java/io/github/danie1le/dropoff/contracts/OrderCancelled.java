@@ -1,4 +1,4 @@
-package io.github.danie1le.dropoff.order;
+package io.github.danie1le.dropoff.contracts;
 
 import java.time.Instant;
 import java.util.UUID;

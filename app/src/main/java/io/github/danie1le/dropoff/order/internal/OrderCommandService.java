@@ -2,11 +2,11 @@ package io.github.danie1le.dropoff.order.internal;
 
 import io.github.danie1le.dropoff.common.DbClock;
 import io.github.danie1le.dropoff.common.DomainException;
+import io.github.danie1le.dropoff.contracts.Actor;
+import io.github.danie1le.dropoff.contracts.OrderCancelled;
+import io.github.danie1le.dropoff.contracts.OrderReady;
 import io.github.danie1le.dropoff.merchant.MerchantDirectory;
 import io.github.danie1le.dropoff.merchant.MerchantDirectory.MerchantView;
-import io.github.danie1le.dropoff.order.Actor;
-import io.github.danie1le.dropoff.order.OrderCancelled;
-import io.github.danie1le.dropoff.order.OrderReady;
 import io.github.danie1le.dropoff.order.internal.OrderRequests.OrderResponse;
 import jakarta.persistence.EntityManager;
 import java.sql.Timestamp;
@@ -22,7 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Applies path-scoped status commands (ADR-0005). The status write is a conditional {@code UPDATE …
+ * Applies path-scoped status commands (ADR-0005). The status write is a conditional {@code UPDATE â€¦
  * WHERE status IN (sources)}, so of two racing commands only one moves the order; the loser re-reads and becomes a
  * no-op or a 409.
  */

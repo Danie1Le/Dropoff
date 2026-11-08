@@ -3,6 +3,9 @@ package io.github.danie1le.dropoff.order;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.danie1le.dropoff.TestcontainersConfiguration;
+import io.github.danie1le.dropoff.contracts.Actor;
+import io.github.danie1le.dropoff.contracts.OrderCancelled;
+import io.github.danie1le.dropoff.contracts.OrderReady;
 import io.github.danie1le.dropoff.order.OrderCommandApiIT.Fixture;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
