@@ -312,6 +312,64 @@ class DeliveryIT {
         assertThat(courierStatus(o.courierId())).isEqualTo("AVAILABLE");
     }
 
+    @Test
+    void aDeliveryBeforeTheLatePickupClosesTheOrderAndFreesTheNextCourier() {
+        long next = nextCourier();
+        Offered o = pickedUpThenOfflineBeforeDispatchHears(next);
+        long nextOffer = offerOf(o.orderId(), next);
+
+        delivery.delivered(o.orderId(), o.courierId());
+        delivery.pickedUp(o.orderId(), o.courierId());
+
+        assertThat(dispatchStatus(o.orderId())).isEqualTo("DONE");
+        assertThat(dispatchCourier(o.orderId())).isEqualTo(Long.toString(o.courierId()));
+        assertThat(value("SELECT status FROM offers WHERE id = ?", nextOffer)).isEqualTo("WITHDRAWN");
+        assertThat(openOffers(o.orderId())).isZero();
+        assertThat(courierStatus(next)).isEqualTo("AVAILABLE");
+        // They went OFFLINE themselves; delivering does not put them back to work.
+        assertThat(courierStatus(o.courierId())).isEqualTo("OFFLINE");
+    }
+
+    @Test
+    void aLatePickupWithdrawsTheCouriersOfferOfAnotherOrder() {
+        long next = nextCourier();
+        Offered o = pickedUpThenOfflineBeforeDispatchHears(next);
+        couriers.changeStatus(o.courierId(), CourierStatus.AVAILABLE);
+        Offered other = offeredTo(o.courierId());
+
+        delivery.pickedUp(o.orderId(), o.courierId());
+
+        assertThat(value("SELECT status FROM offers WHERE id = ?", other.offerId()))
+                .isEqualTo("WITHDRAWN");
+        assertThat(dispatchStatus(other.orderId())).isEqualTo("WAITING");
+        assertThat(courierStatus(o.courierId())).isEqualTo("BUSY");
+
+        delivery.delivered(o.orderId(), o.courierId());
+
+        assertThat(courierStatus(o.courierId())).isEqualTo("AVAILABLE");
+    }
+
+    @Test
+    void deliveringOneOrderKeepsACourierWithAnotherOpenOrderBusy() {
+        long next = nextCourier();
+        Offered o = pickedUpThenOfflineBeforeDispatchHears(next);
+        couriers.changeStatus(o.courierId(), CourierStatus.AVAILABLE);
+        Offered other = offeredTo(o.courierId());
+        assertThat(post("/api/v1/couriers/{c}/offers/{o}/accept", o.courierId(), other.offerId()))
+                .hasStatusOk();
+        delivery.pickedUp(o.orderId(), o.courierId());
+
+        delivery.delivered(o.orderId(), o.courierId());
+
+        assertThat(dispatchStatus(o.orderId())).isEqualTo("DONE");
+        assertThat(dispatchStatus(other.orderId())).isEqualTo("ASSIGNED");
+        assertThat(courierStatus(o.courierId())).isEqualTo("BUSY");
+
+        delivery.delivered(other.orderId(), o.courierId());
+
+        assertThat(courierStatus(o.courierId())).isEqualTo("AVAILABLE");
+    }
+
     /** A new READY order offered to {@code courierId}, who must be AVAILABLE and at the shop. */
     private Offered offeredTo(long courierId) {
         long customerId = OrderFixtures.customer(jdbc);
