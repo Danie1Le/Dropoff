@@ -10,11 +10,13 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
 /**
- * The order module's copies of merchants and menu items (M5-3, ADR-0007), kept current from merchant's events. The order
- * module reads merchants and items only from here, never from the merchant module.
+ * The order module's copies of merchants and menu items (M5-3, ADR-0007), kept current from merchant's events. The
+ * order module reads merchants and items only from here, never from the merchant module.
  *
  * <p>Each event carries the whole entity, so a write is an upsert: insert the row, or overwrite it if the id is already
- * there. Applying an event twice leaves the same row, so the consumer needs no dedupe.
+ * there. Applying an event twice leaves the same row, so the consumer needs no dedupe. Events can arrive out of order,
+ * so the overwrite happens only when the event's version is higher than the copy's: an older event never undoes a
+ * newer one.
  */
 @Repository
 class MerchantCopies {
@@ -30,19 +32,35 @@ class MerchantCopies {
     }
 
     void save(MerchantChanged event) {
-        jdbc.sql("INSERT INTO merchant_copies (merchant_id, name, address, open, lat, lng) VALUES (?, ?, ?, ?, ?, ?)"
-                        + " ON CONFLICT (merchant_id) DO UPDATE SET name = EXCLUDED.name, address = EXCLUDED.address,"
-                        + " open = EXCLUDED.open, lat = EXCLUDED.lat, lng = EXCLUDED.lng")
-                .params(event.merchantId(), event.name(), event.address(), event.open(), event.lat(), event.lng())
+        jdbc.sql("INSERT INTO merchant_copies (merchant_id, name, address, open, lat, lng, version)"
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (merchant_id) DO UPDATE SET"
+                        + " name = EXCLUDED.name, address = EXCLUDED.address, open = EXCLUDED.open,"
+                        + " lat = EXCLUDED.lat, lng = EXCLUDED.lng, version = EXCLUDED.version"
+                        + " WHERE merchant_copies.version < EXCLUDED.version")
+                .params(
+                        event.merchantId(),
+                        event.name(),
+                        event.address(),
+                        event.open(),
+                        event.lat(),
+                        event.lng(),
+                        event.version())
                 .update();
     }
 
     void save(MenuItemChanged event) {
-        jdbc.sql("INSERT INTO menu_item_copies (menu_item_id, merchant_id, name, price_cents, available)"
-                        + " VALUES (?, ?, ?, ?, ?) ON CONFLICT (menu_item_id) DO UPDATE SET"
+        jdbc.sql("INSERT INTO menu_item_copies (menu_item_id, merchant_id, name, price_cents, available, version)"
+                        + " VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (menu_item_id) DO UPDATE SET"
                         + " merchant_id = EXCLUDED.merchant_id, name = EXCLUDED.name,"
-                        + " price_cents = EXCLUDED.price_cents, available = EXCLUDED.available")
-                .params(event.menuItemId(), event.merchantId(), event.name(), event.priceCents(), event.available())
+                        + " price_cents = EXCLUDED.price_cents, available = EXCLUDED.available,"
+                        + " version = EXCLUDED.version WHERE menu_item_copies.version < EXCLUDED.version")
+                .params(
+                        event.menuItemId(),
+                        event.merchantId(),
+                        event.name(),
+                        event.priceCents(),
+                        event.available(),
+                        event.version())
                 .update();
     }
 

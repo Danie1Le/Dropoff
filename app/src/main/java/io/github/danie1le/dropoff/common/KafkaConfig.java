@@ -59,8 +59,8 @@ class KafkaConfig {
 
     /**
      * Every event that crosses Kafka. Its simple name is its logical type name. Add each new contract event here, and
-     * route it in {@link #eventExternalization} if the registry sends it. A type missing from this list has no logical name, so its records fail conversion and go
-     * straight to the DLT.
+     * route it in {@link #eventExternalization} if the registry sends it. A type missing from this list has no logical
+     * name, so its records fail conversion and go straight to the DLT.
      */
     static final List<Class<? extends Record>> EVENTS = List.of(
             OrderPlaced.class,
@@ -112,9 +112,9 @@ class KafkaConfig {
     /**
      * Which events the registry sends to Kafka, and where. Order and courier events are keyed by orderId; merchant and
      * menu item changes by their own id, since a compacted topic keeps only the latest record per key (ticket #16).
-     * {@code CourierLocationUpdated} is not among them: dispatch
-     * sends it straight with {@code KafkaTemplate} (ticket #15). The routes live here, not in {@code @Externalized} on
-     * the records, because the contracts package carries no Spring (ADR-0008).
+     * {@code CourierLocationUpdated} is not among them: dispatch sends it straight with {@code KafkaTemplate} (ticket
+     * #15). The routes live here, not in {@code @Externalized} on the records, because the contracts package carries no
+     * Spring (ADR-0008).
      */
     @Bean
     EventExternalizationConfiguration eventExternalization() {

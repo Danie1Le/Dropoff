@@ -30,6 +30,10 @@ class MenuItem {
     @Column(name = "is_available", nullable = false)
     private boolean available;
 
+    /** 1 on create, plus 1 per {@link #changed()}. Not JPA's {@code @Version}: the update path locks the row. */
+    @Column(nullable = false)
+    private long version;
+
     /** For JPA only. */
     @SuppressWarnings("NullAway.Init")
     protected MenuItem() {}
@@ -39,6 +43,7 @@ class MenuItem {
         this.name = name;
         this.priceCents = priceCents;
         this.available = true;
+        this.version = 1;
     }
 
     long id() {
@@ -71,5 +76,14 @@ class MenuItem {
 
     void changeAvailability(boolean available) {
         this.available = available;
+    }
+
+    long version() {
+        return version;
+    }
+
+    /** Marks one change. Call it once per update, with the row locked, so versions follow commit order. */
+    void changed() {
+        version++;
     }
 }

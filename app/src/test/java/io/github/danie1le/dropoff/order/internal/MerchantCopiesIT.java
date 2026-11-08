@@ -11,7 +11,6 @@ import io.github.danie1le.dropoff.order.internal.MerchantCopies.MenuItemCopy;
 import io.github.danie1le.dropoff.order.internal.MerchantCopies.MerchantCopy;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -30,9 +29,9 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * The order module fills its merchant and menu item copies from the compacted topics, and rebuilds them from offset 0
- * when they are empty (M5-3, ADR-0007). Events are sent straight to the topics, as merchant-service will send them after
- * the split, with ids no other test uses: every test context shares one broker, and a context that rebuilds its copies
- * reads these records too.
+ * when they are empty (M5-3, ADR-0007). Events are sent straight to the topics, as merchant-service will send them
+ * after the split, with ids no other test uses: every test context shares one broker, and a context that rebuilds its
+ * copies reads these records too.
  */
 @SpringBootTest
 @Import(TestcontainersConfiguration.class)
@@ -40,12 +39,13 @@ class MerchantCopiesIT {
 
     private static final Duration WAIT = Duration.ofSeconds(15);
 
+    /** The lowest id this class uses, far above any sequence value. */
+    private static final long MIN_ID = 1_000_000_000L;
+
     private final JdbcClient jdbc;
     private final MerchantCopies copies;
     private final JsonMapper json;
     private final KafkaListenerEndpointRegistry listeners;
-    private final List<Long> merchantIds = new ArrayList<>();
-    private final List<Long> menuItemIds = new ArrayList<>();
 
     MerchantCopiesIT(
             @Autowired JdbcClient jdbc,
@@ -58,36 +58,24 @@ class MerchantCopiesIT {
         this.listeners = listeners;
     }
 
+    /**
+     * Deletes every copy in this class's id range, not only this test's: a rebuild replays the records every test of
+     * this class has sent.
+     */
     @AfterEach
     void cleanUp() {
         KafkaTestSupport.awaitSettled(jdbc);
-        if (!merchantIds.isEmpty()) {
-            jdbc.sql("DELETE FROM merchant_copies WHERE merchant_id IN (:ids)")
-                    .param("ids", merchantIds)
-                    .update();
-        }
-        if (!menuItemIds.isEmpty()) {
-            jdbc.sql("DELETE FROM menu_item_copies WHERE menu_item_id IN (:ids)")
-                    .param("ids", menuItemIds)
-                    .update();
-        }
+        jdbc.sql("DELETE FROM merchant_copies WHERE merchant_id >= ?")
+                .param(MIN_ID)
+                .update();
+        jdbc.sql("DELETE FROM menu_item_copies WHERE menu_item_id >= ?")
+                .param(MIN_ID)
+                .update();
     }
 
     /** An id far above any sequence value, so it collides with no fixture row in any test context. */
     private static long unusedId() {
-        return ThreadLocalRandom.current().nextLong(1_000_000_000L, 1_000_000_000_000L);
-    }
-
-    private long newMerchantId() {
-        long id = unusedId();
-        merchantIds.add(id);
-        return id;
-    }
-
-    private long newMenuItemId() {
-        long id = unusedId();
-        menuItemIds.add(id);
-        return id;
+        return ThreadLocalRandom.current().nextLong(MIN_ID, 1_000_000_000_000L);
     }
 
     private void send(MerchantChanged event) {
@@ -106,13 +94,14 @@ class MerchantCopiesIT {
                 json.writeValueAsBytes(event));
     }
 
-    private static MerchantChanged merchant(long id, String name, boolean open) {
+    private static MerchantChanged merchant(long id, String name, boolean open, long version) {
         return new MerchantChanged(
-                UUID.randomUUID(), id, name, "100 Congress Ave", open, 30.2672, -97.7431, Instant.now());
+                UUID.randomUUID(), id, name, "100 Congress Ave", open, 30.2672, -97.7431, version, Instant.now());
     }
 
-    private static MenuItemChanged item(long id, long merchantId, long priceCents, boolean available) {
-        return new MenuItemChanged(UUID.randomUUID(), id, merchantId, "Taco", priceCents, available, Instant.now());
+    private static MenuItemChanged item(long id, long merchantId, long priceCents, boolean available, long version) {
+        return new MenuItemChanged(
+                UUID.randomUUID(), id, merchantId, "Taco", priceCents, available, version, Instant.now());
     }
 
     private MerchantCopy awaitMerchant(long id, boolean open) {
@@ -136,34 +125,56 @@ class MerchantCopiesIT {
 
     @Test
     void copiesMerchantsAndMenuItemsAndOverwritesThemOnEachChange() {
-        long merchantId = newMerchantId();
-        long itemId = newMenuItemId();
+        long merchantId = unusedId();
+        long itemId = unusedId();
 
-        send(merchant(merchantId, "Taco Shop", true));
-        send(item(itemId, merchantId, 399, true));
+        send(merchant(merchantId, "Taco Shop", true, 1));
+        send(item(itemId, merchantId, 399, true, 1));
 
         assertThat(awaitMerchant(merchantId, true))
                 .isEqualTo(new MerchantCopy(merchantId, "Taco Shop", "100 Congress Ave", true, 30.2672, -97.7431));
         assertThat(awaitItem(itemId, 399)).isEqualTo(new MenuItemCopy(itemId, merchantId, "Taco", 399, true));
 
-        send(merchant(merchantId, "Taco Truck", false));
-        send(item(itemId, merchantId, 450, false));
+        send(merchant(merchantId, "Taco Truck", false, 2));
+        send(item(itemId, merchantId, 450, false, 2));
 
         assertThat(awaitMerchant(merchantId, false).name()).isEqualTo("Taco Truck");
         assertThat(awaitItem(itemId, 450).available()).isFalse();
     }
 
     /**
+     * Records can arrive out of order (async externalization, a republish on restart, a DLT replay). An older version
+     * read after a newer one leaves the copy alone.
+     */
+    @Test
+    void keepsTheNewerVersionWhenAnOlderOneArrivesLater() {
+        long merchantId = unusedId();
+        long itemId = unusedId();
+        send(merchant(merchantId, "Taco Shop", false, 2));
+        send(item(itemId, merchantId, 450, false, 2));
+        awaitMerchant(merchantId, false);
+        awaitItem(itemId, 450);
+
+        send(merchant(merchantId, "Taco Shop", true, 1));
+        send(item(itemId, merchantId, 399, true, 1));
+        KafkaTestSupport.awaitSettled(jdbc);
+
+        assertThat(copies.findMerchant(merchantId).orElseThrow().open()).isFalse();
+        assertThat(copies.findMenuItems(List.of(itemId)))
+                .containsExactly(new MenuItemCopy(itemId, merchantId, "Taco", 450, false));
+    }
+
+    /**
      * The consumers have already read every record, so only a seek back to offset 0 can bring the deleted rows back. A
-     * merchant changed twice comes back as its latest state.
+     * merchant changed twice comes back as its highest version.
      */
     @Test
     void rebuildsEmptyCopiesFromOffsetZero() {
-        long merchantId = newMerchantId();
-        long itemId = newMenuItemId();
-        send(merchant(merchantId, "Taco Shop", true));
-        send(merchant(merchantId, "Taco Shop", false));
-        send(item(itemId, merchantId, 399, true));
+        long merchantId = unusedId();
+        long itemId = unusedId();
+        send(merchant(merchantId, "Taco Shop", true, 1));
+        send(merchant(merchantId, "Taco Shop", false, 2));
+        send(item(itemId, merchantId, 399, true, 1));
         awaitMerchant(merchantId, false);
         awaitItem(itemId, 399);
         KafkaTestSupport.awaitSettled(jdbc);

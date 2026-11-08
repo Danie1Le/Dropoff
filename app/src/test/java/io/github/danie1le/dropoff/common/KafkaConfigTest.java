@@ -40,7 +40,7 @@ class KafkaConfigTest {
     void routesMerchantChangesToTheMerchantsTopicKeyedByMerchantId() {
         EventExternalizationConfiguration routes = new KafkaConfig().eventExternalization();
         MerchantChanged event = new MerchantChanged(
-                UUID.randomUUID(), 7, "Taco Shop", "100 Congress Ave", true, 30.2, -97.7, Instant.EPOCH);
+                UUID.randomUUID(), 7, "Taco Shop", "100 Congress Ave", true, 30.2, -97.7, 1, Instant.EPOCH);
 
         assertThat(routes.supports(event)).isTrue();
         RoutingTarget target = routes.determineTarget(event);
@@ -51,7 +51,7 @@ class KafkaConfigTest {
     @Test
     void routesMenuItemChangesToTheMenuItemsTopicKeyedByMenuItemId() {
         EventExternalizationConfiguration routes = new KafkaConfig().eventExternalization();
-        MenuItemChanged event = new MenuItemChanged(UUID.randomUUID(), 42, 7, "Taco", 399, true, Instant.EPOCH);
+        MenuItemChanged event = new MenuItemChanged(UUID.randomUUID(), 42, 7, "Taco", 399, true, 1, Instant.EPOCH);
 
         assertThat(routes.supports(event)).isTrue();
         RoutingTarget target = routes.determineTarget(event);

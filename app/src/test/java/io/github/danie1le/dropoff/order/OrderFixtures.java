@@ -20,8 +20,8 @@ public final class OrderFixtures {
     }
 
     /**
-     * A merchant, plus the order module's copy of it, as the {@code MerchantChanged} consumer would write it (M5-3). The
-     * merchants row is still needed for the foreign key from {@code orders}.
+     * A merchant, plus the order module's copy of it, as the {@code MerchantChanged} consumer would write it (M5-3).
+     * The merchants row is still needed for the foreign key from {@code orders}.
      */
     public static long merchant(JdbcClient jdbc, boolean open) {
         long id = jdbc.sql("INSERT INTO merchants (name, address, lat, lng, is_open) VALUES ('Taco Shop', '100 Congress"

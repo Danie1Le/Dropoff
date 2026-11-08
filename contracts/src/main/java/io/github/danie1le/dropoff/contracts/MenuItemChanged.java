@@ -4,9 +4,12 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * A menu item was created or changed (docs/PLAN.md, "Shared contracts"; ADR-0007). Published by merchant on every create
- * and update with the item's full current state, to the compacted {@code menu-items} topic keyed by menuItemId, so the
- * latest record per item is its current state. The order module validates and prices orders from its copy.
+ * A menu item was created or changed (docs/PLAN.md, "Shared contracts"; ADR-0007). Published by merchant on every
+ * create and update with the item's full current state, to the compacted {@code menu-items} topic keyed by menuItemId.
+ * The order module validates and prices orders from its copy.
+ *
+ * <p>{@code version} starts at 1 on create and goes up by one on every change, in commit order. Records can arrive out
+ * of order, so a consumer keeps the state with the highest version, not the last one it read.
  */
 public record MenuItemChanged(
         UUID eventId,
@@ -15,4 +18,5 @@ public record MenuItemChanged(
         String name,
         long priceCents,
         boolean available,
+        long version,
         Instant occurredAt) {}

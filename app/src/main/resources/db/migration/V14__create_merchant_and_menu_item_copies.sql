@@ -1,7 +1,8 @@
 -- The order module's own copies of merchants and menu items (M5-3, tickets #16, #42, ADR-0007). It validates and
 -- prices orders from these, never from the merchant module's tables, so ordering keeps working once merchant becomes
 -- its own service and while that service is down. Filled from the compacted merchants and menu-items topics with
--- upserts (the latest event per id wins); rebuilt by reading both topics from offset 0 when empty.
+-- upserts (the event with the highest version per id wins, V15); rebuilt by reading both topics from offset 0 when
+-- empty.
 -- No foreign keys: a copy may arrive before or without the row it copies, and the source tables move to another
 -- database at the split. No CHECKs either: merchant already validated every value it publishes.
 CREATE TABLE merchant_copies (

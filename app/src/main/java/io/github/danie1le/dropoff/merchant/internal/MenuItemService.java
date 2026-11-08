@@ -54,7 +54,7 @@ class MenuItemService {
     /** Changes only the fields the request gives. Items are never deleted (ticket #61). */
     @Transactional
     MenuItem update(long id, UpdateMenuItem request) {
-        MenuItem item = get(id);
+        MenuItem item = items.findForUpdateById(id).orElseThrow(() -> notFound(id));
         String name = request.trimmedName();
         if (name != null) {
             item.rename(name);
@@ -67,6 +67,7 @@ class MenuItemService {
         if (available != null) {
             item.changeAvailability(available);
         }
+        item.changed();
         return published(item);
     }
 
@@ -79,6 +80,7 @@ class MenuItemService {
                 item.name(),
                 item.priceCents(),
                 item.isAvailable(),
+                item.version(),
                 DbClock.now(clock)));
         return item;
     }

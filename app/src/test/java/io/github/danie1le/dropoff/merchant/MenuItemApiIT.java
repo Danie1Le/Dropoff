@@ -310,6 +310,7 @@ class MenuItemApiIT {
             assertThat(e.name()).isEqualTo("Horchata");
             assertThat(e.priceCents()).isEqualTo(250);
             assertThat(e.available()).isTrue();
+            assertThat(e.version()).isEqualTo(1);
             assertThat(e.eventId()).isNotNull();
             assertThat(e.occurredAt()).isNotNull();
         });
@@ -331,6 +332,7 @@ class MenuItemApiIT {
                     assertThat(e.available()).isFalse();
                     assertThat(e.name()).isEqualTo("Horchata");
                     assertThat(e.priceCents()).isEqualTo(250);
+                    assertThat(e.version()).isEqualTo(2);
                 });
     }
 

@@ -83,6 +83,7 @@ class MerchantApiIT {
             assertThat(e.open()).isTrue();
             assertThat(e.lat()).isEqualTo(30.2672);
             assertThat(e.lng()).isEqualTo(-97.7431);
+            assertThat(e.version()).isEqualTo(1);
             assertThat(e.eventId()).isNotNull();
             assertThat(e.occurredAt()).isNotNull();
         });
@@ -102,6 +103,7 @@ class MerchantApiIT {
                     assertThat(e.open()).isFalse();
                     assertThat(e.name()).isEqualTo("Taco Shop");
                     assertThat(e.address()).isEqualTo("100 Congress Ave");
+                    assertThat(e.version()).isEqualTo(2);
                 });
     }
 

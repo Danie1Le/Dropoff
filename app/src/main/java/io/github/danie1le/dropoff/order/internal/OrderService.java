@@ -67,8 +67,8 @@ class OrderService {
      * idempotency key (M2-4). A replay skips every other check, so it succeeds even if, say, the merchant has closed
      * since. Otherwise checks run in this order: customer, merchant, merchant open, then each menu item by ascending
      * id (unknown, wrong merchant, unavailable). Merchants and items are read from the order module's own copies
-     * (M5-3, ADR-0007), so an id merchant has not published yet is unknown here. Repeated menu items merge into one line, since an order has one line
-     * per menu item.
+     * (M5-3, ADR-0007), so an id merchant has not published yet is unknown here. Repeated menu items merge into one
+     * line, since an order has one line per menu item.
      *
      * <p>A concurrent request with the same key waits on the unique index and then fails with
      * {@link org.springframework.dao.DataIntegrityViolationException}; the caller then calls {@link #replay}.

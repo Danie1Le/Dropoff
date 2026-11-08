@@ -57,8 +57,8 @@ These apply across many PRs, and #42 is the source for all of them.
 | `OrderPickedUp` | orderId, courierId | order | M3-5 |
 | `OrderDelivered` | orderId, courierId | order | M3-5 |
 | `CourierLocationUpdated` | courierId, orderId, lat, lng, at | dispatch | M4-2 |
-| `MerchantChanged` | merchantId, name, address, open, lat, lng | merchant | M5-3 |
-| `MenuItemChanged` | menuItemId, merchantId, name, priceCents, available | merchant | M5-3 |
+| `MerchantChanged` | merchantId, name, address, open, lat, lng, version | merchant | M5-3 |
+| `MenuItemChanged` | menuItemId, merchantId, name, priceCents, available, version | merchant | M5-3 |
 
 **Error codes** (Problem Details `code` field):
 - 400: `VALIDATION_FAILED`, `MALFORMED_REQUEST`, `IDEMPOTENCY_KEY_REQUIRED`.

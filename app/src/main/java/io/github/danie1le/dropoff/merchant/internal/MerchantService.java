@@ -48,7 +48,7 @@ class MerchantService {
 
     @Transactional
     Merchant update(long id, UpdateMerchant request) {
-        Merchant merchant = get(id);
+        Merchant merchant = merchants.findForUpdateById(id).orElseThrow(() -> notFound(id));
         String name = request.name();
         if (name != null) {
             merchant.rename(name.trim());
@@ -61,6 +61,7 @@ class MerchantService {
         if (location != null) {
             merchant.moveTo(trimmed(location));
         }
+        merchant.changed();
         return published(merchant);
     }
 
@@ -74,6 +75,7 @@ class MerchantService {
                 merchant.isOpen(),
                 merchant.lat(),
                 merchant.lng(),
+                merchant.version(),
                 DbClock.now(clock)));
         return merchant;
     }
