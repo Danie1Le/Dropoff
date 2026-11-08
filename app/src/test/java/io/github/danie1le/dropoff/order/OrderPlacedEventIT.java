@@ -25,9 +25,9 @@ class OrderPlacedEventIT {
 
     @Test
     void publishesOrderPlaced(@Autowired MockMvcTester mvc, @Autowired JdbcClient jdbc, Scenario scenario) {
-        long customerId = PlaceOrderApiIT.customer(jdbc);
-        long merchantId = PlaceOrderApiIT.merchant(jdbc, true);
-        long taco = PlaceOrderApiIT.item(jdbc, merchantId, 399, true);
+        long customerId = OrderFixtures.customer(jdbc);
+        long merchantId = OrderFixtures.merchant(jdbc, true);
+        long taco = OrderFixtures.item(jdbc, merchantId, 399, true);
         String body = "{\"customerId\":%d,\"merchantId\":%d,\"lines\":[{\"menuItemId\":%d,\"quantity\":2}]}"
                 .formatted(customerId, merchantId, taco);
 

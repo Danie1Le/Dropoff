@@ -47,10 +47,10 @@ class IdempotencyApiIT {
         this.mvc = mvc;
         this.jdbc = jdbc;
         this.tx = tx;
-        this.customerId = PlaceOrderApiIT.customer(jdbc);
-        this.merchantId = PlaceOrderApiIT.merchant(jdbc, true);
-        this.taco = PlaceOrderApiIT.item(jdbc, merchantId, 399, true);
-        this.soda = PlaceOrderApiIT.item(jdbc, merchantId, 150, true);
+        this.customerId = OrderFixtures.customer(jdbc);
+        this.merchantId = OrderFixtures.merchant(jdbc, true);
+        this.taco = OrderFixtures.item(jdbc, merchantId, 399, true);
+        this.soda = OrderFixtures.item(jdbc, merchantId, 150, true);
     }
 
     @AfterEach

@@ -55,9 +55,9 @@ class OrderCommandApiIT {
 
     /** Places a real order through the API, so it has lines and its PLACED event row. */
     static Fixture placed(MockMvcTester mvc, JdbcClient jdbc) {
-        long customerId = PlaceOrderApiIT.customer(jdbc);
-        long merchantId = PlaceOrderApiIT.merchant(jdbc, true);
-        long taco = PlaceOrderApiIT.item(jdbc, merchantId, 399, true);
+        long customerId = OrderFixtures.customer(jdbc);
+        long merchantId = OrderFixtures.merchant(jdbc, true);
+        long taco = OrderFixtures.item(jdbc, merchantId, 399, true);
         MvcTestResult result = mvc.post()
                 .uri("/api/v1/orders")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -175,7 +175,7 @@ class OrderCommandApiIT {
     @Test
     void wrongMerchantIs404() {
         Fixture f = placed(mvc, jdbc);
-        long other = PlaceOrderApiIT.merchant(jdbc, true);
+        long other = OrderFixtures.merchant(jdbc, true);
         assertError(
                 merchant(new Fixture(f.customerId(), other, f.orderId()), "accept"),
                 HttpStatus.NOT_FOUND,
@@ -185,7 +185,7 @@ class OrderCommandApiIT {
     @Test
     void wrongCustomerIs404() {
         Fixture f = placed(mvc, jdbc);
-        long other = PlaceOrderApiIT.customer(jdbc);
+        long other = OrderFixtures.customer(jdbc);
         assertError(
                 customerCancel(new Fixture(other, f.merchantId(), f.orderId())),
                 HttpStatus.NOT_FOUND,
