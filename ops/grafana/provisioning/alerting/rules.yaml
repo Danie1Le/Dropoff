@@ -12,7 +12,9 @@ groups:
         title: Order waiting for a courier over 15 min
         condition: C
         for: 1m
-        noDataState: OK
+        # No data means the gauge is gone: the dispatch service is down or not scraped, so nobody is assigning
+        # couriers. That is worse than a quiet queue, so it must alert, not pass as OK.
+        noDataState: Alerting
         execErrState: Error
         annotations:
           summary: The oldest order waiting for a courier is older than 15 minutes (decision #13).
