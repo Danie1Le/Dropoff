@@ -34,6 +34,13 @@ jobs:
       - name: Format, static checks and unit tests
         run: ./gradlew build -x integrationTest
 
+      # The build step made the boot jars; the Dockerfiles copy them (M6-3, ticket #114). Images are built, not pushed.
+      - name: Build images and check their size
+        run: |
+          ./gradlew :tools:simulator:installDist
+          docker compose --profile demo build
+          ops/docker/check-image-sizes.sh
+
       # Integration tests (*IT) use Testcontainers on the runner's Docker.
       - name: Integration tests (Testcontainers)
         run: ./gradlew integrationTest

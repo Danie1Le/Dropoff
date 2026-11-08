@@ -1,8 +1,12 @@
-# Local infrastructure for development (ticket #6 picks the images).
-# Start with `docker compose up -d`; then run merchant-service with `./gradlew :services:merchant:bootRun` (port 8081),
-# order-service with `./gradlew :services:order:bootRun` (port 8082) and dispatch-service with
-# `./gradlew :services:dispatch:bootRun` (port 8083). Each logs in as its own user to its own database (ADR-0007).
-# Prometheus (port 9090) scrapes all three (M6-1).
+# Local infrastructure and the three services as containers (ticket #6 picks the images, M6-3 adds the services).
+# Build the jars, then start everything:
+#   ./gradlew :services:merchant:bootJar :services:order:bootJar :services:dispatch:bootJar :tools:simulator:installDist
+#   docker compose up -d --build                  # merchant 8081, order 8082, dispatch 8083, Prometheus 9090
+#   docker compose --profile demo up -d --build   # the same, plus the simulator: seeds once, then runs the bots
+# Each service logs in as its own user to its own database (ADR-0007). Prometheus scrapes all three by service name.
+# To run a service from source instead, start only the infrastructure, then `./gradlew :services:<name>:bootRun`:
+#   docker compose up -d postgres redis kafka prometheus
+# The services are capped at 512 MB each (heap 256 MB) to fit small machines.
 services:
   postgres:
     # Keep in sync with TestcontainersConfiguration (integration tests use the same image).
@@ -73,11 +77,101 @@ services:
     volumes:
       - ./ops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
-    # The services run on the host until M6-3; this makes host.docker.internal work on Linux too.
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+
+  # The three services (M6-3, ticket #114). Each image is built from its Dockerfile and the jar the host built, and is
+  # named the way M6-4 publishes it. Ports stay on 127.0.0.1, so the smoke script and curl work as with bootRun.
+  merchant:
+    image: ghcr.io/danie1le/dropoff-merchant:${DROPOFF_TAG:-local}
+    build: services/merchant
+    ports:
+      - "127.0.0.1:8081:8081"
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/merchant_db
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      JAVA_TOOL_OPTIONS: -Xmx256m
+    mem_limit: 512m
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      # Busybox wget ships with the Alpine base image. The other two services repeat this with their own port.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8081/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 90s
+      retries: 10
+
+  order:
+    image: ghcr.io/danie1le/dropoff-order:${DROPOFF_TAG:-local}
+    build: services/order
+    ports:
+      - "127.0.0.1:8082:8082"
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/order_db
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      JAVA_TOOL_OPTIONS: -Xmx256m
+    mem_limit: 512m
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8082/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 90s
+      retries: 10
+
+  dispatch:
+    image: ghcr.io/danie1le/dropoff-dispatch:${DROPOFF_TAG:-local}
+    build: services/dispatch
+    ports:
+      - "127.0.0.1:8083:8083"
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/dispatch_db
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      REDIS_HOST: redis
+      JAVA_TOOL_OPTIONS: -Xmx256m
+    mem_limit: 512m
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8083/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 90s
+      retries: 10
+
+  # Profile demo only (M6-3): seeds through the services if its volume has no state file, then runs the customer,
+  # merchant and courier bots until stopped. `docker compose down -v` drops the state with the databases, so the next
+  # demo seeds again. `docker compose --profile demo run --rm simulator smoke` runs the full-flow check instead.
+  simulator:
+    image: ghcr.io/danie1le/dropoff-simulator:${DROPOFF_TAG:-local}
+    build: tools/simulator
+    profiles: [demo]
+    environment:
+      JAVA_TOOL_OPTIONS: -Xmx128m
+    mem_limit: 256m
+    volumes:
+      - simulator-data:/data
+    depends_on:
+      merchant:
+        condition: service_healthy
+      order:
+        condition: service_healthy
+      dispatch:
+        condition: service_healthy
 
 volumes:
   postgres-data:
   kafka-data:
   prometheus-data:
+  simulator-data:

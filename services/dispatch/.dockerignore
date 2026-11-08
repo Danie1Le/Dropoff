@@ -1,0 +1,3 @@
+# Only the built jar goes to the Docker daemon (M6-3).
+*
+!build/libs/dispatch.jar
