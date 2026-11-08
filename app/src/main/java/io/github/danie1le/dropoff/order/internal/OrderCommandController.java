@@ -1,5 +1,6 @@
 package io.github.danie1le.dropoff.order.internal;
 
+import io.github.danie1le.dropoff.common.ProblemResponse;
 import io.github.danie1le.dropoff.order.internal.OrderRequests.OrderResponse;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -18,26 +19,36 @@ class OrderCommandController {
         this.service = service;
     }
 
+    @ProblemResponse(status = 404, codes = "ORDER_NOT_FOUND")
+    @ProblemResponse(status = 409, codes = "INVALID_STATUS_TRANSITION")
     @PostMapping("/merchants/{merchantId}/orders/{orderId}/accept")
     OrderResponse accept(@PathVariable long merchantId, @PathVariable long orderId) {
         return service.byMerchant(merchantId, orderId, OrderCommand.ACCEPT);
     }
 
+    @ProblemResponse(status = 404, codes = "ORDER_NOT_FOUND")
+    @ProblemResponse(status = 409, codes = "INVALID_STATUS_TRANSITION")
     @PostMapping("/merchants/{merchantId}/orders/{orderId}/start-preparing")
     OrderResponse startPreparing(@PathVariable long merchantId, @PathVariable long orderId) {
         return service.byMerchant(merchantId, orderId, OrderCommand.START_PREPARING);
     }
 
+    @ProblemResponse(status = 404, codes = "ORDER_NOT_FOUND")
+    @ProblemResponse(status = 409, codes = "INVALID_STATUS_TRANSITION")
     @PostMapping("/merchants/{merchantId}/orders/{orderId}/ready")
     OrderResponse ready(@PathVariable long merchantId, @PathVariable long orderId) {
         return service.byMerchant(merchantId, orderId, OrderCommand.MARK_READY);
     }
 
+    @ProblemResponse(status = 404, codes = "ORDER_NOT_FOUND")
+    @ProblemResponse(status = 409, codes = "INVALID_STATUS_TRANSITION")
     @PostMapping("/merchants/{merchantId}/orders/{orderId}/cancel")
     OrderResponse merchantCancel(@PathVariable long merchantId, @PathVariable long orderId) {
         return service.byMerchant(merchantId, orderId, OrderCommand.CANCEL);
     }
 
+    @ProblemResponse(status = 404, codes = "ORDER_NOT_FOUND")
+    @ProblemResponse(status = 409, codes = "INVALID_STATUS_TRANSITION")
     @PostMapping("/customers/{customerId}/orders/{orderId}/cancel")
     OrderResponse customerCancel(@PathVariable long customerId, @PathVariable long orderId) {
         return service.byCustomer(customerId, orderId, OrderCommand.CANCEL);

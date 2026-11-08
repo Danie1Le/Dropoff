@@ -1,9 +1,11 @@
 package io.github.danie1le.dropoff.order.internal;
 
 import io.github.danie1le.dropoff.common.PageParams;
+import io.github.danie1le.dropoff.common.ProblemResponse;
 import io.github.danie1le.dropoff.order.internal.OrderRequests.OrderResponse;
 import jakarta.validation.Valid;
 import org.jspecify.annotations.Nullable;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.web.PagedModel;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,16 +25,18 @@ class OrderListController {
         this.lists = lists;
     }
 
+    @ProblemResponse(status = 404, codes = "MERCHANT_NOT_FOUND")
     @GetMapping("/merchants/{id}/orders")
     PagedModel<OrderResponse> forMerchant(
             @PathVariable long id,
             @RequestParam(required = false) @Nullable OrderStatus status,
-            @Valid PageParams params) {
+            @ParameterObject @Valid PageParams params) {
         return lists.forMerchant(id, status, params);
     }
 
+    @ProblemResponse(status = 404, codes = "CUSTOMER_NOT_FOUND")
     @GetMapping("/customers/{id}/orders")
-    PagedModel<OrderResponse> forCustomer(@PathVariable long id, @Valid PageParams params) {
+    PagedModel<OrderResponse> forCustomer(@PathVariable long id, @ParameterObject @Valid PageParams params) {
         return lists.forCustomer(id, params);
     }
 }
