@@ -55,6 +55,12 @@ class OrderService {
         this.clock = clock;
     }
 
+    /** One order as a response body, built inside the transaction because its lines load lazily. */
+    @Transactional(readOnly = true)
+    OrderResponse get(long orderId) {
+        return OrderResponse.of(orders.findById(orderId).orElseThrow(() -> OrderCommandService.notFound(orderId)));
+    }
+
     /** The outcome of a place-order request: the order, and whether it was an earlier order replayed. */
     record Placement(long orderId, OrderResponse body, boolean replayed) {}
 
