@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.function.Supplier;
+import java.util.function.ToDoubleFunction;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,5 +44,11 @@ public final class CachedSnapshot<T> {
             }
         }
         return value;
+    }
+
+    /** One field of the cached value as a gauge reading; NaN while no load has worked yet. */
+    public double read(ToDoubleFunction<T> field) {
+        T current = get();
+        return current == null ? Double.NaN : field.applyAsDouble(current);
     }
 }

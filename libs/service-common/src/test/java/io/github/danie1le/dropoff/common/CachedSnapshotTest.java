@@ -74,7 +74,7 @@ class CachedSnapshotTest {
     }
 
     @Test
-    void aFailedFirstLoadReturnsNull() {
+    void aFailedFirstLoadReadsAsNaN() {
         CachedSnapshot<Integer> snapshot = new CachedSnapshot<>(
                 () -> {
                     throw new IllegalStateException("database down");
@@ -83,5 +83,6 @@ class CachedSnapshotTest {
                 clock());
 
         assertThat(snapshot.get()).isNull();
+        assertThat(snapshot.read(Integer::doubleValue)).isNaN();
     }
 }

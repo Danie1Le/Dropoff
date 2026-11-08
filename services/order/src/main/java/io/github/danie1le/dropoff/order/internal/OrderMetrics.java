@@ -11,7 +11,6 @@ import java.time.Duration;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.ToDoubleFunction;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
@@ -58,14 +57,13 @@ class OrderMetrics {
                             .register(meters));
         }
 
-        // Gauges hold their state object weakly; strongReference keeps this local snapshot alive for the app\'s life.
-
+        // Gauges hold their state object weakly; strongReference keeps this local snapshot alive for the app's life.
         CachedSnapshot<InPreparation> snapshot = new CachedSnapshot<>(() -> inPreparation(jdbc), gaugeMaxAge, clock);
-        Gauge.builder("dropoff.orders.in.preparation", snapshot, s -> value(s, InPreparation::orders))
+        Gauge.builder("dropoff.orders.in.preparation", snapshot, s -> s.read(InPreparation::orders))
                 .description("Orders ACCEPTED or PREPARING")
                 .strongReference(true)
                 .register(meters);
-        Gauge.builder("dropoff.oldest.in.preparation.age", snapshot, s -> value(s, InPreparation::oldestAgeSeconds))
+        Gauge.builder("dropoff.oldest.in.preparation.age", snapshot, s -> s.read(InPreparation::oldestAgeSeconds))
                 .description("How long the oldest order in preparation has been accepted")
                 .strongReference(true)
                 .baseUnit("seconds")
@@ -99,10 +97,5 @@ class OrderMetrics {
                         + " FROM orders o WHERE o.status IN ('ACCEPTED', 'PREPARING')) p")
                 .query((rs, row) -> new InPreparation(rs.getLong("orders"), rs.getDouble("oldest_age")))
                 .single();
-    }
-
-    private static double value(CachedSnapshot<InPreparation> snapshot, ToDoubleFunction<InPreparation> field) {
-        InPreparation current = snapshot.get();
-        return current == null ? Double.NaN : field.applyAsDouble(current);
     }
 }

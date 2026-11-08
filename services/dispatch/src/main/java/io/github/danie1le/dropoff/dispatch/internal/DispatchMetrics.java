@@ -11,7 +11,6 @@ import java.time.Duration;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.ToDoubleFunction;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
@@ -56,22 +55,23 @@ class DispatchMetrics {
         dispatchDuration = Timer.builder("dropoff.dispatch.duration")
                 .description("From the order being READY to a courier accepting it")
                 .publishPercentileHistogram()
+                .minimumExpectedValue(Duration.ofSeconds(1))
+                .maximumExpectedValue(Duration.ofMinutes(30))
                 .register(meters);
 
-        // Gauges hold their state object weakly; strongReference keeps this local snapshot alive for the app\'s life.
-
+        // Gauges hold their state object weakly; strongReference keeps this local snapshot alive for the app's life.
         CachedSnapshot<Snapshot> snapshot = new CachedSnapshot<>(() -> snapshot(jdbc), gaugeMaxAge, clock);
-        Gauge.builder("dropoff.orders.waiting.for.courier", snapshot, s -> value(s, Snapshot::waiting))
+        Gauge.builder("dropoff.orders.waiting.for.courier", snapshot, s -> s.read(Snapshot::waiting))
                 .description("Orders READY with no courier assigned")
                 .strongReference(true)
                 .register(meters);
-        Gauge.builder("dropoff.oldest.waiting.order.age", snapshot, s -> value(s, Snapshot::oldestWaitSeconds))
+        Gauge.builder("dropoff.oldest.waiting.order.age", snapshot, s -> s.read(Snapshot::oldestWaitSeconds))
                 .description("How long the oldest order waiting for a courier has been READY")
                 .strongReference(true)
                 .baseUnit("seconds")
                 .register(meters);
         for (CourierStatus status : CourierStatus.values()) {
-            Gauge.builder("dropoff.couriers", snapshot, s -> value(s, c -> c.couriers(status)))
+            Gauge.builder("dropoff.couriers", snapshot, s -> s.read(c -> c.couriers(status)))
                     .description("Couriers, by status")
                     .strongReference(true)
                     .tag("status", status.name())
@@ -124,10 +124,5 @@ class DispatchMetrics {
                         rs.getLong("available"),
                         rs.getLong("busy")))
                 .single();
-    }
-
-    private static double value(CachedSnapshot<Snapshot> snapshot, ToDoubleFunction<Snapshot> field) {
-        Snapshot current = snapshot.get();
-        return current == null ? Double.NaN : field.applyAsDouble(current);
     }
 }
