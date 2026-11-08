@@ -67,16 +67,7 @@ class OfferApiIT {
                             CourierGeoIndex.KEY,
                             courierIds.stream().map(String::valueOf).toArray(String[]::new));
         }
-        if (!orderIds.isEmpty()) {
-            for (String table : List.of("offers", "dispatch_orders", "order_events", "order_lines")) {
-                jdbc.sql("DELETE FROM " + table + " WHERE order_id IN (:ids)")
-                        .param("ids", orderIds)
-                        .update();
-            }
-            jdbc.sql("DELETE FROM orders WHERE id IN (:ids)")
-                    .param("ids", orderIds)
-                    .update();
-        }
+        OrderFixtures.deleteOrders(jdbc, orderIds);
         deleteByIds("couriers", courierIds);
         deleteByIds("customers", customerIds);
         deleteByIds("merchants", merchantIds);
@@ -292,8 +283,9 @@ class OfferApiIT {
     }
 
     @Test
-    void aCourierWhoWentOfflineStaysOfflineAfterDeclining() {
+    void aDeclineAfterGoingOfflineIsARepeatAndTheCourierStaysOffline() {
         Offered o = offered();
+        // Going OFFLINE already declined the open offer (M3-4, ticket #85).
         couriers.changeStatus(o.courierId(), CourierStatus.OFFLINE);
 
         assertThat(command(o.courierId(), o.offerId(), "decline"))
@@ -307,7 +299,7 @@ class OfferApiIT {
     }
 
     @Test
-    void aCourierWhoIsNotBusyCannotAccept() {
+    void anAcceptAfterGoingOfflineIsClosed() {
         Offered o = offered();
         couriers.changeStatus(o.courierId(), CourierStatus.OFFLINE);
 
@@ -315,8 +307,8 @@ class OfferApiIT {
                 .hasStatus(HttpStatus.CONFLICT)
                 .bodyJson()
                 .extractingPath("$.code")
-                .isEqualTo("COURIER_NOT_BUSY");
-        assertThat(value("SELECT status FROM offers WHERE id = ?", o.offerId())).isEqualTo("OFFERED");
+                .isEqualTo("OFFER_CLOSED");
+        assertThat(value("SELECT status FROM offers WHERE id = ?", o.offerId())).isEqualTo("DECLINED");
         assertThat(value("SELECT status FROM dispatch_orders WHERE order_id = ?", o.orderId()))
                 .isEqualTo("WAITING");
         assertThat(value("SELECT status FROM couriers WHERE id = ?", o.courierId()))

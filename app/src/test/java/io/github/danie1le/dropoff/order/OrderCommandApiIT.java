@@ -64,6 +64,7 @@ class OrderCommandApiIT {
                                 .query(Long.class)
                                 .single()
                         == 0);
+        jdbc.sql("UPDATE orders SET assigned_offer_id = NULL").update();
         for (String table : List.of(
                 "event_publication",
                 "offers",

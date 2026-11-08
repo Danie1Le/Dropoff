@@ -6,8 +6,10 @@ import io.github.danie1le.dropoff.dispatch.internal.OfferResponses.CurrentOffer;
 import io.github.danie1le.dropoff.dispatch.internal.OfferResponses.OfferResponse;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,7 +26,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  *
  * <p>The database decides whether an answer is late: the {@code UPDATE} only matches while {@code expires_at > now()},
  * so there is no gap between checking the deadline and writing the answer, and a race with the timeout job (M3-4)
- * settles on the row lock.
+ * settles on the row lock. Silence is the third answer: the timeout job closes an expired offer as TIMED_OUT (M3-4).
  */
 @Service
 class OfferService {
@@ -76,8 +78,8 @@ class OfferService {
 
     /**
      * Accepts the offer: the order becomes ASSIGNED to the courier, who stays BUSY, and {@link CourierAssigned} is
-     * published for the order module. Only a BUSY courier can accept: one who went OFFLINE while the offer was open
-     * gets a 409 {@code COURIER_NOT_BUSY} and the offer stays open.
+     * published for the order module. Only a BUSY courier can accept; any other gets a 409 {@code COURIER_NOT_BUSY} and
+     * the offer stays open. Since M3-4 going OFFLINE declines the open offer, so this guard is only a backstop.
      *
      * <p>Locks the courier, then the offer, then {@code dispatch_orders}: the lock order every offer command uses.
      */
@@ -114,16 +116,64 @@ class OfferService {
         Declined declined =
                 Objects.requireNonNull(transaction.execute(status -> declineAndRelease(courierId, offerId)));
         if (declined.changed()) {
-            try {
-                dispatch.dispatch(declined.offer().orderId());
-            } catch (RuntimeException e) {
-                log.warn(
-                        "Dispatch of order {} after a decline failed; the dispatch-again job will retry it",
-                        declined.offer().orderId(),
-                        e);
-            }
+            dispatchAgain(declined.offer().orderId(), "a decline");
         }
         return declined.offer();
+    }
+
+    /**
+     * Times out the oldest expired open offer whose id is not in {@code tried} (M3-4, ticket #11 point 7): the offer
+     * becomes TIMED_OUT, the courier OFFLINE, and once that commits the order is dispatched to someone else.
+     *
+     * <p>The offer and its courier are locked together with {@code FOR UPDATE OF o, c SKIP LOCKED} (ticket #85). An
+     * accept or decline locks the courier and then the offer; locking the offer first and then waiting on the courier
+     * could deadlock against it. Both rows are taken in one statement that never waits, so the job steps past a row an
+     * offer command or another instance holds, and a later run takes it.
+     *
+     * <p>The picked id is added to {@code tried} before the update, so if it throws the caller still steps past it.
+     *
+     * @return whether an offer was picked; {@code false} means none is left
+     */
+    boolean timeOutNextExpired(Set<Long> tried) {
+        Optional<Long> orderId = Objects.requireNonNull(transaction.execute(status -> timeOut(tried)));
+        orderId.ifPresent(id -> dispatchAgain(id, "a timeout"));
+        return orderId.isPresent();
+    }
+
+    private record Expired(long offerId, long orderId, long courierId) {}
+
+    private Optional<Long> timeOut(Set<Long> tried) {
+        String skipTried = tried.isEmpty() ? "" : " AND o.id NOT IN (:tried)";
+        JdbcClient.StatementSpec select = jdbc.sql("SELECT o.id, o.order_id, o.courier_id"
+                + " FROM offers o JOIN couriers c ON c.id = o.courier_id"
+                + " WHERE o.status = 'OFFERED' AND o.expires_at <= now()"
+                + skipTried
+                + " ORDER BY o.expires_at, o.id LIMIT 1 FOR UPDATE OF o, c SKIP LOCKED");
+        if (!tried.isEmpty()) {
+            select = select.param("tried", List.copyOf(tried));
+        }
+        Optional<Expired> next = select.query(
+                        (rs, row) -> new Expired(rs.getLong("id"), rs.getLong("order_id"), rs.getLong("courier_id")))
+                .optional();
+        if (next.isEmpty()) {
+            return Optional.empty();
+        }
+        Expired expired = next.get();
+        tried.add(expired.offerId());
+        jdbc.sql("UPDATE offers SET status = 'TIMED_OUT', responded_at = now() WHERE id = ?")
+                .param(expired.offerId())
+                .update();
+        couriers.timeOut(expired.courierId());
+        return Optional.of(expired.orderId());
+    }
+
+    /** Dispatches the order in its own transaction; a failure is logged and left to the dispatch-again job. */
+    private void dispatchAgain(long orderId, String after) {
+        try {
+            dispatch.dispatch(orderId);
+        } catch (RuntimeException e) {
+            log.warn("Dispatch of order {} after {} failed; the dispatch-again job will retry it", orderId, after, e);
+        }
     }
 
     private record Declined(OfferResponse offer, boolean changed) {}

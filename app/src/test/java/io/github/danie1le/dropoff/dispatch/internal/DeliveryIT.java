@@ -17,6 +17,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
@@ -73,16 +75,7 @@ class DeliveryIT {
                             CourierGeoIndex.KEY,
                             courierIds.stream().map(String::valueOf).toArray(String[]::new));
         }
-        if (!orderIds.isEmpty()) {
-            for (String table : List.of("offers", "dispatch_orders", "order_events", "order_lines")) {
-                jdbc.sql("DELETE FROM " + table + " WHERE order_id IN (:ids)")
-                        .param("ids", orderIds)
-                        .update();
-            }
-            jdbc.sql("DELETE FROM orders WHERE id IN (:ids)")
-                    .param("ids", orderIds)
-                    .update();
-        }
+        OrderFixtures.deleteOrders(jdbc, orderIds);
         deleteByIds("couriers", courierIds);
         deleteByIds("customers", customerIds);
         deleteByIds("merchants", merchantIds);
@@ -215,6 +208,168 @@ class DeliveryIT {
                 .isEqualTo("OFFERED");
     }
 
+    /** An AVAILABLE courier a little further from the shop, in the geo set, waiting for the next offer. */
+    private long nextCourier() {
+        long id = couriers.create("Eli").id();
+        courierIds.add(id);
+        couriers.moveTo(id, new Position(30.2849, -97.7341));
+        couriers.changeStatus(id, CourierStatus.AVAILABLE);
+        await().atMost(Duration.ofSeconds(5)).until(() -> inGeoSet(id));
+        return id;
+    }
+
+    /**
+     * The order side has committed the pickup, but dispatch has not handled {@code OrderPickedUp} yet when the courier
+     * goes OFFLINE. Dispatch still says ASSIGNED, so the order is unassigned and offered to {@code next}.
+     */
+    private Offered pickedUpThenOfflineBeforeDispatchHears(long next) {
+        Offered o = assigned();
+        await().atMost(Duration.ofSeconds(10)).until(() -> orderCourier(o.orderId()) != null);
+        jdbc.sql("UPDATE orders SET status = 'PICKED_UP' WHERE id = ?")
+                .param(o.orderId())
+                .update();
+        couriers.changeStatus(o.courierId(), CourierStatus.OFFLINE);
+        assertThat(dispatchStatus(o.orderId())).isEqualTo("WAITING");
+        assertThat(value("SELECT courier_id::text FROM offers WHERE order_id = ? AND status = 'OFFERED'", o.orderId()))
+                .isEqualTo(Long.toString(next));
+        return o;
+    }
+
+    private long offerOf(long orderId, long courierId) {
+        return jdbc.sql("SELECT id FROM offers WHERE order_id = ? AND courier_id = ?")
+                .params(orderId, courierId)
+                .query(Long.class)
+                .single();
+    }
+
+    private long openOffers(long orderId) {
+        return jdbc.sql("SELECT count(*) FROM offers WHERE order_id = ? AND status = 'OFFERED'")
+                .param(orderId)
+                .query(Long.class)
+                .single();
+    }
+
+    private String dispatchCourier(long orderId) {
+        return value("SELECT courier_id::text FROM dispatch_orders WHERE order_id = ?", orderId);
+    }
+
+    @Test
+    void aLatePickupTakesTheOrderBackFromTheNextOffer() {
+        long next = nextCourier();
+        Offered o = pickedUpThenOfflineBeforeDispatchHears(next);
+        long nextOffer = offerOf(o.orderId(), next);
+
+        delivery.pickedUp(o.orderId(), o.courierId());
+
+        assertThat(dispatchStatus(o.orderId())).isEqualTo("PICKED_UP");
+        assertThat(dispatchCourier(o.orderId())).isEqualTo(Long.toString(o.courierId()));
+        assertThat(courierStatus(o.courierId())).isEqualTo("BUSY");
+        assertThat(value("SELECT status FROM offers WHERE id = ?", nextOffer)).isEqualTo("WITHDRAWN");
+        assertThat(openOffers(o.orderId())).isZero();
+        assertThat(courierStatus(next)).isEqualTo("AVAILABLE");
+        await().atMost(Duration.ofSeconds(5)).until(() -> inGeoSet(next));
+
+        delivery.delivered(o.orderId(), o.courierId());
+
+        assertThat(dispatchStatus(o.orderId())).isEqualTo("DONE");
+        assertThat(courierStatus(o.courierId())).isEqualTo("AVAILABLE");
+    }
+
+    @Test
+    void aLatePickupTakesTheOrderBackFromTheNextCourierWhoAccepted() {
+        long next = nextCourier();
+        Offered o = pickedUpThenOfflineBeforeDispatchHears(next);
+        assertThat(post("/api/v1/couriers/{c}/offers/{o}/accept", next, offerOf(o.orderId(), next)))
+                .hasStatusOk();
+        assertThat(dispatchCourier(o.orderId())).isEqualTo(Long.toString(next));
+
+        delivery.pickedUp(o.orderId(), o.courierId());
+
+        assertThat(dispatchStatus(o.orderId())).isEqualTo("PICKED_UP");
+        assertThat(dispatchCourier(o.orderId())).isEqualTo(Long.toString(o.courierId()));
+        assertThat(courierStatus(o.courierId())).isEqualTo("BUSY");
+        assertThat(courierStatus(next)).isEqualTo("AVAILABLE");
+        assertThat(openOffers(o.orderId())).isZero();
+        // The order side never let the next courier in: its CourierAssigned is skipped for a PICKED_UP order.
+        assertThat(orderCourier(o.orderId())).isEqualTo(o.courierId());
+
+        delivery.delivered(o.orderId(), o.courierId());
+
+        assertThat(dispatchStatus(o.orderId())).isEqualTo("DONE");
+        assertThat(courierStatus(o.courierId())).isEqualTo("AVAILABLE");
+        assertThat(courierStatus(next)).isEqualTo("AVAILABLE");
+    }
+
+    @Test
+    void aRepeatedPickupAfterTheDeliveryChangesNothing() {
+        Offered o = assigned();
+        delivery.pickedUp(o.orderId(), o.courierId());
+        delivery.delivered(o.orderId(), o.courierId());
+
+        delivery.pickedUp(o.orderId(), o.courierId());
+
+        assertThat(dispatchStatus(o.orderId())).isEqualTo("DONE");
+        assertThat(courierStatus(o.courierId())).isEqualTo("AVAILABLE");
+    }
+
+    @Test
+    void aDeliveryBeforeTheLatePickupClosesTheOrderAndFreesTheNextCourier() {
+        long next = nextCourier();
+        Offered o = pickedUpThenOfflineBeforeDispatchHears(next);
+        long nextOffer = offerOf(o.orderId(), next);
+
+        delivery.delivered(o.orderId(), o.courierId());
+        delivery.pickedUp(o.orderId(), o.courierId());
+
+        assertThat(dispatchStatus(o.orderId())).isEqualTo("DONE");
+        assertThat(dispatchCourier(o.orderId())).isEqualTo(Long.toString(o.courierId()));
+        assertThat(value("SELECT status FROM offers WHERE id = ?", nextOffer)).isEqualTo("WITHDRAWN");
+        assertThat(openOffers(o.orderId())).isZero();
+        assertThat(courierStatus(next)).isEqualTo("AVAILABLE");
+        // They went OFFLINE themselves; delivering does not put them back to work.
+        assertThat(courierStatus(o.courierId())).isEqualTo("OFFLINE");
+    }
+
+    @Test
+    void aLatePickupWithdrawsTheCouriersOfferOfAnotherOrder() {
+        long next = nextCourier();
+        Offered o = pickedUpThenOfflineBeforeDispatchHears(next);
+        couriers.changeStatus(o.courierId(), CourierStatus.AVAILABLE);
+        Offered other = offeredTo(o.courierId());
+
+        delivery.pickedUp(o.orderId(), o.courierId());
+
+        assertThat(value("SELECT status FROM offers WHERE id = ?", other.offerId()))
+                .isEqualTo("WITHDRAWN");
+        assertThat(dispatchStatus(other.orderId())).isEqualTo("WAITING");
+        assertThat(courierStatus(o.courierId())).isEqualTo("BUSY");
+
+        delivery.delivered(o.orderId(), o.courierId());
+
+        assertThat(courierStatus(o.courierId())).isEqualTo("AVAILABLE");
+    }
+
+    @Test
+    void deliveringOneOrderKeepsACourierWithAnotherOpenOrderBusy() {
+        long next = nextCourier();
+        Offered o = pickedUpThenOfflineBeforeDispatchHears(next);
+        couriers.changeStatus(o.courierId(), CourierStatus.AVAILABLE);
+        Offered other = offeredTo(o.courierId());
+        assertThat(post("/api/v1/couriers/{c}/offers/{o}/accept", o.courierId(), other.offerId()))
+                .hasStatusOk();
+        delivery.pickedUp(o.orderId(), o.courierId());
+
+        delivery.delivered(o.orderId(), o.courierId());
+
+        assertThat(dispatchStatus(o.orderId())).isEqualTo("DONE");
+        assertThat(dispatchStatus(other.orderId())).isEqualTo("ASSIGNED");
+        assertThat(courierStatus(o.courierId())).isEqualTo("BUSY");
+
+        delivery.delivered(other.orderId(), o.courierId());
+
+        assertThat(courierStatus(o.courierId())).isEqualTo("AVAILABLE");
+    }
+
     /** A new READY order offered to {@code courierId}, who must be AVAILABLE and at the shop. */
     private Offered offeredTo(long courierId) {
         long customerId = OrderFixtures.customer(jdbc);
@@ -249,6 +404,17 @@ class DeliveryIT {
                 .hasStatusOk();
         await().atMost(Duration.ofSeconds(10))
                 .until(() -> dispatchStatus(o.orderId()).equals("PICKED_UP"));
+        assertThat(mvc.patch()
+                        .uri("/api/v1/couriers/{id}/status", o.courierId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"status":"OFFLINE"}
+                                """)
+                        .exchange())
+                .hasStatus(HttpStatus.CONFLICT)
+                .bodyJson()
+                .extractingPath("$.code")
+                .isEqualTo("COURIER_HAS_ACTIVE_DELIVERY");
 
         assertThat(post("/api/v1/couriers/{c}/orders/{o}/deliver", o.courierId(), o.orderId()))
                 .hasStatusOk();

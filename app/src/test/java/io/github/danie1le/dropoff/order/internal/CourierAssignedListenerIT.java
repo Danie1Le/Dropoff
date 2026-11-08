@@ -20,7 +20,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 
 /**
  * The order side of an accept (M3-3, ticket #11): {@code CourierAssigned} records the courier, but only on a READY
- * order. The listener is called directly, without its async proxy, so each test sees the update as soon as it returns.
+ * order and only for an offer newer than the one already recorded (ticket #85). The listener is called directly, without its async proxy, so each test sees the update as soon as it returns.
  */
 @SpringBootTest
 @Import(TestcontainersConfiguration.class)
@@ -40,7 +40,7 @@ class CourierAssignedListenerIT {
 
     @AfterEach
     void deleteCreatedRows() {
-        deleteByIds("orders", orderIds);
+        OrderFixtures.deleteOrders(jdbc, orderIds);
         deleteByIds("couriers", courierIds);
         deleteByIds("customers", customerIds);
         deleteByIds("merchants", merchantIds);
@@ -85,8 +85,23 @@ class CourierAssignedListenerIT {
                 .get(0);
     }
 
-    private void assign(long orderId, long courierId) {
-        listener.on(new CourierAssigned(UUID.randomUUID(), orderId, courierId, 1, Instant.now()));
+    /** Assigns the courier for a new accepted offer, and returns its id. */
+    private long assign(long orderId, long courierId) {
+        long offerId = OrderFixtures.acceptedOffer(jdbc, orderId, courierId);
+        assign(orderId, courierId, offerId);
+        return offerId;
+    }
+
+    private void assign(long orderId, long courierId, long offerId) {
+        listener.on(new CourierAssigned(UUID.randomUUID(), orderId, courierId, offerId, Instant.now()));
+    }
+
+    private @Nullable Long assignedOfferOf(long orderId) {
+        return jdbc.sql("SELECT assigned_offer_id FROM orders WHERE id = ?")
+                .param(orderId)
+                .query((rs, row) -> rs.getObject("assigned_offer_id", Long.class))
+                .list()
+                .get(0);
     }
 
     @Test
@@ -94,10 +109,11 @@ class CourierAssignedListenerIT {
         long orderId = order("READY");
         long courierId = courier();
 
-        assign(orderId, courierId);
-        assign(orderId, courierId);
+        long offerId = assign(orderId, courierId);
+        assign(orderId, courierId, offerId);
 
         assertThat(courierOf(orderId)).isEqualTo(courierId);
+        assertThat(assignedOfferOf(orderId)).isEqualTo(offerId);
         assertThat(jdbc.sql("SELECT status FROM orders WHERE id = ?")
                         .param(orderId)
                         .query(String.class)
@@ -116,5 +132,21 @@ class CourierAssignedListenerIT {
 
         assertThat(courierOf(cancelled)).isNull();
         assertThat(courierOf(preparing)).isNull();
+    }
+
+    @Test
+    void anOlderOfferArrivingLateDoesNotReplaceANewerOne() {
+        long orderId = order("READY");
+        long first = courier();
+        long second = courier();
+
+        long older = OrderFixtures.acceptedOffer(jdbc, orderId, first);
+        long newer = OrderFixtures.acceptedOffer(jdbc, orderId, second);
+
+        assign(orderId, second, newer);
+        assign(orderId, first, older);
+
+        assertThat(courierOf(orderId)).isEqualTo(second);
+        assertThat(assignedOfferOf(orderId)).isEqualTo(newer);
     }
 }

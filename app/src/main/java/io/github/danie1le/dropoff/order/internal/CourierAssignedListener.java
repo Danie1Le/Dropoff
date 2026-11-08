@@ -14,11 +14,11 @@ import org.springframework.stereotype.Component;
  * Records the courier on the order once dispatch assigns one (M3-3, ticket #11, point 4). Runs after dispatch's
  * commit, through the Modulith event registry, which retries an unfinished delivery (ADR-0006).
  *
- * <p>Only a READY order takes a courier: a cancelled order, or one already past READY, is left alone, and the skip is
- * logged. While {@code CourierAssigned} is the only event that writes {@code orders.courier_id} (M3-3), an order gets
- * at most one, so a redelivery writes the same courier again. That stops holding once M3-4 adds {@code
- * CourierUnassigned}: a stale or reordered event could then restore an earlier courier, and #85 adds an offer-id
- * high-water mark to the guard.
+ * <p>Only a READY order takes a courier: a cancelled order, or one already past READY, is left alone. Since M3-4 an
+ * order can go assign A, unassign A, assign B while READY, so the guard also holds an offer-id high-water mark
+ * ({@code assigned_offer_id}, ticket #85): the courier is written only for an offer newer than the one recorded. A
+ * redelivered or reordered event for an older or the same offer, even after {@code CourierUnassigned} cleared the
+ * courier, matches nothing. Every skip is logged.
  */
 @Component
 class CourierAssignedListener {
@@ -35,17 +35,21 @@ class CourierAssignedListener {
 
     @ApplicationModuleListener
     void on(CourierAssigned event) {
-        int updated = jdbc.sql(
-                        "UPDATE orders SET courier_id = :courierId, updated_at = :now WHERE id = :id AND status = 'READY'")
+        int updated = jdbc.sql("UPDATE orders SET courier_id = :courierId, assigned_offer_id = :offerId,"
+                        + " updated_at = :now WHERE id = :id AND status = 'READY'"
+                        + " AND (assigned_offer_id IS NULL OR assigned_offer_id < :offerId)")
                 .param("courierId", event.courierId())
+                .param("offerId", event.offerId())
                 .param("now", Timestamp.from(DbClock.now(clock)))
                 .param("id", event.orderId())
                 .update();
         if (updated == 0) {
             log.warn(
-                    "Skipped CourierAssigned {}: order {} is not READY, so courier {} was not recorded",
+                    "Skipped CourierAssigned {}: order {} is not READY or already has offer {} or newer, so courier {}"
+                            + " was not recorded",
                     event.eventId(),
                     event.orderId(),
+                    event.offerId(),
                     event.courierId());
         }
     }
