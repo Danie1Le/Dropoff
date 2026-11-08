@@ -475,7 +475,7 @@ footer { padding: 40px 0 48px; color: var(--muted); font-size: 13px; }
 </section>
 
 <footer>
-  Sources: <code>PROJECT_OVERVIEW.md</code>, <code>GLOSSARY.md</code>, <code>docs/adr/</code>, and the <a href="https://github.com/Danie1Le/Dropoff/issues/2">wayfinder map</a>. Data last synced 2026-11-07. Update the arrays at the bottom of this file when tickets close or tasks land.
+  Sources: <code>PROJECT_OVERVIEW.md</code>, <code>GLOSSARY.md</code>, <code>docs/adr/</code>, and the <a href="https://github.com/Danie1Le/Dropoff/issues/2">wayfinder map</a>. Data last synced 2026-11-08. Update the arrays at the bottom of this file when tickets close or tasks land.
 </footer>
 </div>
 
@@ -560,18 +560,18 @@ const MILESTONES = [
     { t: 'Claim with UPDATE … WHERE status = AVAILABLE', done: true },
     { t: 'Offers: GET /api/v1/couriers/{id}/offers/current (200 or 204), POST /api/v1/couriers/{id}/offers/{offerId}/accept and decline', done: true },
     { t: 'Other courier → 404, repeat → 200 no-op', done: true },
-    { t: 'Going OFFLINE with an open offer declines it' },
+    { t: 'Going OFFLINE with an open offer declines it', done: true },
     { t: 'Explicit accept within 30 s; late accept → 409 OFFER_CLOSED via conditional UPDATE on expires_at', done: true },
     { t: 'Decline → courier AVAILABLE (GEOADD) and the order is dispatched again', done: true },
-    { t: 'Timeout job every 5 s: TIMED_OUT, courier → OFFLINE, next courier' },
+    { t: 'Timeout job every 5 s: TIMED_OUT, courier → OFFLINE, next courier', done: true },
     { t: 'CourierAssigned on accept sets orders.courier_id (only while READY)', done: true },
-    { t: 'CourierUnassigned on reassignment clears orders.courier_id' },
+    { t: 'CourierUnassigned on reassignment clears orders.courier_id', done: true },
     { t: 'Event records in a shared contracts package (no Spring, no module dependencies), so order and dispatch never depend on each other (ADR-0008)', done: true },
     { t: 'Each dispatch excludes couriers who had an offer for the order in the last 5 min', done: true },
-    { t: 'Timeout and dispatch retry jobs use the same SKIP LOCKED pattern (one row per transaction, max 50 per run)' },
+    { t: 'Timeout and dispatch retry jobs use the same SKIP LOCKED pattern (one row per transaction, max 50 per run)', done: true },
     { t: 'Partial unique index one_open_offer_per_order (offers.order_id WHERE status = OFFERED): a second open offer rolls back with its courier claim', done: true },
     { t: 'Job tries dispatch again every 10 s when no courier is found; READY orders retry forever and are never cancelled', done: true },
-    { t: 'Courier offline before pickup → auto-reassign; after pickup → 409 COURIER_HAS_ACTIVE_DELIVERY' },
+    { t: 'Courier offline before pickup → auto-reassign; after pickup → 409 COURIER_HAS_ACTIVE_DELIVERY', done: true },
     { t: 'Testcontainers integration tests (Postgres + Redis)' },
     { t: 'tools/simulator: seed via the public API (Austin; 10 merchants × 8 items, 50 customers, 30 couriers) and run with customer, merchant and courier bots (couriers poll offers every 2 s; accept 80%, decline 15%, ignore 5%); fixed random seed; runs via Gradle until the M6 demo profile' },
   ]},

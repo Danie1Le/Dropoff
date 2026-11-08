@@ -128,7 +128,7 @@ class OpenApiDocsIT {
                 .bodyJson()
                 .extractingPath("$.paths['/api/v1/couriers/{id}/status'].patch.responses.409.description")
                 .asString()
-                .contains("COURIER_LOCATION_UNKNOWN", "COURIER_BUSY");
+                .contains("COURIER_LOCATION_UNKNOWN", "COURIER_BUSY", "COURIER_HAS_ACTIVE_DELIVERY");
         assertThat(result)
                 .bodyJson()
                 .extractingPath("$.paths['/api/v1/couriers/{courierId}/offers/current'].get.responses")

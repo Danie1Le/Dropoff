@@ -71,14 +71,20 @@ class Courier {
     }
 
     /** Applies the courier's own status request; see {@link CourierStatus#change}. */
-    void changeStatus(CourierStatus requested, Instant now) {
-        this.status = status.change(requested, position().isPresent());
+    void changeStatus(CourierStatus requested, boolean hasActiveDelivery, Instant now) {
+        this.status = status.change(requested, position().isPresent(), hasActiveDelivery);
+        this.updatedAt = now;
+    }
+
+    /** Takes the courier off work after they let an offer time out (ticket #11, point 8). */
+    void timeOut(Instant now) {
+        this.status = CourierStatus.OFFLINE;
         this.updatedAt = now;
     }
 
     /**
-     * Frees the courier after they decline an offer (ticket #11, point 8): BUSY becomes AVAILABLE. A courier who went
-     * OFFLINE while the offer was open stays OFFLINE.
+     * Frees the courier after they decline an offer (ticket #11, point 8): BUSY becomes AVAILABLE. Any other status is
+     * left as it is.
      */
     void release(Instant now) {
         if (status == CourierStatus.BUSY) {

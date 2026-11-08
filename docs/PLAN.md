@@ -53,7 +53,7 @@ These apply across many PRs, and #42 is the source for all of them.
 | `OrderCancelled` | orderId, merchantId, actor | order | M2-5 |
 | `OrderReady` | orderId, merchantId, merchantName, merchantAddress, pickupLat, pickupLng, deliveryAddress, deliveryLat, deliveryLng, readyAt | order | M2-5 |
 | `CourierAssigned` | orderId, courierId, offerId | dispatch | M3-3 |
-| `CourierUnassigned` | orderId, courierId | dispatch | M3-4 |
+| `CourierUnassigned` | orderId, courierId, offerId | dispatch | M3-4 |
 | `OrderPickedUp` | orderId, courierId | order | M3-5 |
 | `OrderDelivered` | orderId, courierId | order | M3-5 |
 | `CourierLocationUpdated` | courierId, orderId, lat, lng, at | dispatch | M4-2 |
@@ -87,8 +87,8 @@ PATCH bodies: an absent or null field means unchanged; to change a location send
 **Redis writes** (`GEOADD` / `ZREM`) run in an after-commit hook, so a rolled-back transaction never changes Redis.
 
 **Event listeners update with conditions**, so out-of-order events can't corrupt state:
-- `CourierAssigned` sets `orders.courier_id` only `WHERE status = 'READY'`.
-- `CourierUnassigned` clears it only `WHERE courier_id = :courierId AND status = 'READY'`.
+- `CourierAssigned` sets `orders.courier_id` and `orders.assigned_offer_id` only `WHERE status = 'READY' AND (assigned_offer_id IS NULL OR assigned_offer_id < :offerId)`: an offer-id high-water mark (#85).
+- `CourierUnassigned` clears `courier_id` only `WHERE courier_id = :courierId AND assigned_offer_id = :offerId AND status = 'READY'`, and keeps `assigned_offer_id`, so a stale `CourierAssigned` can never bring the courier back.
 - Dispatch's `OrderPickedUp` / `OrderDelivered` update `dispatch_orders` only `WHERE courier_id = :courierId`.
 - A guard matching 0 rows is logged and skipped.
 

@@ -55,7 +55,7 @@ class CourierController {
     @ProblemResponse(status = 404, codes = "COURIER_NOT_FOUND")
     @ProblemResponse(
             status = 409,
-            codes = {"COURIER_LOCATION_UNKNOWN", "COURIER_BUSY"})
+            codes = {"COURIER_LOCATION_UNKNOWN", "COURIER_BUSY", "COURIER_HAS_ACTIVE_DELIVERY"})
     @PatchMapping("/{id}/status")
     CourierResponse changeStatus(@PathVariable long id, @Valid @RequestBody ChangeStatus request) {
         return CourierResponse.of(service.changeStatus(id, request.requested()));

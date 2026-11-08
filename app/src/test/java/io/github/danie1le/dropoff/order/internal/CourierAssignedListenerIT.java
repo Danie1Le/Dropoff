@@ -20,7 +20,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 
 /**
  * The order side of an accept (M3-3, ticket #11): {@code CourierAssigned} records the courier, but only on a READY
- * order. The listener is called directly, without its async proxy, so each test sees the update as soon as it returns.
+ * order and only for an offer newer than the one already recorded (ticket #85). The listener is called directly, without its async proxy, so each test sees the update as soon as it returns.
  */
 @SpringBootTest
 @Import(TestcontainersConfiguration.class)
@@ -86,7 +86,19 @@ class CourierAssignedListenerIT {
     }
 
     private void assign(long orderId, long courierId) {
-        listener.on(new CourierAssigned(UUID.randomUUID(), orderId, courierId, 1, Instant.now()));
+        assign(orderId, courierId, 1);
+    }
+
+    private void assign(long orderId, long courierId, long offerId) {
+        listener.on(new CourierAssigned(UUID.randomUUID(), orderId, courierId, offerId, Instant.now()));
+    }
+
+    private @Nullable Long assignedOfferOf(long orderId) {
+        return jdbc.sql("SELECT assigned_offer_id FROM orders WHERE id = ?")
+                .param(orderId)
+                .query((rs, row) -> rs.getObject("assigned_offer_id", Long.class))
+                .list()
+                .get(0);
     }
 
     @Test
@@ -98,6 +110,7 @@ class CourierAssignedListenerIT {
         assign(orderId, courierId);
 
         assertThat(courierOf(orderId)).isEqualTo(courierId);
+        assertThat(assignedOfferOf(orderId)).isEqualTo(1L);
         assertThat(jdbc.sql("SELECT status FROM orders WHERE id = ?")
                         .param(orderId)
                         .query(String.class)
@@ -116,5 +129,18 @@ class CourierAssignedListenerIT {
 
         assertThat(courierOf(cancelled)).isNull();
         assertThat(courierOf(preparing)).isNull();
+    }
+
+    @Test
+    void anOlderOfferArrivingLateDoesNotReplaceANewerOne() {
+        long orderId = order("READY");
+        long first = courier();
+        long second = courier();
+
+        assign(orderId, second, 2);
+        assign(orderId, first, 1);
+
+        assertThat(courierOf(orderId)).isEqualTo(second);
+        assertThat(assignedOfferOf(orderId)).isEqualTo(2L);
     }
 }

@@ -12,17 +12,27 @@ enum CourierStatus {
     BUSY;
 
     /**
-     * The status after the courier asks for {@code requested} (ticket #42, point 10). OFFLINE is always allowed for
-     * now, since nothing sets BUSY before M3-2; M3-4 (ticket #85) narrows it so a courier with a picked-up delivery gets
-     * 409 COURIER_HAS_ACTIVE_DELIVERY. AVAILABLE needs a known location and is refused while BUSY. Asking for the
-     * current status is a no-op.
+     * The status after the courier asks for {@code requested} (ticket #42, point 10; ticket #85). OFFLINE is allowed
+     * from any status unless the courier carries a picked-up order, which gets 409 COURIER_HAS_ACTIVE_DELIVERY: food
+     * on the road must not lose its courier. Whatever else the courier holds is released by the caller: an open offer
+     * is declined and an assigned order is unassigned. AVAILABLE needs a known location and is refused while BUSY.
+     * Asking for the current status is a no-op.
      *
+     * @param hasActiveDelivery whether the courier has an order in PICKED_UP
      * @throws IllegalArgumentException if {@code requested} is BUSY: the request validation lets only AVAILABLE and
      *     OFFLINE through
      */
-    CourierStatus change(CourierStatus requested, boolean hasLocation) {
+    CourierStatus change(CourierStatus requested, boolean hasLocation, boolean hasActiveDelivery) {
         return switch (requested) {
-            case OFFLINE -> OFFLINE;
+            case OFFLINE -> {
+                if (hasActiveDelivery) {
+                    throw new DomainException(
+                            DomainException.Category.CONFLICT,
+                            "COURIER_HAS_ACTIVE_DELIVERY",
+                            "The courier has picked up an order and cannot go OFFLINE until it is delivered.");
+                }
+                yield OFFLINE;
+            }
             case AVAILABLE -> {
                 if (this == BUSY) {
                     throw new DomainException(
