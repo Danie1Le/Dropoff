@@ -35,7 +35,6 @@ class CourierAssignmentWriterIT {
     private final List<Long> orderIds = new ArrayList<>();
     private final List<Long> customerIds = new ArrayList<>();
     private final List<Long> merchantIds = new ArrayList<>();
-    private final List<Long> courierIds = new ArrayList<>();
 
     CourierAssignmentWriterIT(@Autowired JdbcClient jdbc) {
         this.jdbc = jdbc;
@@ -45,10 +44,9 @@ class CourierAssignmentWriterIT {
     @AfterEach
     void deleteCreatedRows() {
         OrderFixtures.deleteOrders(jdbc, orderIds);
-        deleteByIds("couriers", courierIds);
         deleteByIds("customers", customerIds);
         OrderFixtures.deleteMerchants(jdbc, merchantIds);
-        for (List<Long> ids : List.of(orderIds, courierIds, customerIds, merchantIds)) {
+        for (List<Long> ids : List.of(orderIds, customerIds, merchantIds)) {
             ids.clear();
         }
     }
@@ -72,12 +70,9 @@ class CourierAssignmentWriterIT {
         return orderId;
     }
 
-    private long courier() {
-        long id = jdbc.sql("INSERT INTO couriers (name, status) VALUES ('Carla', 'BUSY') RETURNING id")
-                .query(Long.class)
-                .single();
-        courierIds.add(id);
-        return id;
+    /** Couriers live in dispatch-service since M5-4; the order only stores the id. */
+    private static long courier() {
+        return OrderFixtures.courierId();
     }
 
     /** The order's courier, or null. Read with {@code list()}, since {@code single()} rejects a null value. */
@@ -106,7 +101,7 @@ class CourierAssignmentWriterIT {
 
     /** Assigns the courier for a new accepted offer, and returns its id. */
     private long assign(long orderId, long courierId) {
-        long offerId = OrderFixtures.acceptedOffer(jdbc, orderId, courierId);
+        long offerId = OrderFixtures.offerId();
         assign(orderId, courierId, offerId);
         return offerId;
     }
@@ -151,8 +146,8 @@ class CourierAssignmentWriterIT {
         long first = courier();
         long second = courier();
 
-        long older = OrderFixtures.acceptedOffer(jdbc, orderId, first);
-        long newer = OrderFixtures.acceptedOffer(jdbc, orderId, second);
+        long older = OrderFixtures.offerId();
+        long newer = OrderFixtures.offerId();
 
         assign(orderId, second, newer);
         assign(orderId, first, older);

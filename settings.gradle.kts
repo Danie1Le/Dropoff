@@ -23,5 +23,9 @@ include("app")
 include("contracts")
 // DomainException, Problem Details error handling, paging limits and the /api/v1 prefix for every service (M5-2).
 include("libs:web-common")
+// Kafka setup, consumer dedupe and clocks every service shares, plus their Testcontainers test fixtures (M5-4).
+include("libs:service-common")
+// dispatch-service on port 8083 with its own dispatch_db (M5-4, ADR-0007): couriers, offers and dispatch_orders.
+include("services:dispatch")
 // Demo data seeder and courier/merchant/customer bots (M3-6, ticket #33). Plain Java, no Spring.
 include("tools:simulator")

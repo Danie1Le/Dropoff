@@ -1,5 +1,6 @@
 # Local infrastructure for development (ticket #6 picks the images).
-# Start with `docker compose up -d`; the app runs with `./gradlew :app:bootRun`.
+# Start with `docker compose up -d`; the app runs with `./gradlew :app:bootRun` (port 8080) and dispatch-service with
+# `./gradlew :services:dispatch:bootRun` (port 8083).
 services:
   postgres:
     # Keep in sync with TestcontainersConfiguration (integration tests use the same image).
@@ -13,6 +14,9 @@ services:
     volumes:
       # Postgres 18 images keep data under /var/lib/postgresql (not .../data).
       - postgres-data:/var/lib/postgresql
+      # Creates dispatch_db, merchant_db and order_db with one user each (M5-4, ADR-0007). It runs only on an empty
+      # volume: after a change, `docker compose down -v` and reseed.
+      - ./ops/postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U dropoff -d dropoff"]
       interval: 5s

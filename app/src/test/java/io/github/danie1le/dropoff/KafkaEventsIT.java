@@ -45,7 +45,7 @@ class KafkaEventsIT {
 
     @AfterEach
     void deleteProcessedEvents() {
-        KafkaTestSupport.awaitSettled(jdbc);
+        Consumers.awaitSettled(jdbc);
         if (!eventIds.isEmpty()) {
             jdbc.sql("DELETE FROM processed_events WHERE event_id IN (:ids)")
                     .param("ids", eventIds)
@@ -107,7 +107,7 @@ class KafkaEventsIT {
 
         KafkaTestSupport.send(KafkaTopics.COURIER_EVENTS, Long.toString(orderId), "CourierUnassigned", unassigned);
         KafkaTestSupport.send(KafkaTopics.COURIER_EVENTS, Long.toString(orderId), "CourierUnassigned", unassigned);
-        KafkaTestSupport.awaitSettled(jdbc);
+        Consumers.awaitSettled(jdbc);
 
         assertThat(jdbc.sql("SELECT count(*) FROM processed_events WHERE consumer_group = 'order-service'"
                                 + " AND event_id = ?")
@@ -132,13 +132,13 @@ class KafkaEventsIT {
         String key = Long.toString(unknownOrderId());
         byte[] poison = "not json".getBytes(StandardCharsets.UTF_8);
 
-        KafkaTestSupport.send(KafkaTopics.ORDER_EVENTS, key, "OrderReady", poison);
+        KafkaTestSupport.send(KafkaTopics.COURIER_EVENTS, key, "CourierAssigned", poison);
 
         ConsumerRecord<String, byte[]> dead = KafkaTestSupport.readUntil(
-                        KafkaTopics.ORDER_EVENTS + ".DLT", record -> key.equals(record.key()))
+                        KafkaTopics.COURIER_EVENTS + ".DLT", record -> key.equals(record.key()))
                 .getLast();
         assertThat(dead.value()).isEqualTo(poison);
         assertThat(KafkaTestSupport.header(dead, "kafka_dlt-original-consumer-group"))
-                .isEqualTo("dispatch-service");
+                .isEqualTo("order-service");
     }
 }

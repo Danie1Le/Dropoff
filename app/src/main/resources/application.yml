@@ -6,11 +6,6 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/dropoff}
     username: ${DB_USERNAME:dropoff}
     password: ${DB_PASSWORD:dropoff}
-  data:
-    redis:
-      # Defaults match compose.yaml; containers override them with REDIS_HOST and REDIS_PORT.
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
   kafka:
     # Default matches compose.yaml; containers override it with KAFKA_BOOTSTRAP_SERVERS.
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}

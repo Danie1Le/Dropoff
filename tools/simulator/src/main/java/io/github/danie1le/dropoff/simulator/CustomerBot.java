@@ -47,7 +47,7 @@ final class CustomerBot implements Bot {
         nextOrderAt = nextOrderAt.equals(Instant.MIN) ? now.plus(interval) : nextOrderAt.plus(interval);
         long customerId = pick(state.customerIds());
         SimState.MerchantState merchant = pick(state.merchants());
-        List<OrderLine> lines = lines(merchant.menuItemIds());
+        List<OrderLine> lines = lines(merchant.menuItemIds(), random);
         try {
             long orderId = api.placeOrder(customerId, merchant.id(), lines);
             stats.ordersPlaced++;
@@ -58,7 +58,8 @@ final class CustomerBot implements Bot {
         }
     }
 
-    private List<OrderLine> lines(List<Long> menuItemIds) {
+    /** One to three different items from the menu, one or two of each. The smoke test orders the same way. */
+    static List<OrderLine> lines(List<Long> menuItemIds, Random random) {
         List<Long> items = new ArrayList<>(menuItemIds);
         int count = 1 + random.nextInt(Math.min(MAX_LINES, items.size()));
         List<OrderLine> lines = new ArrayList<>();

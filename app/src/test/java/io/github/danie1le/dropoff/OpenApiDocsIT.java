@@ -22,7 +22,10 @@ class OpenApiDocsIT {
 
     private static final String PROBLEM = "#/components/schemas/Problem";
 
-    /** Every Dropoff endpoint on main, path to HTTP methods. Test-only controllers are left out. */
+    /**
+     * Every endpoint of the app, path to HTTP methods. Test-only controllers are left out. Courier, location and offer
+     * endpoints moved to dispatch-service in M5-4 (its own OpenApiDocsIT); a courier's pick-up and deliver stay here.
+     */
     private static final Map<String, List<String>> OPERATIONS = Map.ofEntries(
             Map.entry("/api/v1/merchants", List.of("get", "post")),
             Map.entry("/api/v1/merchants/{id}", List.of("get", "patch")),
@@ -40,13 +43,6 @@ class OpenApiDocsIT {
             Map.entry("/api/v1/merchants/{merchantId}/orders/{orderId}/ready", List.of("post")),
             Map.entry("/api/v1/merchants/{merchantId}/orders/{orderId}/cancel", List.of("post")),
             Map.entry("/api/v1/customers/{customerId}/orders/{orderId}/cancel", List.of("post")),
-            Map.entry("/api/v1/couriers", List.of("post")),
-            Map.entry("/api/v1/couriers/{id}", List.of("get")),
-            Map.entry("/api/v1/couriers/{id}/status", List.of("patch")),
-            Map.entry("/api/v1/couriers/{id}/location", List.of("put")),
-            Map.entry("/api/v1/couriers/{courierId}/offers/current", List.of("get")),
-            Map.entry("/api/v1/couriers/{courierId}/offers/{offerId}/accept", List.of("post")),
-            Map.entry("/api/v1/couriers/{courierId}/offers/{offerId}/decline", List.of("post")),
             Map.entry("/api/v1/couriers/{courierId}/orders/{orderId}/pick-up", List.of("post")),
             Map.entry("/api/v1/couriers/{courierId}/orders/{orderId}/deliver", List.of("post")));
 
@@ -128,36 +124,6 @@ class OpenApiDocsIT {
                 .containsKeys("200", "400", "404", "409", "500");
         assertThat(result)
                 .bodyJson()
-                .extractingPath("$.paths['/api/v1/couriers/{id}/status'].patch.responses.409.description")
-                .asString()
-                .contains("COURIER_LOCATION_UNKNOWN", "COURIER_BUSY", "COURIER_HAS_ACTIVE_DELIVERY");
-        assertThat(result)
-                .bodyJson()
-                .extractingPath("$.paths['/api/v1/couriers/{courierId}/offers/current'].get.responses")
-                .asMap()
-                .containsKeys("200", "204", "404");
-        for (String command : List.of("accept", "decline")) {
-            String responses =
-                    "$.paths['/api/v1/couriers/{courierId}/offers/{offerId}/%s'].post.responses".formatted(command);
-            assertThat(result)
-                    .bodyJson()
-                    .extractingPath(responses + ".404.description")
-                    .asString()
-                    .contains("COURIER_NOT_FOUND", "OFFER_NOT_FOUND");
-            assertThat(result)
-                    .bodyJson()
-                    .extractingPath(responses + ".409.description")
-                    .asString()
-                    .contains("OFFER_CLOSED");
-        }
-        assertThat(result)
-                .bodyJson()
-                .extractingPath(
-                        "$.paths['/api/v1/couriers/{courierId}/offers/{offerId}/accept'].post.responses.409.description")
-                .asString()
-                .contains("COURIER_NOT_BUSY");
-        assertThat(result)
-                .bodyJson()
                 .extractingPath("$.paths['/api/v1/orders'].post.responses.422.description")
                 .asString()
                 .contains(
@@ -197,11 +163,7 @@ class OpenApiDocsIT {
         MvcTestResult result = apiDocs();
 
         for (String path : List.of(
-                "/api/v1/merchants",
-                "/api/v1/merchants/{id}/menu-items",
-                "/api/v1/customers",
-                "/api/v1/orders",
-                "/api/v1/couriers")) {
+                "/api/v1/merchants", "/api/v1/merchants/{id}/menu-items", "/api/v1/customers", "/api/v1/orders")) {
             assertThat(result)
                     .bodyJson()
                     .extractingPath("$.paths['" + path + "'].post.responses")
