@@ -19,3 +19,5 @@ dependencyResolutionManagement {
 rootProject.name = "dropoff"
 
 include("app")
+// Demo data seeder and courier/merchant/customer bots (M3-6, ticket #33). Plain Java, no Spring.
+include("tools:simulator")
