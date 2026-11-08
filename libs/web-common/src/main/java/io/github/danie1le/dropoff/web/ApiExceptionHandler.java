@@ -1,6 +1,5 @@
-package io.github.danie1le.dropoff.common.web;
+package io.github.danie1le.dropoff.web;
 
-import io.github.danie1le.dropoff.common.DomainException;
 import java.util.List;
 import java.util.Map;
 import org.jspecify.annotations.Nullable;

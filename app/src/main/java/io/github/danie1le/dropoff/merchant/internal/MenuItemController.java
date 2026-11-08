@@ -1,9 +1,9 @@
 package io.github.danie1le.dropoff.merchant.internal;
 
-import io.github.danie1le.dropoff.common.ProblemResponse;
 import io.github.danie1le.dropoff.merchant.internal.MenuItemRequests.CreateMenuItem;
 import io.github.danie1le.dropoff.merchant.internal.MenuItemRequests.MenuItemResponse;
 import io.github.danie1le.dropoff.merchant.internal.MenuItemRequests.UpdateMenuItem;
+import io.github.danie1le.dropoff.web.ProblemResponse;
 import io.swagger.v3.oas.annotations.headers.Header;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;

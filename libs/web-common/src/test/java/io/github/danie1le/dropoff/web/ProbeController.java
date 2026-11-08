@@ -1,7 +1,5 @@
-package io.github.danie1le.dropoff.common.web;
+package io.github.danie1le.dropoff.web;
 
-import io.github.danie1le.dropoff.common.DomainException;
-import io.github.danie1le.dropoff.common.PageParams;
 import jakarta.validation.Constraint;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;

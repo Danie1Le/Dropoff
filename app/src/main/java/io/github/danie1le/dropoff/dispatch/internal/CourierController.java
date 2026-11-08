@@ -1,10 +1,10 @@
 package io.github.danie1le.dropoff.dispatch.internal;
 
-import io.github.danie1le.dropoff.common.ProblemResponse;
 import io.github.danie1le.dropoff.dispatch.internal.CourierRequests.ChangeStatus;
 import io.github.danie1le.dropoff.dispatch.internal.CourierRequests.CourierResponse;
 import io.github.danie1le.dropoff.dispatch.internal.CourierRequests.CreateCourier;
 import io.github.danie1le.dropoff.dispatch.internal.CourierRequests.UpdateLocation;
+import io.github.danie1le.dropoff.web.ProblemResponse;
 import io.swagger.v3.oas.annotations.headers.Header;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;

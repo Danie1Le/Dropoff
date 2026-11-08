@@ -1,7 +1,6 @@
 package io.github.danie1le.dropoff.order.internal;
 
 import io.github.danie1le.dropoff.common.DbClock;
-import io.github.danie1le.dropoff.common.DomainException;
 import io.github.danie1le.dropoff.contracts.Actor;
 import io.github.danie1le.dropoff.contracts.OrderCancelled;
 import io.github.danie1le.dropoff.contracts.OrderDelivered;
@@ -10,6 +9,7 @@ import io.github.danie1le.dropoff.contracts.OrderReady;
 import io.github.danie1le.dropoff.merchant.MerchantDirectory;
 import io.github.danie1le.dropoff.merchant.MerchantDirectory.MerchantView;
 import io.github.danie1le.dropoff.order.internal.OrderRequests.OrderResponse;
+import io.github.danie1le.dropoff.web.DomainException;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import java.sql.Timestamp;

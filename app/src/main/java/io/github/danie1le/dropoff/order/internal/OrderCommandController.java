@@ -1,7 +1,7 @@
 package io.github.danie1le.dropoff.order.internal;
 
-import io.github.danie1le.dropoff.common.ProblemResponse;
 import io.github.danie1le.dropoff.order.internal.OrderRequests.OrderResponse;
+import io.github.danie1le.dropoff.web.ProblemResponse;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;

@@ -1,4 +1,4 @@
-package io.github.danie1le.dropoff.common;
+package io.github.danie1le.dropoff.web;
 
 /**
  * A broken business rule. Domain code throws it without knowing about HTTP; the web layer maps the {@link Category}

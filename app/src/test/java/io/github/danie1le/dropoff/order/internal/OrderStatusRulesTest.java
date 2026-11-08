@@ -20,8 +20,8 @@ import static io.github.danie1le.dropoff.order.internal.OrderStatus.READY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import io.github.danie1le.dropoff.common.DomainException;
 import io.github.danie1le.dropoff.contracts.Actor;
+import io.github.danie1le.dropoff.web.DomainException;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.stream.Stream;

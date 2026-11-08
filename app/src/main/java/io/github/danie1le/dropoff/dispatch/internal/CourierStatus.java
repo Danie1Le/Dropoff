@@ -1,6 +1,6 @@
 package io.github.danie1le.dropoff.dispatch.internal;
 
-import io.github.danie1le.dropoff.common.DomainException;
+import io.github.danie1le.dropoff.web.DomainException;
 
 /** Whether a courier can get offers (GLOSSARY: Courier). The V8 CHECK repeats these values. */
 enum CourierStatus {

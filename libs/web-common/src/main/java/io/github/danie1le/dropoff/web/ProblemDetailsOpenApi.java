@@ -1,6 +1,5 @@
-package io.github.danie1le.dropoff.common.web;
+package io.github.danie1le.dropoff.web;
 
-import io.github.danie1le.dropoff.common.ProblemResponse;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.media.ArraySchema;
 import io.swagger.v3.oas.models.media.Content;

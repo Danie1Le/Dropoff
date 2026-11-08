@@ -1,4 +1,4 @@
-package io.github.danie1le.dropoff.common.web;
+package io.github.danie1le.dropoff.web;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.bind.annotation.RestController;

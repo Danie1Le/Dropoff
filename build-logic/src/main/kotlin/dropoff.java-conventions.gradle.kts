@@ -33,6 +33,11 @@ dependencies {
 
 tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
+    // Spring binds @PathVariable and @RequestParam by parameter name. The Spring Boot plugin adds this flag to Boot
+    // apps only, so library modules such as libs/web-common (M5-2) need it here too.
+    if ("-parameters" !in options.compilerArgs) {
+        options.compilerArgs.add("-parameters")
+    }
     options.errorprone {
         // ERROR-level checks fail the build; warnings print and are reviewed (ticket #7).
         check("NullAway", CheckSeverity.ERROR)

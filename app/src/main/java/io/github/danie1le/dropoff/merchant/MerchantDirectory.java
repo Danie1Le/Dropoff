@@ -1,6 +1,6 @@
 package io.github.danie1le.dropoff.merchant;
 
-import io.github.danie1le.dropoff.common.DomainException;
+import io.github.danie1le.dropoff.web.DomainException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;

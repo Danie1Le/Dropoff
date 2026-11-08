@@ -1,8 +1,8 @@
 package io.github.danie1le.dropoff.merchant.internal;
 
-import io.github.danie1le.dropoff.common.DomainException;
 import io.github.danie1le.dropoff.merchant.internal.MenuItemRequests.CreateMenuItem;
 import io.github.danie1le.dropoff.merchant.internal.MenuItemRequests.UpdateMenuItem;
+import io.github.danie1le.dropoff.web.DomainException;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

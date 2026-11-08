@@ -1,7 +1,7 @@
 package io.github.danie1le.dropoff.order.internal;
 
-import io.github.danie1le.dropoff.common.DomainException;
 import io.github.danie1le.dropoff.contracts.Actor;
+import io.github.danie1le.dropoff.web.DomainException;
 
 /**
  * The order status rules in pure Java (tickets #3, #10, #13). PLACED → ACCEPTED → PREPARING → READY → PICKED_UP →

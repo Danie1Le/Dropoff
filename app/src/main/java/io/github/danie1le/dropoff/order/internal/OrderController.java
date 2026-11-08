@@ -1,9 +1,9 @@
 package io.github.danie1le.dropoff.order.internal;
 
-import io.github.danie1le.dropoff.common.ProblemResponse;
 import io.github.danie1le.dropoff.order.internal.OrderRequests.OrderResponse;
 import io.github.danie1le.dropoff.order.internal.OrderRequests.PlaceOrder;
 import io.github.danie1le.dropoff.order.internal.OrderService.Placement;
+import io.github.danie1le.dropoff.web.ProblemResponse;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.headers.Header;
