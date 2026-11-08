@@ -34,6 +34,24 @@ jobs:
       - name: Format, static checks and unit tests
         run: ./gradlew build -x integrationTest
 
+      # The build step made the boot jars; the Dockerfiles copy them (M6-3, ticket #114). Images are built, not pushed.
+      - name: Build images and check their size
+        run: |
+          ./gradlew :tools:simulator:installDist
+          docker compose --profile demo build
+          ops/docker/check-image-sizes.sh
+
+      # Boots the three service images and waits for their healthchecks, so a jlink module missing at runtime, a bad
+      # healthcheck or a too-small memory limit fails here. Torn down before the integration tests.
+      - name: Start the service images
+        run: docker compose --profile services up -d --wait --wait-timeout 300
+
+      - name: Stop the service images
+        if: always()
+        run: |
+          docker compose --profile services logs --tail 50 merchant order dispatch || true
+          docker compose --profile services down -v
+
       # Integration tests (*IT) use Testcontainers on the runner's Docker.
       - name: Integration tests (Testcontainers)
         run: ./gradlew integrationTest

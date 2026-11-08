@@ -1,0 +1,4 @@
+# Only the installed libraries and the entrypoint go to the Docker daemon (M6-3).
+*
+!build/install/simulator/lib/
+!docker/

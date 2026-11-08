@@ -1,8 +1,32 @@
-# Local infrastructure for development (ticket #6 picks the images).
-# Start with `docker compose up -d`; then run merchant-service with `./gradlew :services:merchant:bootRun` (port 8081),
-# order-service with `./gradlew :services:order:bootRun` (port 8082) and dispatch-service with
-# `./gradlew :services:dispatch:bootRun` (port 8083). Each logs in as its own user to its own database (ADR-0007).
-# Prometheus (port 9090) scrapes all three (M6-1); Grafana (port 3000) charts them (M6-2).
+# Local infrastructure, plus the three services as containers (ticket #6 picks the images, M6-3 adds the services).
+# A plain `docker compose up -d` starts only the infrastructure (Postgres, Redis, Kafka, Prometheus 9090, Grafana 3000),
+# so the services can run from source with `./gradlew :services:<name>:bootRun`. To run them as containers, build the
+# jars, then pick a profile:
+#   ./gradlew :services:merchant:bootJar :services:order:bootJar :services:dispatch:bootJar :tools:simulator:installDist
+#   docker compose --profile services up -d --build   # plus merchant 8081, order 8082, dispatch 8083
+#   docker compose --profile demo up -d --build       # the same, plus the simulator: seeds once, then runs the bots
+#   docker compose --profile demo down -v             # stop everything, and drop the data and the simulator's state
+# Each service logs in as its own user to its own database (ADR-0007). Prometheus scrapes all three by service name
+# (M6-1); Grafana charts them (M6-2). Their targets show as down while only the infrastructure runs.
+#
+# Memory: each service is capped at 512 MB with a 256 MB heap; the rest is metaspace, threads and Kafka/Netty buffers.
+# If a container exits with code 137 (OOM-killed), raise mem_limit in x-service first (768m), and the heap only if the
+# logs show an OutOfMemoryError: Java heap space. Keep -Xmx at about half of mem_limit.
+
+# Shared by merchant, order and dispatch (YAML merge keys). A service that sets environment or depends_on merges these
+# in with `<<:`, since a merge does not reach into nested maps.
+x-service: &service
+  profiles: [services, demo]
+  mem_limit: 512m
+  environment: &service-env
+    KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+    JAVA_TOOL_OPTIONS: -Xmx256m
+  depends_on: &service-deps
+    postgres:
+      condition: service_healthy
+    kafka:
+      condition: service_healthy
+
 services:
   postgres:
     # Keep in sync with TestcontainersConfiguration (integration tests use the same image).
@@ -73,9 +97,75 @@ services:
     volumes:
       - ./ops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
-    # The services run on the host until M6-3; this makes host.docker.internal work on Linux too.
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+
+  # The three services (M6-3, ticket #114), in profiles `services` and `demo`. Each image is built from the shared
+  # ops/docker/service.Dockerfile and the jar the host built, and is named the way M6-4 publishes it. Ports stay on
+  # 127.0.0.1, so the smoke script and curl work as with bootRun. The healthcheck is in the Dockerfile.
+  merchant:
+    <<: *service
+    image: ghcr.io/danie1le/dropoff-merchant:${DROPOFF_TAG:-local}
+    build:
+      context: services/merchant
+      dockerfile: ../../ops/docker/service.Dockerfile
+      args: {JAR: merchant.jar, PORT: 8081}
+    ports:
+      - "127.0.0.1:8081:8081"
+    environment:
+      <<: *service-env
+      DB_URL: jdbc:postgresql://postgres:5432/merchant_db
+
+  order:
+    <<: *service
+    image: ghcr.io/danie1le/dropoff-order:${DROPOFF_TAG:-local}
+    build:
+      context: services/order
+      dockerfile: ../../ops/docker/service.Dockerfile
+      args: {JAR: order.jar, PORT: 8082}
+    ports:
+      - "127.0.0.1:8082:8082"
+    environment:
+      <<: *service-env
+      DB_URL: jdbc:postgresql://postgres:5432/order_db
+
+  dispatch:
+    <<: *service
+    image: ghcr.io/danie1le/dropoff-dispatch:${DROPOFF_TAG:-local}
+    build:
+      context: services/dispatch
+      dockerfile: ../../ops/docker/service.Dockerfile
+      args: {JAR: dispatch.jar, PORT: 8083}
+    ports:
+      - "127.0.0.1:8083:8083"
+    environment:
+      <<: *service-env
+      DB_URL: jdbc:postgresql://postgres:5432/dispatch_db
+      REDIS_HOST: redis
+    depends_on:
+      <<: *service-deps
+      redis:
+        condition: service_healthy
+
+  # Profile demo only (M6-3): seeds through the services if /data/state.json is missing, then runs the customer,
+  # merchant and courier bots until stopped. `docker compose down -v` drops the volume with the databases, so the next
+  # demo seeds again. `docker compose --profile demo run --rm simulator smoke` runs the full-flow check instead. Smoke
+  # keeps its own state in /data/smoke-state.json, so it seeds and drives its own merchants and couriers instead of
+  # racing the demo's bots for theirs.
+  simulator:
+    image: ghcr.io/danie1le/dropoff-simulator:${DROPOFF_TAG:-local}
+    build: tools/simulator
+    profiles: [demo]
+    environment:
+      JAVA_TOOL_OPTIONS: -Xmx128m
+    mem_limit: 256m
+    volumes:
+      - simulator-data:/data
+    depends_on:
+      merchant:
+        condition: service_healthy
+      order:
+        condition: service_healthy
+      dispatch:
+        condition: service_healthy
 
   grafana:
     # Dashboard, datasource and alert rules come from ops/grafana/provisioning (M6-2, ticket #34). UI at
@@ -100,3 +190,4 @@ volumes:
   kafka-data:
   prometheus-data:
   grafana-data:
+  simulator-data:
