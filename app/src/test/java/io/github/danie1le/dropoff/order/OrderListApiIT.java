@@ -99,6 +99,18 @@ class OrderListApiIT {
         assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("MERCHANT_NOT_FOUND");
     }
 
+    /** The order module knows a merchant only through its copy (M5-3, ADR-0007). */
+    @Test
+    void merchantWithNoCopyIsNotFound() {
+        long m = OrderFixtures.merchant(jdbc, true);
+        jdbc.sql("DELETE FROM merchant_copies WHERE merchant_id = ?").param(m).update();
+
+        MvcTestResult result = mvc.get().uri("/api/v1/merchants/{id}/orders", m).exchange();
+
+        assertThat(result).hasStatus(HttpStatus.NOT_FOUND);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("MERCHANT_NOT_FOUND");
+    }
+
     @Test
     void unknownCustomerIsNotFound() {
         MvcTestResult result =

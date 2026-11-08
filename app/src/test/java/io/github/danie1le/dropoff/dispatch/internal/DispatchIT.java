@@ -84,7 +84,7 @@ class DispatchIT {
         OrderFixtures.deleteOrders(jdbc, orderIds);
         deleteByIds("couriers", courierIds);
         deleteByIds("customers", customerIds);
-        deleteByIds("merchants", merchantIds);
+        OrderFixtures.deleteMerchants(jdbc, merchantIds);
         for (List<Long> ids : List.of(orderIds, courierIds, customerIds, merchantIds)) {
             ids.clear();
         }

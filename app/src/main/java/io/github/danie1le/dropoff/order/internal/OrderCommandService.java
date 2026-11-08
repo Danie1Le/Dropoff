@@ -6,8 +6,7 @@ import io.github.danie1le.dropoff.contracts.OrderCancelled;
 import io.github.danie1le.dropoff.contracts.OrderDelivered;
 import io.github.danie1le.dropoff.contracts.OrderPickedUp;
 import io.github.danie1le.dropoff.contracts.OrderReady;
-import io.github.danie1le.dropoff.merchant.MerchantDirectory;
-import io.github.danie1le.dropoff.merchant.MerchantDirectory.MerchantView;
+import io.github.danie1le.dropoff.order.internal.MerchantCopies.MerchantCopy;
 import io.github.danie1le.dropoff.order.internal.OrderRequests.OrderResponse;
 import io.github.danie1le.dropoff.web.DomainException;
 import jakarta.persistence.EntityManager;
@@ -34,7 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 class OrderCommandService {
 
     private final OrderRepository orders;
-    private final MerchantDirectory merchants;
+    private final MerchantCopies merchants;
     private final JdbcClient jdbc;
     private final OrderEventLog eventLog;
     private final EntityManager entityManager;
@@ -43,7 +42,7 @@ class OrderCommandService {
 
     OrderCommandService(
             OrderRepository orders,
-            MerchantDirectory merchants,
+            MerchantCopies merchants,
             JdbcClient jdbc,
             OrderEventLog eventLog,
             EntityManager entityManager,
@@ -159,9 +158,10 @@ class OrderCommandService {
             case CANCEL ->
                 events.publishEvent(new OrderCancelled(UUID.randomUUID(), order.id(), order.merchantId(), actor, now));
             case MARK_READY -> {
-                MerchantView merchant = merchants
+                // The pickup point comes from the order module's copy (ADR-0007), so dispatch needs no merchant data.
+                MerchantCopy merchant = merchants
                         .findMerchant(order.merchantId())
-                        .orElseThrow(() -> new IllegalStateException("order's merchant is gone"));
+                        .orElseThrow(() -> new IllegalStateException("order's merchant has no copy"));
                 Location delivery = order.deliveryAddress();
                 events.publishEvent(new OrderReady(
                         UUID.randomUUID(),

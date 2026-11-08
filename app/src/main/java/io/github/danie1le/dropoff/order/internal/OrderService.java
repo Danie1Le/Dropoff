@@ -5,9 +5,8 @@ import static io.github.danie1le.dropoff.web.Validated.required;
 import io.github.danie1le.dropoff.common.DbClock;
 import io.github.danie1le.dropoff.contracts.Actor;
 import io.github.danie1le.dropoff.contracts.OrderPlaced;
-import io.github.danie1le.dropoff.merchant.MerchantDirectory;
-import io.github.danie1le.dropoff.merchant.MerchantDirectory.MenuItemView;
-import io.github.danie1le.dropoff.merchant.MerchantDirectory.MerchantView;
+import io.github.danie1le.dropoff.order.internal.MerchantCopies.MenuItemCopy;
+import io.github.danie1le.dropoff.order.internal.MerchantCopies.MerchantCopy;
 import io.github.danie1le.dropoff.order.internal.OrderRequests.OrderResponse;
 import io.github.danie1le.dropoff.order.internal.OrderRequests.PlaceOrder;
 import io.github.danie1le.dropoff.web.DomainException;
@@ -34,7 +33,7 @@ class OrderService {
 
     private final OrderRepository orders;
     private final CustomerRepository customers;
-    private final MerchantDirectory merchants;
+    private final MerchantCopies merchants;
     private final OrderEventLog eventLog;
     private final ApplicationEventPublisher events;
     private final Clock clock;
@@ -42,7 +41,7 @@ class OrderService {
     OrderService(
             OrderRepository orders,
             CustomerRepository customers,
-            MerchantDirectory merchants,
+            MerchantCopies merchants,
             OrderEventLog eventLog,
             ApplicationEventPublisher events,
             Clock clock) {
@@ -67,8 +66,9 @@ class OrderService {
      * Places a PLACED order and publishes {@link OrderPlaced}, or replays the order already placed with this
      * idempotency key (M2-4). A replay skips every other check, so it succeeds even if, say, the merchant has closed
      * since. Otherwise checks run in this order: customer, merchant, merchant open, then each menu item by ascending
-     * id (unknown, wrong merchant, unavailable). Repeated menu items merge into one line, since an order has one line
-     * per menu item.
+     * id (unknown, wrong merchant, unavailable). Merchants and items are read from the order module's own copies
+     * (M5-3, ADR-0007), so an id merchant has not published yet is unknown here. Repeated menu items merge into one
+     * line, since an order has one line per menu item.
      *
      * <p>A concurrent request with the same key waits on the unique index and then fails with
      * {@link org.springframework.dao.DataIntegrityViolationException}; the caller then calls {@link #replay}.
@@ -87,18 +87,18 @@ class OrderService {
         Customer customer = customers
                 .findById(customerId)
                 .orElseThrow(() -> unprocessable("CUSTOMER_UNKNOWN", "The customer does not exist."));
-        MerchantView merchant = merchants
+        MerchantCopy merchant = merchants
                 .findMerchant(merchantId)
                 .orElseThrow(() -> unprocessable("MERCHANT_UNKNOWN", "The merchant does not exist."));
         if (!merchant.open()) {
             throw unprocessable("MERCHANT_CLOSED", "The merchant is closed.");
         }
 
-        Map<Long, MenuItemView> items = merchants.findMenuItems(quantities.keySet()).stream()
-                .collect(Collectors.toMap(MenuItemView::id, Function.identity()));
+        Map<Long, MenuItemCopy> items = merchants.findMenuItems(quantities.keySet()).stream()
+                .collect(Collectors.toMap(MenuItemCopy::id, Function.identity()));
         List<OrderLine> lines = new ArrayList<>();
         quantities.forEach((menuItemId, quantity) -> {
-            MenuItemView item = items.get(menuItemId);
+            MenuItemCopy item = items.get(menuItemId);
             if (item == null) {
                 throw unprocessable("MENU_ITEM_UNKNOWN", "A menu item does not exist.");
             }

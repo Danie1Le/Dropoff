@@ -90,7 +90,7 @@ class CourierLocationStompIT {
         OrderFixtures.deleteOrders(jdbc, orderIds);
         deleteByIds("couriers", courierIds);
         deleteByIds("customers", customerIds);
-        deleteByIds("merchants", merchantIds);
+        OrderFixtures.deleteMerchants(jdbc, merchantIds);
     }
 
     private void deleteByIds(String table, List<Long> ids) {

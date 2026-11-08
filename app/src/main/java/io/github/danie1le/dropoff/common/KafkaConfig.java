@@ -3,6 +3,8 @@ package io.github.danie1le.dropoff.common;
 import io.github.danie1le.dropoff.contracts.CourierAssigned;
 import io.github.danie1le.dropoff.contracts.CourierLocationUpdated;
 import io.github.danie1le.dropoff.contracts.CourierUnassigned;
+import io.github.danie1le.dropoff.contracts.MenuItemChanged;
+import io.github.danie1le.dropoff.contracts.MerchantChanged;
 import io.github.danie1le.dropoff.contracts.OrderCancelled;
 import io.github.danie1le.dropoff.contracts.OrderDelivered;
 import io.github.danie1le.dropoff.contracts.OrderPickedUp;
@@ -41,7 +43,7 @@ import tools.jackson.databind.json.JsonMapper;
  * <ul>
  *   <li>Topics are declared here and created at startup; the broker never creates one on its own.
  *   <li>Events leave through the Modulith event registry (the outbox): it stores each event in the transaction that
- *       publishes it, and sends it to its topic, keyed by orderId, only after that transaction commits.
+ *       publishes it, and sends it to its topic only after that transaction commits.
  *   <li>Values are JSON. The {@code __TypeId__} header carries a logical name ({@code OrderReady}) instead of the Java
  *       class, so the classes can move packages, and consumers pick the type from it.
  *   <li>A failed record is retried 3 times (1 s, 2 s, 4 s), then sent to {@code <topic>.DLT}. A record that cannot be
@@ -56,10 +58,9 @@ class KafkaConfig {
     static final String DLT_SUFFIX = ".DLT";
 
     /**
-     * Every event that crosses Kafka. Its simple name is its logical type name. Add each new contract event here
-     * (M5-3: {@code MerchantChanged}, {@code MenuItemChanged}), and route it in {@link #eventExternalization} if the
-     * registry sends it. A type missing from this list has no logical name, so its records fail conversion and go
-     * straight to the DLT.
+     * Every event that crosses Kafka. Its simple name is its logical type name. Add each new contract event here, and
+     * route it in {@link #eventExternalization} if the registry sends it. A type missing from this list has no logical
+     * name, so its records fail conversion and go straight to the DLT.
      */
     static final List<Class<? extends Record>> EVENTS = List.of(
             OrderPlaced.class,
@@ -69,7 +70,9 @@ class KafkaConfig {
             OrderDelivered.class,
             CourierAssigned.class,
             CourierUnassigned.class,
-            CourierLocationUpdated.class);
+            CourierLocationUpdated.class,
+            MerchantChanged.class,
+            MenuItemChanged.class);
 
     @Bean
     KafkaAdmin.NewTopics topics() {
@@ -107,9 +110,11 @@ class KafkaConfig {
     }
 
     /**
-     * Which events the registry sends to Kafka, and where. {@code CourierLocationUpdated} is not among them: dispatch
-     * sends it straight with {@code KafkaTemplate} (ticket #15). The routes live here, not in {@code @Externalized} on
-     * the records, because the contracts package carries no Spring (ADR-0008).
+     * Which events the registry sends to Kafka, and where. Order and courier events are keyed by orderId; merchant and
+     * menu item changes by their own id, since a compacted topic keeps only the latest record per key (ticket #16).
+     * {@code CourierLocationUpdated} is not among them: dispatch sends it straight with {@code KafkaTemplate} (ticket
+     * #15). The routes live here, not in {@code @Externalized} on the records, because the contracts package carries no
+     * Spring (ADR-0008).
      */
     @Bean
     EventExternalizationConfiguration eventExternalization() {
@@ -122,11 +127,13 @@ class KafkaConfig {
                 .route(OrderDelivered.class, e -> to(KafkaTopics.ORDER_EVENTS, e.orderId()))
                 .route(CourierAssigned.class, e -> to(KafkaTopics.COURIER_EVENTS, e.orderId()))
                 .route(CourierUnassigned.class, e -> to(KafkaTopics.COURIER_EVENTS, e.orderId()))
+                .route(MerchantChanged.class, e -> to(KafkaTopics.MERCHANTS, e.merchantId()))
+                .route(MenuItemChanged.class, e -> to(KafkaTopics.MENU_ITEMS, e.menuItemId()))
                 .build();
     }
 
-    private static RoutingTarget to(String topic, long orderId) {
-        return RoutingTarget.forTarget(topic).andKey(Long.toString(orderId));
+    private static RoutingTarget to(String topic, long key) {
+        return RoutingTarget.forTarget(topic).andKey(Long.toString(key));
     }
 
     /**

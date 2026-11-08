@@ -56,9 +56,17 @@ class OrderCommandEventsIT {
                 });
     }
 
+    /**
+     * The merchant fields come from the order module's copy (M5-3, ADR-0007). The copy is changed here and the
+     * merchants row is not, so the event shows which one was read.
+     */
     @Test
-    void publishesOrderReady(Scenario scenario) {
+    void publishesOrderReadyWithThePickupFromTheMerchantCopy(Scenario scenario) {
         Fixture f = OrderCommandApiIT.placed(mvc, jdbc);
+        jdbc.sql("UPDATE merchant_copies SET name = 'Taco Truck', address = '300 Colorado St', lat = 30.2655,"
+                        + " lng = -97.7450 WHERE merchant_id = ?")
+                .param(f.merchantId())
+                .update();
         post("/api/v1/merchants/{id}/orders/{o}/accept", f.merchantId(), f.orderId());
         post("/api/v1/merchants/{id}/orders/{o}/start-preparing", f.merchantId(), f.orderId());
         scenario.stimulate(() -> post("/api/v1/merchants/{id}/orders/{o}/ready", f.merchantId(), f.orderId()))
@@ -66,10 +74,10 @@ class OrderCommandEventsIT {
                 .matching(e -> e.orderId() == f.orderId())
                 .toArriveAndVerify(e -> {
                     assertThat(e.merchantId()).isEqualTo(f.merchantId());
-                    assertThat(e.merchantName()).isEqualTo("Taco Shop");
-                    assertThat(e.merchantAddress()).isEqualTo("100 Congress Ave");
-                    assertThat(e.pickupLat()).isEqualTo(30.2672);
-                    assertThat(e.pickupLng()).isEqualTo(-97.7431);
+                    assertThat(e.merchantName()).isEqualTo("Taco Truck");
+                    assertThat(e.merchantAddress()).isEqualTo("300 Colorado St");
+                    assertThat(e.pickupLat()).isEqualTo(30.2655);
+                    assertThat(e.pickupLng()).isEqualTo(-97.7450);
                     assertThat(e.deliveryAddress()).isEqualTo("200 Lavaca St");
                     assertThat(e.deliveryLat()).isEqualTo(30.2669);
                     assertThat(e.deliveryLng()).isEqualTo(-97.7466);
