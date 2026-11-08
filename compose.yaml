@@ -6,6 +6,7 @@
 #   docker compose --profile services up -d --build   # plus merchant 8081, order 8082, dispatch 8083
 #   docker compose --profile demo up -d --build       # the same, plus the simulator: seeds once, then runs the bots
 #   docker compose --profile demo down -v             # stop everything, and drop the data and the simulator's state
+#   docker compose --profile demo --profile load run --rm k6 run browse.js   # a short k6 run (M7-1, see the k6 service)
 # CI publishes the images on pushes to main (M6-4); to run those instead of building, set DROPOFF_TAG and pull first.
 # This works only once the four packages are public (a one-time step, see docs/milestones/M6.md):
 #   DROPOFF_TAG=main docker compose --profile demo pull merchant order dispatch simulator
@@ -34,6 +35,9 @@ services:
   postgres:
     # Keep in sync with TestcontainersConfiguration (integration tests use the same image).
     image: postgres:18.6-alpine
+    # pg_stat_statements records every statement's calls and time for M7 (ticket #35; 02-pg-stat-statements.sql
+    # creates its view). track_io_timing adds read times to EXPLAIN (ANALYZE, BUFFERS).
+    command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements", "-c", "track_io_timing=on"]
     environment:
       POSTGRES_DB: dropoff
       POSTGRES_USER: dropoff
@@ -168,6 +172,28 @@ services:
       order:
         condition: service_healthy
       dispatch:
+        condition: service_healthy
+
+  # Profile load only (M7-1, ticket #35): the k6 load generator. It runs one script and exits; docs/milestones/M7.md has the steps.
+  # Start the demo profile first (the simulator seeds, and its bots deliver the load's orders), then for example:
+  #   docker compose --profile demo --profile load run --rm k6 run place-orders.js
+  # Runs are short by default (LOAD_PROFILE=short, about 1 min); LOAD_PROFILE=full is the ticket #35 shape. k6 gets
+  # its own memory cap so a runaway script can't starve the services it measures.
+  k6:
+    image: grafana/k6:2.3.0
+    profiles: [load]
+    mem_limit: 256m
+    working_dir: /scripts
+    environment:
+      LOAD_PROFILE: ${LOAD_PROFILE:-short}
+    volumes:
+      - ./ops/k6:/scripts:ro
+      # Summaries written with --summary-export=/results/<name>.json land in ops/k6/results (git-ignored).
+      - ./ops/k6/results:/results
+    depends_on:
+      merchant:
+        condition: service_healthy
+      order:
         condition: service_healthy
 
   grafana:

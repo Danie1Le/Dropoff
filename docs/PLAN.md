@@ -468,11 +468,13 @@ Goal: measured load and one or two measured wins.
 - Scope:
   - `ops/k6/` scripts:
     - `place-orders`: 5→50 orders/s over 10 min.
-    - `browse`: 100 req/s.
-    - `order-history`: deep pages.
+    - `browse`: 100 req/s for 5 min.
+    - `order-history`: deep pages, 50 req/s for 5 min.
+    - These are `LOAD_PROFILE=full`. Runs default to `short` (about 1 min at a fifth of the rate), since the dev
+      machine is low on memory.
   - Thresholds: p95 < 300 ms, errors < 1%.
-  - Compose profile `load` (`grafana/k6:2.3.0`).
-  - `ops/perf/seed-history.sql` (~200k orders).
+  - Compose profile `load` (`grafana/k6:2.3.0`), capped at 256 MB.
+  - `ops/perf/seed-history.sql` (200k orders: 100 customers with 2,000 each, so deep pages exist).
   - `pg_stat_statements` enabled.
 - Tests: each script runs to completion locally.
 - Decisions: #35.
@@ -481,6 +483,7 @@ Goal: measured load and one or two measured wins.
 - Scope:
   - The median of 3 runs per scenario: throughput, p50/p95/p99, errors, dispatch p95 and the top 5 queries.
   - Hardware and SHA recorded.
+  - The simulator seeds 30 couriers, which saturate far below 10 orders/s, so dispatch p95 mostly measures courier capacity. Record the courier count with the result, or seed more couriers for the run.
   - `docs/perf/README.md` started.
 - Tests: none; this is a measurement PR.
 - Decisions: #35.
