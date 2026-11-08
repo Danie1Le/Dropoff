@@ -24,6 +24,9 @@ RUN java -Djarmode=tools -jar application.jar extract --layers --launcher --dest
 # Stage 2 copies the layers least likely to change first, so a code change rebuilds only the last, smallest layer.
 # No compiler and a non-root user keep it small and unprivileged.
 FROM alpine:${ALPINE_VERSION}
+# Links the package on GHCR to this repository (M6-4), so it shows on the repo page and the workflow's GITHUB_TOKEN can
+# push to it.
+LABEL org.opencontainers.image.source=https://github.com/Danie1Le/Dropoff
 ARG PORT
 ENV JAVA_HOME=/opt/java PATH=/opt/java/bin:$PATH SERVICE_PORT=${PORT}
 COPY --from=build /build/jre /opt/java
