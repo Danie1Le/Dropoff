@@ -363,7 +363,7 @@ Goal: three services talking through durable events. Each PR leaves a working sy
     - `merchants` and `menu-items` (compacted).
     - `<topic>.DLT` (14 days).
     - All topics have 3 partitions and RF 1.
-  - Producers: `spring-modulith-events-kafka` with `@Externalized("<topic>::#{orderId()}")`; `CourierLocationUpdated` sent with `KafkaTemplate`. JSON with logical type names.
+  - Producers: `spring-modulith-events-kafka`, routing each event to `<topic>` keyed by its orderId through an `EventExternalizationConfiguration` bean (not `@Externalized` on the records: `contracts` carries no Spring, ADR-0008); `CourierLocationUpdated` sent with `KafkaTemplate`. JSON with logical type names.
   - Cross-module listeners become Kafka consumers in groups `order-service` and `dispatch-service`.
   - Migration `processed_events(consumer_group, event_id, processed_at, PK(consumer_group, event_id))`.
   - `DefaultErrorHandler`: 3 redelivery attempts (1/2/4 s), then the DLT.

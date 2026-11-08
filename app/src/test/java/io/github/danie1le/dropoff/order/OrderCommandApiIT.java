@@ -2,8 +2,8 @@ package io.github.danie1le.dropoff.order;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.github.danie1le.dropoff.KafkaTestSupport;
 import io.github.danie1le.dropoff.TestcontainersConfiguration;
-import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -11,7 +11,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -51,19 +50,12 @@ class OrderCommandApiIT {
     /**
      * Deletes every order, customer and merchant, and dispatch's rows for those orders; only for ITs that commit.
      *
-     * <p>Marking an order ready starts dispatch's async {@code OrderReady} listener (M3-2), which inserts a {@code
-     * dispatch_orders} row. It first waits for event deliveries still in flight, so that insert never lands between the
-     * deletes. Failed deliveries are not waited for; their registry rows are dropped with the rest.
+     * <p>Marking an order ready sends {@code OrderReady} to dispatch's Kafka consumer (M3-2, M5-1), which inserts a
+     * {@code dispatch_orders} row. It first waits until every event is sent and consumed, so that insert never lands
+     * between the deletes. Failed deliveries are not waited for; their registry rows are dropped with the rest.
      */
     static void deleteAll(JdbcClient jdbc) {
-        Awaitility.await()
-                .pollDelay(Duration.ZERO)
-                .atMost(Duration.ofSeconds(10))
-                .until(() -> jdbc.sql("SELECT count(*) FROM event_publication WHERE completion_date IS NULL"
-                                        + " AND status IS DISTINCT FROM 'FAILED'")
-                                .query(Long.class)
-                                .single()
-                        == 0);
+        KafkaTestSupport.awaitSettled(jdbc);
         jdbc.sql("UPDATE orders SET assigned_offer_id = NULL").update();
         for (String table : List.of(
                 "event_publication",

@@ -13,6 +13,8 @@ dependencies {
     implementation(libs.springdoc.openapi.starter.webmvc.ui)
     implementation(libs.spring.modulith.starter.core)
     implementation(libs.spring.modulith.starter.jdbc)
+    implementation(libs.spring.modulith.events.kafka)
+    implementation(libs.spring.boot.starter.kafka)
     implementation(libs.spring.boot.starter.data.jpa)
     implementation(libs.spring.boot.starter.data.redis)
     implementation(libs.spring.boot.starter.websocket)
@@ -25,5 +27,6 @@ dependencies {
     testImplementation(libs.spring.modulith.starter.test)
     testImplementation(libs.spring.boot.testcontainers)
     testImplementation(libs.testcontainers.postgresql)
+    testImplementation(libs.testcontainers.kafka)
     testRuntimeOnly(libs.junit.platform.launcher)
 }

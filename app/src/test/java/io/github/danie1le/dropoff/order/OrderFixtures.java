@@ -1,5 +1,6 @@
 package io.github.danie1le.dropoff.order;
 
+import io.github.danie1le.dropoff.KafkaTestSupport;
 import java.util.List;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
@@ -65,13 +66,15 @@ public final class OrderFixtures {
     }
 
     /**
-     * Deletes the orders with their lines, events and dispatch rows. Clears {@code orders.assigned_offer_id} first, since
+     * Deletes the orders with their lines, events and dispatch rows. First waits until every Kafka event is consumed, so
+     * no consumer writes a row for these orders after the deletes. Clears {@code orders.assigned_offer_id} next, since
      * its FK to offers would otherwise block deleting them.
      */
     public static void deleteOrders(JdbcClient jdbc, List<Long> orderIds) {
         if (orderIds.isEmpty()) {
             return;
         }
+        KafkaTestSupport.awaitSettled(jdbc);
         jdbc.sql("UPDATE orders SET assigned_offer_id = NULL WHERE id IN (:ids)")
                 .param("ids", orderIds)
                 .update();

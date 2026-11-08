@@ -113,8 +113,10 @@ class DeliveryService {
      *
      * <p>Locks the couriers first, in ascending id order, then the offers, then the {@code dispatch_orders} row: the lock
      * order every dispatch command uses. A courier who appears between reading and locking, or a lost lock race,
-     * rolls the attempt back and it is retried; after the last attempt the failure is logged at ERROR and thrown, so the
-     * event stays incomplete for the event registry.
+     * rolls the attempt back and it is retried; after the last attempt the failure is logged at ERROR and thrown. The
+     * Kafka error handler then redelivers the event 3 more times and, if those fail too, sends it to {@code
+     * order-events.DLT}. From then on dispatch disagrees with the order until someone replays the DLT with {@code
+     * ops/kafka/replay-dlt.sh}; nothing retries it on its own.
      */
     private void takeBack(long orderId, long courierId, String target) {
         for (int attempt = 1; attempt <= TAKE_BACK_ATTEMPTS; attempt++) {
