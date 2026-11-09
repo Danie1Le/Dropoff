@@ -28,7 +28,7 @@ class OrderListController {
     }
 
     @ProblemResponse(status = 404, codes = "MERCHANT_NOT_FOUND")
-    @Operation(summary = "List a merchant orders", description = "Oldest first, optionally filtered by status.")
+    @Operation(summary = "List a merchant's orders", description = "Oldest first, optionally filtered by status.")
     @GetMapping("/merchants/{id}/orders")
     PagedModel<OrderResponse> forMerchant(
             @PathVariable long id,
@@ -41,7 +41,7 @@ class OrderListController {
     }
 
     @ProblemResponse(status = 404, codes = "CUSTOMER_NOT_FOUND")
-    @Operation(summary = "List a customer orders", description = "Newest first.")
+    @Operation(summary = "List a customer's orders", description = "Newest first.")
     @GetMapping("/customers/{id}/orders")
     PagedModel<OrderResponse> forCustomer(@PathVariable long id, @ParameterObject @Valid PageParams params) {
         return lists.forCustomer(id, params);

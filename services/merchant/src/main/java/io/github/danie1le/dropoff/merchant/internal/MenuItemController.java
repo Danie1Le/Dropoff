@@ -47,7 +47,7 @@ class MenuItemController {
     }
 
     @ProblemResponse(status = 404, codes = "MERCHANT_NOT_FOUND")
-    @Operation(summary = "List a merchant menu", description = "Every item of the merchant, available or not.")
+    @Operation(summary = "List a merchant's menu", description = "Every item of the merchant, available or not.")
     @GetMapping("/merchants/{id}/menu")
     List<MenuItemResponse> menu(@PathVariable long id) {
         return service.menu(id).stream().map(MenuItemResponse::of).toList();
