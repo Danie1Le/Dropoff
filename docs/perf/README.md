@@ -37,7 +37,8 @@ of 512 MB, dispatch 411 to 420 MB, merchant 322 to 328 MB, Kafka about 1 GB, Pos
 - `pg_stat_statements_reset()` ran right before each run, so each run's top 5 holds only that run.
 - `browse` and `order-history` change no data, so their six runs shared one stack.
 - Each `place-orders` run started from a fresh stack (`down -v`, `up`, simulator seed, history seed). The 30 couriers
-  can't keep up, so one run leaves about 15,000 orders waiting for a courier. A later run on the same stack would count
+  can't keep up, so one run leaves about 15,800 orders READY and waiting for a courier (the order_db count at run end,
+  see [Dispatch p95](#dispatch-p95)). A later run on the same stack would count
   their long waits in its dispatch time.
 - Every number in the tables is the median of the 3 runs, taken separately for each column.
 - Latency is k6's `http_req_duration` for the measured requests only (`kind:load`), so setup requests don't count.
@@ -80,13 +81,14 @@ the baseline.
 | Dispatch time p95 (READY to accept) | 2.12 s, 32.07 s, 2.13 s | 2.13 s |
 | Dispatch time p50 | 1.00 s, 0.93 s, 0.93 s | 0.93 s |
 | Orders dispatched during the run | 24, 29, 27 | 27 |
-| Most orders waiting for a courier | 13,669, 13,256, 13,960 | 13,669 |
+| Peak orders waiting for a courier (Prometheus `max_over_time(dropoff_orders_waiting_for_courier)`) | 13,669, 13,256, 13,960 | 13,669 |
+| Orders READY at run end (order_db `orders` count, `status = 'READY'`) | 15,697, 15,777, 15,847 | 15,777 |
 
 This p95 doesn't measure dispatch. The timer records an order only when a courier accepts it. With 30 couriers, all 30
-were BUSY at the end of every run, about 27 orders were dispatched in 10 minutes, and about 15,800 stayed READY.
+were BUSY at the end of every run, about 27 orders were dispatched in 10 minutes, and about 15,800 stayed READY at the end (the order_db count above;
+the Prometheus peak is lower, 13,669; the two are different sources, read at different times, and not reconciled here).
 The ones that got a courier were the lucky few that turned READY just as a courier came free, so their p95 is a couple
-of seconds. The wait of the rest shows in `dropoff_oldest_waiting_order_age_seconds`, which reached 553 s in run 3.
-That is close to the whole run.
+of seconds. The rest never got one: about 27 of roughly 16,500 placed orders (under 0.2%) were accepted by a courier.
 
 More couriers would not fix this. A delivery takes several minutes at the simulator's 30 km/h, and the load brings
 about 27 orders a second. Keeping up would take thousands of couriers. The simulator runs one bot per courier in a
@@ -95,7 +97,8 @@ courier-capacity number. M7-3/4 compare it only between runs with the same couri
 
 ### Top 5 queries by total time
 
-The median of the 3 runs for each statement. The order was the same in all 3 runs of a scenario.
+The median of the 3 runs for each statement. The five statements and their order were the same in all 3 runs of a scenario, except `place-orders` run 3, where ranks 3
+and 4 swap (`update order_lines` 2,988 ms above `insert into orders` 2,981 ms).
 
 `place-orders` (one run places about 16,500 orders):
 
@@ -132,11 +135,18 @@ What stands out, for M7-3/4 to confirm with `EXPLAIN (ANALYZE, BUFFERS)`:
 - The worst p95 is `POST /orders` (13.42 ms), and the worst p99 too. Every endpoint is far under the 300 ms threshold.
 - Each order costs two `update order_lines set order_id` after its insert, about 2 per order. That is Hibernate
   writing the foreign key of a one-to-many after the line insert. A batching or mapping fix removes them.
-- The status `UPDATE` and the `order_events` insert run about 2.8 and 3.8 times per order, from the merchant bots'
-  accept, prepare and ready steps. They are cheap each but lead the total.
+- The status `UPDATE` and the `order_events` insert run about 2.8 and 3.8 times per order (45,619 and 62,179 calls for 16,531 order inserts). They come from the whole
+  order lifecycle: PLACED, the merchant accept, prepare and ready steps, and the dispatch and courier transitions. They
+  are cheap each but lead the total.
 - The deep history page is the most expensive statement per call (1.09 ms, about 16 times the first page's
   0.07 ms), as offset paging predicts. It still adds only about 1 ms to the endpoint. Each page request also runs a
   `count(*)` over the customer's 2,000 orders.
+
+### Targets for M7-3/M7-4
+
+Rank candidates by total DB time from `pg_stat_statements` and by per-call cost, not by endpoint latency, since every p95 is
+far under 300 ms. Targets: the `place-orders` status `UPDATE` and `order_events` insert, the extra `order_lines` update per
+order, and the deep-page `OFFSET` plus `count(*)` in `order-history`. Dispatch p95 is not a target: it is courier capacity.
 
 ## Reproducing
 
@@ -150,7 +160,8 @@ docker compose --profile demo up -d --build      # wait for "Running 41 bots" in
 docker compose exec -T postgres psql -U order_user -d order_db -v ON_ERROR_STOP=1 -f - < ops/perf/seed-history.sql
 ```
 
-Then, for each run:
+Then repeat the block below for all three scenarios (`browse.js`, `order-history.js`, `place-orders.js`), three runs each,
+changing the script name and the `-N` suffix of the summary file (`browse-1.json`, `browse-2.json`, ...):
 
 ```bash
 docker compose exec postgres psql -U dropoff -d dropoff -c "SELECT pg_stat_statements_reset()"
