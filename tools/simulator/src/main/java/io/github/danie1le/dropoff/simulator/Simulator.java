@@ -39,10 +39,10 @@ public final class Simulator {
                         .run(Clock.systemUTC(), options.duration());
             }
             case SMOKE -> {
-                SimState state =
-                        Files.exists(options.stateFile()) ? StateFile.read(options.stateFile()) : seed(options, api);
+                boolean reused = Files.exists(options.stateFile());
+                SimState state = reused ? StateFile.read(options.stateFile()) : seed(options, api);
                 boolean passed = new Smoke(state, options.smokeOrders(), options.speedKmh(), options.seed(), api)
-                        .run(Clock.systemUTC(), options.smokeTimeout());
+                        .run(Clock.systemUTC(), options.smokeTimeout(), reused);
                 System.exit(passed ? 0 : 1);
             }
             case WATCH -> {

@@ -193,7 +193,9 @@ scope and milestones in [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md) and [docs/PLA
 - `./gradlew build` runs formatting (Spotless), static checks (Error Prone, NullAway), the unit tests and the integration
   tests. Each service also has a Spring Modulith test that verifies its module boundaries.
 - `ops/smoke/full-flow.sh` places 5 orders through the real services and exits 0 once all are delivered.
-  `ops/smoke/full-flow.sh --compose` runs it inside Compose, as CI does.
+  `ops/smoke/full-flow.sh --compose` runs it inside Compose, as CI does. A state file left by an earlier run is checked
+  first; if it is stale (after `docker compose down -v`), the check retries for 20 s before it fails. A fresh seed is
+  not checked, so that delay applies only to reused files.
 
 Run one Gradle build at a time on a small machine, and `./gradlew --stop` when done.
 
