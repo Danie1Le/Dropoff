@@ -235,7 +235,7 @@ UI only.
 
 Claude wrote the code in this repo, and the author reviewed every pull request and answered a quiz on each one. Output
 was checked with unit and integration tests, an automated code review on every PR, and the author's own review. The
-detailed notes, with the mistakes that were caught, will be in `docs/ai-usage.md` (milestone M8, item 3).
+detailed notes, with the mistakes that were caught, are in [`docs/ai-usage.md`](docs/ai-usage.md).
 
 ## License
 
