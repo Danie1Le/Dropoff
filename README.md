@@ -141,7 +141,7 @@ runs `seed` once and then `run` for you. From the host, against the published po
 
 ```bash
 ./gradlew :tools:simulator:run --args="seed"                 # merchants, menus, customers and couriers
-./gradlew :tools:simulator:run --args="run"                  # customer, merchant and courier bots (default 10 minutes)
+./gradlew :tools:simulator:run --args="run"                  # customer, merchant and courier bots (runs until Ctrl+C; add --duration 10m to stop)
 ./gradlew :tools:simulator:run --args="watch 1"              # live STATUS and LOCATION messages for order 1
 docker compose --profile demo run --rm simulator smoke       # full-flow check: exits 0 if 5 orders are DELIVERED
 ```
@@ -213,14 +213,15 @@ docker compose --profile demo --profile load run --rm k6 run browse.js
 ## Monitoring
 
 Prometheus scrapes `/actuator/prometheus` on all three services every 15 s. Grafana at http://localhost:3000 opens on a
-provisioned dashboard (orders per minute, latency, errors, dispatch time, offer outcomes, waiting orders, couriers by status, consumer lag and dead letters), and its alert rules show in the
+provisioned dashboard (orders per minute, latency, errors, dispatch time, offer outcomes, waiting orders, couriers by
+status, consumer lag and dead letters), and its alert rules show in the
 UI only.
 
 ![Grafana overview](docs/media/grafana-overview.png)
 
 ## Known gaps
 
-- **No authentication or authorization.** Every endpoint is open, and the services trust their callers.
+- **No authentication or authorization.** Every endpoint is open, and the services trust their callers. Grafana also allows anonymous Viewer access on port 3000.
 - **No payments.** Prices are recorded on each order, and nothing is charged.
 - **Run one order-service instance.** Its STOMP broker lives in memory, and `courier-locations` is read by a single
   consumer group, so a second instance would miss messages. Scaling out needs a consumer group per instance and a
