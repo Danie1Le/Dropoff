@@ -5,6 +5,7 @@ import static io.github.danie1le.dropoff.web.Validated.required;
 import io.github.danie1le.dropoff.web.Latitude;
 import io.github.danie1le.dropoff.web.Longitude;
 import io.github.danie1le.dropoff.web.NotBlankIfPresent;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Constraint;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
@@ -25,10 +26,17 @@ final class MerchantRequests {
     private MerchantRequests() {}
 
     record CreateMerchant(
-            @NotNull @NotBlankIfPresent @Size(max = 200) String name,
-            @NotNull @NotBlankIfPresent @Size(max = 500) String address,
-            @NotNull @Latitude Double lat,
-            @NotNull @Longitude Double lng) {
+            @Schema(example = "Pizza Palace") @NotNull @NotBlankIfPresent @Size(max = 200)
+            String name,
+
+            @Schema(example = "1 Dam Square, Amsterdam") @NotNull @NotBlankIfPresent @Size(max = 500)
+            String address,
+
+            @Schema(description = "Latitude in degrees.", example = "52.3731") @NotNull @Latitude
+            Double lat,
+
+            @Schema(description = "Longitude in degrees.", example = "4.8926") @NotNull @Longitude
+            Double lng) {
 
         /** The location. {@code @Valid} rejects a missing lat or lng before this is called. */
         Location location() {
@@ -39,11 +47,26 @@ final class MerchantRequests {
     /** Partial update: an absent or null field means unchanged. Address, lat and lng move together (ticket #42). */
     @AddressChangedTogether
     record UpdateMerchant(
-            @Nullable @NotBlankIfPresent @Size(max = 200) String name,
-            @Nullable Boolean open,
-            @Nullable @NotBlankIfPresent @Size(max = 500) String address,
-            @Nullable @Latitude Double lat,
-            @Nullable @Longitude Double lng) {
+            @Schema(description = "New name. Absent or null means unchanged.", example = "Pizza Palace 2")
+            @Nullable
+            @NotBlankIfPresent
+            @Size(max = 200)
+            String name,
+
+            @Schema(description = "Open for orders. Absent or null means unchanged.", example = "false") @Nullable
+            Boolean open,
+
+            @Schema(description = "New address; send with lat and lng.", example = "5 Rokin, Amsterdam")
+            @Nullable
+            @NotBlankIfPresent
+            @Size(max = 500)
+            String address,
+
+            @Schema(description = "New latitude; send with address and lng.", example = "52.3702") @Nullable @Latitude
+            Double lat,
+
+            @Schema(description = "New longitude; send with address and lat.", example = "4.8952") @Nullable @Longitude
+            Double lng) {
 
         /** True when address, lat and lng are all given or all absent. {@link AddressChangedTogether} checks this. */
         boolean locationIsCompleteOrAbsent() {
@@ -85,7 +108,13 @@ final class MerchantRequests {
         }
     }
 
-    record MerchantResponse(long id, String name, String address, double lat, double lng, boolean open) {
+    record MerchantResponse(
+            @Schema(example = "3") long id,
+            @Schema(example = "Pizza Palace") String name,
+            @Schema(example = "1 Dam Square, Amsterdam") String address,
+            @Schema(example = "52.3731") double lat,
+            @Schema(example = "4.8926") double lng,
+            @Schema(example = "true") boolean open) {
 
         static MerchantResponse of(Merchant merchant) {
             return new MerchantResponse(

@@ -4,6 +4,7 @@ import io.github.danie1le.dropoff.order.internal.OrderRequests.OrderResponse;
 import io.github.danie1le.dropoff.order.internal.OrderRequests.PlaceOrder;
 import io.github.danie1le.dropoff.order.internal.OrderService.Placement;
 import io.github.danie1le.dropoff.web.ProblemResponse;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.headers.Header;
@@ -35,6 +36,7 @@ class OrderController {
     }
 
     @ProblemResponse(status = 404, codes = "ORDER_NOT_FOUND")
+    @Operation(summary = "Get an order")
     @GetMapping("/{id}")
     OrderResponse get(@PathVariable long id) {
         return service.get(id);
@@ -66,6 +68,10 @@ class OrderController {
                         name = REPLAYED,
                         description = "true when this is a replay of an earlier request with the same key.")
             })
+    @Operation(
+            summary = "Place an order",
+            description =
+                    "Prices, total and delivery address come from the server. The Idempotency-Key header makes a retry safe.")
     @PostMapping
     ResponseEntity<OrderResponse> place(
             @Parameter(

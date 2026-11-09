@@ -2,8 +2,11 @@ package io.github.danie1le.dropoff;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.jayway.jsonpath.JsonPath;
+import java.io.UnsupportedEncodingException;
 import java.util.List;
 import java.util.Map;
+import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -128,5 +131,100 @@ class OpenApiDocsIT {
                 .extractingPath("$.paths['/api/v1/merchants'].get.parameters[*].name")
                 .asArray()
                 .contains("page", "size");
+    }
+
+    @Test
+    void everyOperationHasASummary() {
+        OPERATIONS.forEach((path, methods) -> {
+            for (String method : methods) {
+                Map<String, Object> operation = operation(path, method);
+                assertThat(operation.get("summary"))
+                        .as("%s %s summary", method, path)
+                        .asString()
+                        .isNotBlank();
+            }
+        });
+    }
+
+    @Test
+    void everyPathParameterHasADescriptionAndAnExample() {
+        OPERATIONS.forEach((path, methods) -> {
+            for (String method : methods) {
+                for (Map<String, Object> parameter : parameters(operation(path, method))) {
+                    if ("path".equals(parameter.get("in"))) {
+                        assertThat(parameter)
+                                .as("%s %s {%s}", method, path, parameter.get("name"))
+                                .containsKeys("description", "example");
+                    }
+                }
+            }
+        });
+    }
+
+    @Test
+    void everyOperationHasASuccessResponseAndEveryBodyHasASchema() {
+        OPERATIONS.forEach((path, methods) -> {
+            for (String method : methods) {
+                Map<String, Object> operation = operation(path, method);
+                assertThat(responses(operation))
+                        .as("%s %s success responses", method, path)
+                        .anySatisfy((status, response) -> {
+                            assertThat(status).startsWith("2");
+                            assertThat(map(response)).containsKey("content");
+                        });
+                if (operation.containsKey("requestBody")) {
+                    assertThat(operation.get("requestBody"))
+                            .as("%s %s request body", method, path)
+                            .asInstanceOf(InstanceOfAssertFactories.MAP)
+                            .containsKey("content");
+                }
+            }
+        });
+    }
+
+    @Test
+    void everyBodyPropertyHasAnExample() {
+        Map<String, Object> schemas = map(map(apiDocsJson().get("components")).get("schemas"));
+        assertThat(schemas).isNotEmpty();
+        schemas.forEach((name, schema) -> {
+            if (name.equals("Problem") || name.startsWith("Paged") || name.equals("PageMetadata")) {
+                return;
+            }
+            map(map(schema).get("properties")).forEach((property, definition) -> {
+                Map<String, Object> field = map(definition);
+                boolean scalar = field.get("type") instanceof String type
+                        && List.of("string", "integer", "number", "boolean").contains(type);
+                if (scalar && !field.containsKey("enum")) {
+                    assertThat(field).as("%s.%s", name, property).containsKey("example");
+                }
+            });
+        });
+    }
+
+    private Map<String, Object> apiDocsJson() {
+        try {
+            return JsonPath.read(apiDocs().getResponse().getContentAsString(), "$");
+        } catch (UnsupportedEncodingException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private Map<String, Object> operation(String path, String method) {
+        return map(map(map(apiDocsJson().get("paths")).get(path)).get(method));
+    }
+
+    private static Map<String, Object> responses(Map<String, Object> operation) {
+        return map(operation.get("responses"));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> parameters(Map<String, Object> operation) {
+        Object parameters = operation.get("parameters");
+        return parameters == null ? List.of() : (List<Map<String, Object>>) parameters;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> map(Object value) {
+        return value == null ? Map.of() : (Map<String, Object>) value;
     }
 }

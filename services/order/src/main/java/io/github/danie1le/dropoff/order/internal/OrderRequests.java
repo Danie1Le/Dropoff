@@ -1,5 +1,6 @@
 package io.github.danie1le.dropoff.order.internal;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotEmpty;
@@ -20,31 +21,46 @@ final class OrderRequests {
      * most {@value #MAX_LINES} lines and {@value #MAX_QUANTITY} per line, so merged quantities never overflow.
      */
     record PlaceOrder(
-            @NotNull Long customerId,
-            @NotNull Long merchantId,
-            @NotNull @NotEmpty @Size(max = MAX_LINES) List<@NotNull @Valid Line> lines) {
+            @Schema(example = "5") @NotNull Long customerId,
+            @Schema(example = "3") @NotNull Long merchantId,
+
+            @Schema(description = "What to order, 1 to 100 lines.") @NotNull @NotEmpty @Size(max = MAX_LINES)
+            List<@NotNull @Valid Line> lines) {
 
         static final int MAX_LINES = 100;
         static final int MAX_QUANTITY = 999;
 
         record Line(
-                @NotNull Long menuItemId,
-                @NotNull @Positive @Max(MAX_QUANTITY) Integer quantity) {}
+                @Schema(example = "12") @NotNull Long menuItemId,
+
+                @Schema(description = "1 to 999.", example = "2") @NotNull @Positive @Max(MAX_QUANTITY)
+                Integer quantity) {}
     }
 
     record OrderResponse(
-            long id,
-            long customerId,
-            long merchantId,
-            @Nullable Long courierId,
+            @Schema(example = "1042") long id,
+            @Schema(example = "5") long customerId,
+            @Schema(example = "3") long merchantId,
+
+            @Schema(description = "Null until a courier accepts the delivery.", example = "7") @Nullable
+            Long courierId,
+
             OrderStatus status,
+
+            @Schema(description = "Sum of the lines, in cents.", example = "2198")
             long totalCents,
+
             Location deliveryAddress,
             List<LineResponse> lines,
-            Instant createdAt,
-            Instant updatedAt) {
+            @Schema(example = "2026-01-15T12:00:00Z") Instant createdAt,
+            @Schema(example = "2026-01-15T12:01:30Z") Instant updatedAt) {
 
-        record LineResponse(long menuItemId, int quantity, long priceCents) {}
+        record LineResponse(
+                @Schema(example = "12") long menuItemId,
+                @Schema(example = "2") int quantity,
+
+                @Schema(description = "Unit price when ordered, in cents.", example = "1099")
+                long priceCents) {}
 
         static OrderResponse of(Order order) {
             return new OrderResponse(

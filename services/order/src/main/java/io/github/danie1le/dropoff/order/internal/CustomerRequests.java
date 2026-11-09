@@ -5,6 +5,7 @@ import static io.github.danie1le.dropoff.web.Validated.required;
 import io.github.danie1le.dropoff.web.Latitude;
 import io.github.danie1le.dropoff.web.Longitude;
 import io.github.danie1le.dropoff.web.NotBlankIfPresent;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Constraint;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
@@ -25,10 +26,17 @@ final class CustomerRequests {
     private CustomerRequests() {}
 
     record CreateCustomer(
-            @NotNull @NotBlankIfPresent @Size(max = 200) String name,
-            @NotNull @NotBlankIfPresent @Size(max = 500) String address,
-            @NotNull @Latitude Double lat,
-            @NotNull @Longitude Double lng) {
+            @Schema(example = "Alex Jansen") @NotNull @NotBlankIfPresent @Size(max = 200)
+            String name,
+
+            @Schema(example = "20 Prinsengracht, Amsterdam") @NotNull @NotBlankIfPresent @Size(max = 500)
+            String address,
+
+            @Schema(description = "Latitude in degrees.", example = "52.3667") @NotNull @Latitude
+            Double lat,
+
+            @Schema(description = "Longitude in degrees.", example = "4.8830") @NotNull @Longitude
+            Double lng) {
 
         /** The location. {@code @Valid} rejects a missing lat or lng before this is called. */
         Location location() {
@@ -39,10 +47,23 @@ final class CustomerRequests {
     /** Partial update: an absent or null field means unchanged. Address, lat and lng move together (ticket #42). */
     @AddressChangedTogether
     record UpdateCustomer(
-            @Nullable @NotBlankIfPresent @Size(max = 200) String name,
-            @Nullable @NotBlankIfPresent @Size(max = 500) String address,
-            @Nullable @Latitude Double lat,
-            @Nullable @Longitude Double lng) {
+            @Schema(description = "New name. Absent or null means unchanged.", example = "Alex de Vries")
+            @Nullable
+            @NotBlankIfPresent
+            @Size(max = 200)
+            String name,
+
+            @Schema(description = "New address; send with lat and lng.", example = "5 Rokin, Amsterdam")
+            @Nullable
+            @NotBlankIfPresent
+            @Size(max = 500)
+            String address,
+
+            @Schema(description = "New latitude; send with address and lng.", example = "52.3702") @Nullable @Latitude
+            Double lat,
+
+            @Schema(description = "New longitude; send with address and lat.", example = "4.8952") @Nullable @Longitude
+            Double lng) {
 
         /**
          * The names of the absent location fields, in the order address, lat, lng. Empty when all three are given or
@@ -79,7 +100,12 @@ final class CustomerRequests {
         }
     }
 
-    record CustomerResponse(long id, String name, String address, double lat, double lng) {
+    record CustomerResponse(
+            @Schema(example = "5") long id,
+            @Schema(example = "Alex Jansen") String name,
+            @Schema(example = "20 Prinsengracht, Amsterdam") String address,
+            @Schema(example = "52.3667") double lat,
+            @Schema(example = "4.8830") double lng) {
 
         static CustomerResponse of(Customer customer) {
             Location location = customer.location();
