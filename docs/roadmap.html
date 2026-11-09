@@ -609,15 +609,15 @@ const MILESTONES = [
     { t: 'ops/perf/seed-history.sql (200k orders: 100 customers x 2,000) and pg_stat_statements', done: true },
     { t: 'Baseline: median of 3 runs; throughput, p50/p95/p99, errors, dispatch p95, top queries; hardware and commit SHA recorded', done: true },
     { t: 'Pick 1–2 of index, cache, batching, keyset paging, location writes to Redis by pg_stat_statements + EXPLAIN; one PR each with before/after numbers', done: true },
-    { t: 'Write-up in docs/perf/README.md, summary table in the README' },
+    { t: 'Write-up in docs/perf/README.md, summary table in the README', done: true },
   ]},
   { id: 'M8', name: 'Polish', gh: 9, needs: [37], goal: 'A repo a reviewer can understand at a glance.', items: [
-    { t: 'README: 15 sections, Mermaid architecture diagram, quick start with ports and URLs' },
+    { t: 'README: 15 sections, Mermaid architecture diagram, quick start with ports and URLs', done: true },
     { t: 'Swagger docs complete', done: true },
     { t: 'Demo GIF (< 30 s): simulator watch + Grafana, recorded with ScreenToGif' },
     { t: 'Screenshots: Swagger UI, Grafana dashboard, k6 summary (docs/media)' },
     { t: 'docs/ai-usage.md: tools, how output was checked, mistakes caught' },
-    { t: 'Known gaps noted: no auth, no payments' },
+    { t: 'Known gaps noted: no auth, no payments', done: true },
   ]},
 ];
 
