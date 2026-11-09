@@ -193,7 +193,7 @@ Build order, issues (#50–#56) and quiz points: `docs/milestones/M2.md`.
   - Migration `customers` (order module).
   - `POST/GET/PATCH /api/v1/customers`.
   - lat −90..90, lng −180..180; address + lat + lng change together; no geocoder.
-- Tests: `CustomerApiIT` (full app, MockMvc, Testcontainers Postgres) and `CustomerRequestsTest` (request records with a Bean Validation validator).
+- Tests: `CustomerApiIT` (full app, MockMvc, Testcontainers Postgres) and `CustomerRequestsTest` (plain unit tests of the address/lat/lng-together rule; field validation is covered in `CustomerApiIT`).
 - Decisions: #9, #42.
 
 **M2-2 Order schema and order status rules (TDD).**
