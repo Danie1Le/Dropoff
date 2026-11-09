@@ -7,17 +7,21 @@ three Spring Boot services that talk through REST and Kafka events. It runs loca
 
 ![Demo: simulator watch beside the Grafana dashboard](docs/media/demo.gif)
 
-The GIF (24 s) shows `simulator watch <orderId>` printing an order's live messages beside the Grafana dashboard taking
-orders. It is a timed sequence of headless screenshots stitched with ffmpeg, not a screen recording; rebuild it with
-`ops/media/capture.ps1` while the demo stack runs. To see the same thing yourself, follow the
-[quick start](#quick-start) and [Running the simulator](#running-the-simulator).
+The GIF shows `simulator watch <orderId>` printing an order's live messages beside the Grafana dashboard taking
+orders. It is about 6x sped up: each 2 s frame is a headless screenshot taken about 12 s of real time after the last. It is
+a timed sequence stitched with ffmpeg, not a screen recording; rebuild it with `ops/media/capture.ps1` while the demo stack
+runs. To see the same thing yourself, follow the [quick start](#quick-start) and
+[Running the simulator](#running-the-simulator).
+
+![Grafana overview dashboard with the demo bots running](docs/media/grafana-overview.png)
 
 | Swagger UI (order-service) | k6 `place-orders.js` summary |
 |---|---|
 | ![Swagger UI](docs/media/swagger-order.png) | ![k6 summary](docs/media/k6-summary.png) |
 
-The k6 run is a one-minute `short` profile on a laptop that also runs the whole demo stack, so its p95 crosses the 300 ms
-threshold. The numbers that matter are in [docs/perf/README.md](docs/perf/README.md).
+This k6 summary was captured on a laptop under memory pressure (~2 GB free) and shows the p95 threshold failing; the clean
+median-of-3 baseline, where every threshold passes, is in [docs/perf/README.md](docs/perf/README.md). Re-run
+`ops/media/capture.ps1 -K6Only` on an idle machine to refresh it.
 
 ## Features
 
