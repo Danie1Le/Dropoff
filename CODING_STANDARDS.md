@@ -75,7 +75,7 @@ How code in Dropoff is written and reviewed. Decided in [Coding standards for co
 
 The PR workflow details below (one plan step per PR, posting and answering review findings, green CI) come from `docs/PLAN.md`, "How every PR works".
 
-- Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:` …). No AI attribution lines.
+- Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:` …).
   _Why:_ history reads as a changelog, and authorship stays with the human.
 - Small PRs, one plan step each (see `docs/PLAN.md`).
   _Why:_ small diffs get real review and are easy to revert.

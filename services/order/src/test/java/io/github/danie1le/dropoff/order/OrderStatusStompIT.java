@@ -174,7 +174,7 @@ class OrderStatusStompIT {
     @Test
     void aNewOrderIsPushedAsPlacedOnlyAfterCommit() throws Exception {
         // MockMvc runs the request on this thread, so the place-order transaction joins this one and commits with
-        // it. The test learns the id and subscribes while PLACED is still held back by the open transaction.
+        // it. The test reads the id and subscribes while PLACED is still held back by the open transaction.
         Subscribed placed = requireNonNull(transactions.execute(status -> {
             long orderId = OrderCommandApiIT.placed(mvc, jdbc).orderId();
             BlockingQueue<JsonNode> messages = subscribe(orderId);

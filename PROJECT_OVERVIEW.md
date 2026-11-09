@@ -203,5 +203,4 @@ WS     /ws  (STOMP)  SUBSCRIBE /topic/orders/{id}   live order + courier updates
 - [ ] README with architecture diagram, setup steps, and screenshots
 - [ ] Swagger docs
 - [ ] Short demo video or GIF
-- [ ] Notes on how AI tools were used and how their output was checked
 - [ ] Optional: a free hosted deploy

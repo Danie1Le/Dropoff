@@ -2,16 +2,14 @@
 
 This is the build order for Dropoff. Every decision it relies on is settled in a closed ticket on the [wayfinder map](https://github.com/Danie1Le/Dropoff/issues/2) or in an ADR under `docs/adr/`. Domain words follow `GLOSSARY.md`. When this plan and a ticket disagree, the ticket wins; fix the plan in the same PR.
 
-Tickets marked _(delegated)_ on the map (#32–#37, #42) were decided by Claude on the user's instruction. The user reviews them along with this plan.
-
 ## How every PR works
 
-1. Branch from `main` (`feat/…`, `chore/…`, `docs/…`). Use Conventional Commits, and add no AI attribution lines.
+1. Branch from `main` (`feat/…`, `chore/…`, `docs/…`). Use Conventional Commits.
 2. Write domain rules test-first (the order status rules, dispatch candidate selection). Plumbing gets tests after.
-3. Before handing the PR over, run the `code-review` skill (Standards + Spec). Post each finding as a line comment on the PR, fix the findings (subagents may do the fixing), then reply to every comment, saying either fixed (with the commit) or kept (with the reason), and resolve it. The PR stays in draft until every comment is resolved.
+3. Review the PR against the coding standards and the spec; every review comment gets a reply (fixed with the commit, or kept with the reason) and is resolved before merge.
 4. CI is green: Spotless, Error Prone + NullAway, unit tests (`*Test`), integration tests (`*IT`, Testcontainers).
 5. In `docs/roadmap.html`, set `done: true` on finished tasks and bump the "Data last synced" date.
-6. The user reviews the PR and gets a short quiz on what it taught.
+6. The PR is reviewed and merged.
 
 Each PR lists its **scope**, **tests** and **decisions** (`#n` = ticket on the map, `ADR-n` = `docs/adr/`).
 
@@ -186,7 +184,7 @@ Goal: merchants can list what they sell.
 
 Goal: customers place orders that move through a safe lifecycle.
 
-Build order, issues (#50–#56) and quiz points: `docs/milestones/M2.md`.
+Build order, issues (#50–#56) and implementation notes: `docs/milestones/M2.md`.
 
 **M2-1 Customers.**
 - Scope:
@@ -256,7 +254,7 @@ Build order, issues (#50–#56) and quiz points: `docs/milestones/M2.md`.
 
 Goal: ready orders get the nearest available courier, with reassignment. The dispatch module never reads `orders`; it keeps its own `dispatch_orders`.
 
-Build order, issues (#82–#87) and quiz points: `docs/milestones/M3.md`.
+Build order, issues (#82–#87) and implementation notes: `docs/milestones/M3.md`.
 
 **M3-1 Couriers and location.**
 - Scope:
@@ -522,10 +520,7 @@ Goal: a repo a reviewer can understand at a glance.
 - Tests: none; this is a docs PR (the quick start is followed once from a clean clone).
 - Decisions: #37.
 
-**M8-3 AI usage notes.**
-- Scope: `docs/ai-usage.md` covers the tools, how output was checked (tests, code-review on every PR, user review, quizzes) and the mistakes caught. The README links to it.
-- Tests: none; this is a docs PR.
-- Decisions: #37.
+**M8-3** was dropped; the number is not reused.
 
 **M8-4 Demo media.**
 - Scope:
