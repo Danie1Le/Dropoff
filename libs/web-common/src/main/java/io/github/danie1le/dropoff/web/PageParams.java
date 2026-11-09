@@ -1,5 +1,6 @@
 package io.github.danie1le.dropoff.web;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import org.jspecify.annotations.Nullable;
@@ -13,8 +14,11 @@ import org.springframework.data.domain.Sort;
  * with 400, never capped (ticket #8).
  */
 public record PageParams(
-        @Nullable @Min(0) Integer page,
-        @Nullable @Min(1) @Max(MAX_SIZE) Integer size) {
+        @Schema(description = "Zero-based page number. Default 0.", example = "0") @Nullable @Min(0)
+        Integer page,
+
+        @Schema(description = "Rows per page, 1 to 100. Default 20.", example = "20") @Nullable @Min(1) @Max(MAX_SIZE)
+        Integer size) {
 
     public static final int DEFAULT_SIZE = 20;
     public static final int MAX_SIZE = 100;

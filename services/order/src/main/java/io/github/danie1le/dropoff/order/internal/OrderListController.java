@@ -3,6 +3,8 @@ package io.github.danie1le.dropoff.order.internal;
 import io.github.danie1le.dropoff.order.internal.OrderRequests.OrderResponse;
 import io.github.danie1le.dropoff.web.PageParams;
 import io.github.danie1le.dropoff.web.ProblemResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.Valid;
 import org.jspecify.annotations.Nullable;
 import org.springdoc.core.annotations.ParameterObject;
@@ -26,15 +28,20 @@ class OrderListController {
     }
 
     @ProblemResponse(status = 404, codes = "MERCHANT_NOT_FOUND")
+    @Operation(summary = "List a merchant's orders", description = "Oldest first, optionally filtered by status.")
     @GetMapping("/merchants/{id}/orders")
     PagedModel<OrderResponse> forMerchant(
             @PathVariable long id,
-            @RequestParam(required = false) @Nullable OrderStatus status,
+            @Parameter(description = "Only orders in this status.", example = "PLACED")
+                    @RequestParam(required = false)
+                    @Nullable
+                    OrderStatus status,
             @ParameterObject @Valid PageParams params) {
         return lists.forMerchant(id, status, params);
     }
 
     @ProblemResponse(status = 404, codes = "CUSTOMER_NOT_FOUND")
+    @Operation(summary = "List a customer's orders", description = "Newest first.")
     @GetMapping("/customers/{id}/orders")
     PagedModel<OrderResponse> forCustomer(@PathVariable long id, @ParameterObject @Valid PageParams params) {
         return lists.forCustomer(id, params);

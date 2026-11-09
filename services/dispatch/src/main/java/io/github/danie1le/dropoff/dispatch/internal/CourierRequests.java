@@ -5,6 +5,7 @@ import static io.github.danie1le.dropoff.web.Validated.required;
 import io.github.danie1le.dropoff.web.Latitude;
 import io.github.danie1le.dropoff.web.Longitude;
 import io.github.danie1le.dropoff.web.NotBlankIfPresent;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -16,11 +17,17 @@ final class CourierRequests {
     private CourierRequests() {}
 
     record CreateCourier(
-            @NotNull @NotBlankIfPresent @Size(max = 200) String name) {}
+            @Schema(description = "Display name.", example = "Sam Rider") @NotNull @NotBlankIfPresent @Size(max = 200)
+            String name) {}
 
     /** BUSY is set by the system only, so a request for it fails validation with 400 (ticket #42, point 10). */
     record ChangeStatus(
-            @NotNull @Pattern(regexp = "AVAILABLE|OFFLINE", message = "must be AVAILABLE or OFFLINE")
+            @Schema(
+                    description = "The status the courier asks for.",
+                    allowableValues = {"AVAILABLE", "OFFLINE"},
+                    example = "AVAILABLE")
+            @NotNull
+            @Pattern(regexp = "AVAILABLE|OFFLINE", message = "must be AVAILABLE or OFFLINE")
             String status) {
 
         /** The requested status. {@code @Valid} rejects any other value before this is called. */
@@ -30,8 +37,11 @@ final class CourierRequests {
     }
 
     record UpdateLocation(
-            @NotNull @Latitude Double lat,
-            @NotNull @Longitude Double lng) {
+            @Schema(description = "Latitude in degrees.", example = "52.3702") @NotNull @Latitude
+            Double lat,
+
+            @Schema(description = "Longitude in degrees.", example = "4.8952") @NotNull @Longitude
+            Double lng) {
 
         /** The new position. {@code @Valid} rejects a missing lat or lng before this is called. */
         Position position() {
@@ -41,11 +51,15 @@ final class CourierRequests {
 
     /** {@code lat} and {@code lng} are null until the courier sends a first location. */
     record CourierResponse(
-            long id,
-            String name,
+            @Schema(example = "7") long id,
+            @Schema(example = "Sam Rider") String name,
             CourierStatus status,
-            @Nullable Double lat,
-            @Nullable Double lng) {
+
+            @Schema(description = "Null until the first location.", example = "52.3702") @Nullable
+            Double lat,
+
+            @Schema(description = "Null until the first location.", example = "4.8952") @Nullable
+            Double lng) {
 
         static CourierResponse of(Courier courier) {
             @Nullable Position position = courier.position().orElse(null);

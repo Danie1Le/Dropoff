@@ -3,6 +3,7 @@ package io.github.danie1le.dropoff.merchant.internal;
 import static io.github.danie1le.dropoff.web.Validated.required;
 
 import io.github.danie1le.dropoff.web.NotBlankIfPresent;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
@@ -21,8 +22,10 @@ final class MenuItemRequests {
      * reported on its field, instead of being truncated to a long by the JSON reader.
      */
     record CreateMenuItem(
-            @NotNull @NotBlankIfPresent @Size(max = 200) String name,
+            @Schema(description = "Display name.", example = "Margherita") @NotNull @NotBlankIfPresent @Size(max = 200)
+            String name,
 
+            @Schema(description = "Price in whole cents.", example = "1099")
             @NotNull
             @PositiveOrZero
             @Digits(integer = 19, fraction = 0, message = "must be a whole number of cents")
@@ -45,15 +48,22 @@ final class MenuItemRequests {
      * {@code priceCents} is a {@link BigDecimal} for the same reason.
      */
     record UpdateMenuItem(
-            @Nullable @NotBlankIfPresent @Size(max = 200) String name,
+            @Schema(description = "New name. Absent or null means unchanged.", example = "Margherita XL")
+            @Nullable
+            @NotBlankIfPresent
+            @Size(max = 200)
+            String name,
 
+            @Schema(description = "New price in whole cents. Absent or null means unchanged.", example = "1299")
             @Nullable
             @PositiveOrZero
             @Digits(integer = 19, fraction = 0, message = "must be a whole number of cents")
             @DecimalMax(value = "9223372036854775807", message = "is too large")
             BigDecimal priceCents,
 
-            @Nullable Boolean available) {
+            @Schema(description = "Whether it can be ordered. Absent or null means unchanged.", example = "false")
+            @Nullable
+            Boolean available) {
 
         /** The new name without surrounding whitespace, or null when it doesn't change. */
         @Nullable
@@ -68,7 +78,15 @@ final class MenuItemRequests {
         }
     }
 
-    record MenuItemResponse(long id, long merchantId, String name, long priceCents, boolean available) {
+    record MenuItemResponse(
+            @Schema(example = "12") long id,
+            @Schema(example = "3") long merchantId,
+            @Schema(example = "Margherita") String name,
+
+            @Schema(description = "Price in whole cents.", example = "1099")
+            long priceCents,
+
+            @Schema(example = "true") boolean available) {
 
         static MenuItemResponse of(MenuItem item) {
             return new MenuItemResponse(

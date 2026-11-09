@@ -3,6 +3,7 @@ package io.github.danie1le.dropoff.dispatch.internal;
 import io.github.danie1le.dropoff.dispatch.internal.OfferResponses.CurrentOffer;
 import io.github.danie1le.dropoff.dispatch.internal.OfferResponses.OfferResponse;
 import io.github.danie1le.dropoff.web.ProblemResponse;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -33,6 +34,7 @@ class OfferController {
             content = @Content(schema = @Schema(implementation = CurrentOffer.class)))
     @ApiResponse(responseCode = "204", description = "The courier has no open offer.")
     @ProblemResponse(status = 404, codes = "COURIER_NOT_FOUND")
+    @Operation(summary = "Get the courier open offer", description = "Couriers poll this; 204 means no open offer.")
     @GetMapping("/current")
     ResponseEntity<CurrentOffer> current(@PathVariable long courierId) {
         return service.current(courierId)
@@ -46,6 +48,9 @@ class OfferController {
     @ProblemResponse(
             status = 409,
             codes = {"OFFER_CLOSED", "COURIER_NOT_BUSY"})
+    @Operation(
+            summary = "Accept an offer",
+            description = "Assigns the order to the courier. Repeating an accepted offer returns it unchanged.")
     @PostMapping("/{offerId}/accept")
     OfferResponse accept(@PathVariable long courierId, @PathVariable long offerId) {
         return service.accept(courierId, offerId);
@@ -55,6 +60,10 @@ class OfferController {
             status = 404,
             codes = {"COURIER_NOT_FOUND", "OFFER_NOT_FOUND"})
     @ProblemResponse(status = 409, codes = "OFFER_CLOSED")
+    @Operation(
+            summary = "Decline an offer",
+            description =
+                    "Closes the offer so dispatch can try another courier. Repeating a decline returns it unchanged.")
     @PostMapping("/{offerId}/decline")
     OfferResponse decline(@PathVariable long courierId, @PathVariable long offerId) {
         return service.decline(courierId, offerId);
