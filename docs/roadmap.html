@@ -607,7 +607,7 @@ const MILESTONES = [
   { id: 'M7', name: 'Performance', gh: 8, needs: [33, 34, 35], goal: 'Measured load and one or two measured wins.', items: [
     { t: 'k6 2.3.0 scripts in ops/k6 (Compose profile load, 256 MB cap): place-orders (5→50 orders/s over 10 min), browse (100 req/s), order-history; p95 < 300 ms, errors < 1%; short 1 min runs by default, LOAD_PROFILE=full for the ticket #35 shape', done: true },
     { t: 'ops/perf/seed-history.sql (200k orders: 100 customers x 2,000) and pg_stat_statements', done: true },
-    { t: 'Baseline: median of 3 runs; throughput, p50/p95/p99, errors, dispatch p95, top queries; hardware and commit SHA recorded' },
+    { t: 'Baseline: median of 3 runs; throughput, p50/p95/p99, errors, dispatch p95, top queries; hardware and commit SHA recorded', done: true },
     { t: 'Pick 1–2 of index, cache, batching, keyset paging, location writes to Redis by pg_stat_statements + EXPLAIN; one PR each with before/after numbers' },
     { t: 'Write-up in docs/perf/README.md, summary table in the README' },
   ]},
