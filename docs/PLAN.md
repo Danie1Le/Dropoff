@@ -529,7 +529,7 @@ Goal: a repo a reviewer can understand at a glance.
 
 **M8-4 Demo media.**
 - Scope:
-  - A demo GIF under 30 s and under 10 MB (simulator `watch` + Grafana, ScreenToGif).
+  - A demo GIF under 30 s and under 10 MB (simulator `watch` + Grafana). It is a composite, not a screen recording: `ops/media/capture.ps1` stitches timed headless Grafana screenshots and the real `watch` output with ffmpeg in Docker. An optional ScreenToGif re-record may replace it.
   - Screenshots of Swagger, Grafana and the k6 summary in `docs/media/`.
 - Tests: none; this is a docs PR.
 - Decisions: #37.
