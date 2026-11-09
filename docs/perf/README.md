@@ -148,6 +148,181 @@ Rank candidates by total DB time from `pg_stat_statements` and by per-call cost,
 far under 300 ms. Targets: the `place-orders` status `UPDATE` and `order_events` insert, the extra `order_lines` update per
 order, and the deep-page `OFFSET` plus `count(*)` in `order-history`. Dispatch p95 is not a target: it is courier capacity.
 
+## M7-3: changes and before/after
+
+Three changes in one PR, all in order-service and all aimed at the targets above. The API and its behaviour are the same:
+the existing tests pass unchanged, and two new `OrderListRepositoryIT` cases pin the history order (ties broken by the
+newest id) and the totals on every page.
+
+| Change | Target it hits |
+|---|---|
+| `OrderLine` owns `order_id` (`@ManyToOne`, `mappedBy` on `Order.lines`) | the `update order_lines set order_id` after every line insert |
+| Status commands run `UPDATE orders ... WHERE id = $3 AND status IN ($4) RETURNING old.status` | the status `UPDATE` |
+| `V3`: index `(customer_id, created_at, id)` replaces `(customer_id, created_at)`; later history pages use a deferred join | the deep-page `OFFSET` |
+
+### Measurement
+
+Same setup and method as the baseline (demo profile, `LOAD_PROFILE=full`, 3 runs each, `pg_stat_statements_reset()`
+before each run, `MSYS_NO_PATHCONV=1`, every command from Git Bash). Only the two affected scenarios were measured
+again: `order-history` with 3 runs on one stack, and `place-orders` on a fresh stack for each run (`down -v`, `up`,
+simulator seed, history seed). `browse` reads only merchant-service, which this PR doesn't touch. The code was at
+`b0300b6` on `feat/m7-3-optimizations`, on 2026-11-08. Autovacuum had processed `orders` and `order_lines` before
+every run (it starts about a minute after the history seed). No container was OOM-killed or restarted. The host had
+less free memory than for the baseline (about 2 GB free with the stack down, against 4.8 GB), so for `place-orders`
+one extra pair of runs was added: `main` (`ddca65c`) and this branch, back to back, on the same host state.
+
+### `order-history`
+
+| Endpoint | Before p50 / p95 / p99 | After p50 / p95 / p99 | Change (p50 / p95 / p99) |
+|---|---|---|---|
+| all | 3.30 / 4.45 / 5.39 ms | 3.15 / 4.03 / 5.01 ms | −4.5% / −9.4% / −7.1% |
+| page 0 | 2.74 / 3.45 / 4.65 ms | 2.78 / 3.58 / 4.69 ms | +1.5% / +3.8% / +0.9% |
+| deep page | 3.69 / 4.69 / 5.71 ms | 3.31 / 4.21 / 5.21 ms | −10.3% / −10.2% / −8.8% |
+
+50.00 req/s and 0.00% errors in every run, as before. After, runs 1, 2 and 3: p50 3.35, 3.15, 3.15 ms; p95 5.21, 4.03,
+3.97 ms; p99 7.71, 5.01, 4.77 ms. Page 0 is unchanged within run-to-run noise. The deep page gains about 0.4 to 0.5 ms
+at every percentile, about what its query lost.
+
+`pg_stat_statements`, median of the 3 runs:
+
+| Statement | Before calls / total / mean | After calls / total / mean |
+|---|---|---|
+| deep page: `... OFFSET $2 ROWS FETCH NEXT $3 ROWS ONLY`, now the deferred join | 7,530 / 8,142 ms / 1.09 ms | 7,495 / 1,843 ms / 0.25 ms |
+| page 0: `... FETCH FIRST $2 ROWS ONLY`, now `... LIMIT $2` | 7,472 / 532 ms / 0.07 ms | 7,507 / 473 ms / 0.06 ms |
+| `SELECT count(*) FROM orders WHERE customer_id = $1` | 15,002 / 2,357 ms / 0.16 ms | 15,002 / 2,443 ms / 0.16 ms |
+| order lines of the page (`... where l1_0.order_id = any ($1)`) | 15,005 / 1,635 ms / 0.11 ms | 15,005 / 1,746 ms / 0.12 ms |
+
+The two page queries together went from 8,674 ms to 2,316 ms per run (−73%). The deep page alone went from 1.09 ms to
+0.25 ms a call (−77%). The `count(*)` is now the most expensive history statement. It already reads only the index
+(`Heap Fetches: 0`, 13 to 19 buffers). Dropping or caching it would change the `page.totalElements` the API returns,
+so it stays.
+
+Why the deep page was slow. The old index stopped at `created_at`, so the list's `ORDER BY created_at DESC, id DESC`
+couldn't come from it. For a deep page Postgres read all 2,000 of the customer's orders from 2,102 heap pages, sorted
+them, and threw 1,980 away (warm cache, customer 1000042, offset 1980):
+
+```text
+Limit  (actual time=3.471..3.476 rows=20.00 loops=1)
+  Buffers: shared hit=2123
+  ->  Sort  (actual time=3.204..3.413 rows=2000.00 loops=1)
+        Sort Key: created_at DESC, id DESC
+        ->  Bitmap Heap Scan on orders  (actual time=1.105..2.512 rows=2000.00 loops=1)
+              Heap Blocks: exact=2102
+              ->  Bitmap Index Scan on orders_customer_id_idx  (rows=4000.00 loops=1)
+Execution Time: 3.630 ms
+```
+
+After. With `id` in the index, a backward scan returns the ids already in list order. The deferred join skips the
+offset inside an index-only scan and reads only the 20 rows it keeps, by primary key:
+
+```sql
+SELECT o.* FROM orders o
+JOIN (SELECT id FROM orders WHERE customer_id = :customerId
+      ORDER BY created_at DESC, id DESC OFFSET :offset LIMIT :limit) page ON page.id = o.id
+ORDER BY o.created_at DESC, o.id DESC
+```
+
+```text
+Sort  (rows=20.00 loops=1)
+  Buffers: shared hit=99
+  ->  Nested Loop  (rows=20.00 loops=1)
+        ->  Limit  (rows=20.00 loops=1)
+              ->  Index Only Scan Backward using orders_customer_id_created_at_id_idx on orders  (rows=2000.00 loops=1)
+                    Heap Fetches: 0
+                    Buffers: shared hit=19
+        ->  Index Scan using orders_pkey on orders o  (rows=1.00 loops=20)
+              Buffers: shared hit=80
+```
+
+2,123 buffers became 99. The generic plan Postgres can switch to for a prepared statement has the same shape (checked
+with `plan_cache_mode = force_generic_plan`).
+
+Page 0 skips the join. A first try used the deferred join for every page and made page 0 slower: its 20 primary-key
+probes cost 84 buffers and 0.15 ms, against 23 buffers and 0.06 ms for a plain `LIMIT` on the backward index scan.
+With nothing to skip, the join only adds work. `OrderListRepository.findForCustomer` now runs the plain query for page
+0 and the join for every later page. The numbers above are from that version.
+
+Keyset paging (`WHERE (created_at, id) < ($1, $2)`) would make a deep page as cheap as page 0. It would also replace
+`?page=` with a cursor and drop the page count, which changes the API contract, so it wasn't used. The deferred join still walks the skipped index entries, so its cost grows with the offset, but it reads no
+table rows for them.
+
+### `place-orders`
+
+| | Before (baseline median) | After (median of 3) | Change |
+|---|---|---|---|
+| Throughput | 27.42 req/s (16,471 orders) | 27.40 req/s (16,459 orders) | 0% |
+| p50 | 7.08 ms | 6.69 ms | −5.5% |
+| p95 | 13.42 ms | 17.60 ms | +31% |
+| p99 | 66.24 ms | 1,260.54 ms | see below |
+| Errors | 0.00% | 0.00% | |
+
+After, runs 1, 2 and 3: p50 6.69, 6.72, 6.67 ms; p95 17.60, 19.42, 14.68 ms; p99 2,074.09, 1,260.54, 889.28 ms. k6
+dropped 206, 52 and 71 iterations.
+
+The p95 and p99 rise is the host, not the change. The extra back-to-back pair on the same host state:
+
+| Run | p50 | p95 | p99 |
+|---|---|---|---|
+| `main` (`ddca65c`), 1 run | 7.18 ms | 14.58 ms | 268.38 ms |
+| this branch, 1 run | 6.57 ms | 12.38 ms | 49.48 ms |
+
+A p99 of 49 ms on this branch against 268 ms on `main` in the same conditions, and 40 to 527 ms in the baseline's own
+three runs, show that the `place-orders` tail is set by pauses on a host short of memory (GC, Docker, paging), not by
+the SQL. p50 is the stable number: 6.57 to 6.72 ms on this branch in all four runs, against 7.06 to 7.33 ms in the
+baseline and 7.18 ms on `main`, about 0.4 ms (−5%) faster. Part of that is the DB time saved per order below (about
+0.19 ms for the line updates), and part is the two round trips those updates no longer make.
+
+`pg_stat_statements` for the targeted statements in order_db (calls / total / mean). "Control" is the `main` run of the
+pair above. The baseline's top 5 didn't list the line insert.
+
+| Statement | Before (baseline median) | Control (`main`, 1 run) | After (median of 3) |
+|---|---|---|---|
+| status `UPDATE` | 45,619 / 8,766 ms / 0.19 ms | 45,519 / 8,880 ms / 0.20 ms | 45,348 / 8,283 ms / 0.18 ms |
+| `update order_lines set order_id=$1 where id=$2` | 33,158 / 3,034 ms / 0.09 ms | 32,892 / 3,097 ms / 0.09 ms | gone |
+| `insert into order_lines (...)` | not in the top 5 | 32,892 / 2,790 ms / 0.08 ms | 33,001 / 2,728 ms / 0.08 ms |
+| `INSERT INTO order_events (...)` | 62,179 / 6,906 ms / 0.11 ms | 62,012 / 7,048 ms / 0.11 ms | 61,836 / 7,197 ms / 0.12 ms |
+| `insert into orders (...)` | 16,531 / 3,056 ms / 0.18 ms | 16,493 / 3,122 ms / 0.19 ms | 16,488 / 3,120 ms / 0.19 ms |
+
+- **`order_lines`:** the control shows that Hibernate already wrote `order_id` in the line `INSERT` and then set it
+  again with an `UPDATE`, once per line. That came from the unidirectional `@OneToMany @JoinColumn`. With the line
+  owning the column, the `UPDATE` is gone and the insert costs the same: 3,097 ms of DB time per run saved, about
+  0.19 ms per order, with no other cost.
+- **Status `UPDATE`:** the old statement joined `orders` to a `FOR UPDATE` sub-select of itself to read the old status,
+  so it probed the primary key twice and added a `LockRows` node. An `UPDATE` with the source statuses in its `WHERE`
+  already waits for a racing command's row lock and re-checks the `WHERE` on the new row version (READ COMMITTED). So
+  `RETURNING old.status` (new in Postgres 18) gives the same answer, with one probe:
+
+  ```text
+  -- before
+  Update on orders o
+    ->  Nested Loop
+          ->  Subquery Scan on old
+                ->  LockRows
+                      ->  Index Scan using orders_pkey on orders  (Index Cond: (id = 150000))
+          ->  Index Scan using orders_pkey on orders o  (Index Cond: (id = old.id))
+  -- after
+  Update on orders
+    ->  Index Scan using orders_pkey on orders  (Index Cond: (id = 150000))
+          Filter: ((status)::text = ANY ('{DELIVERED,CANCELLED}'::text[]))
+  ```
+
+  The gain is small, 0.19 ms to 0.18 ms a call and 8,766 ms to 8,283 ms a run (−5.5%). Most of an `UPDATE`'s cost is
+  writing the new row version and its index entries. `status` is in three indexes, so the update can't be HOT.
+- **`order_events`:** unchanged. It is one audit row per status change (ticket #10), so it can't be skipped, and its
+  0.11 ms includes the foreign-key check on `orders`.
+
+The four statements other than the line insert took 21,762 ms of DB time per run in the baseline, 22,147 ms in the
+control and 18,600 ms after (−15% against the baseline). Dispatch p95 is
+courier capacity, as in the baseline: runs 1, 2, 3 gave 8.16, 2.38 and 2.72 s (median 2.72 s, baseline 2.13 s), with
+about 28 orders dispatched per run and 30 couriers. It isn't a result of this PR.
+
+### What's left
+
+- `order-history`: the `count(*)` per page, now the top statement, costs 0.16 ms. Removing it changes the API.
+- `place-orders`: the status `UPDATE` and the `order_events` insert are one each per status change. Fewer of them
+  would mean fewer transitions or no audit trail, which are behaviour changes. A second optimization PR (M7-4) has no
+  target worth it in these numbers.
+
 ## Reproducing
 
 Docker Desktop must be running. Close everything else; the stack needs about 4 GB.
