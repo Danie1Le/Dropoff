@@ -2,9 +2,13 @@ package io.github.danie1le.dropoff.simulator;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 class SmokeTest {
@@ -72,13 +76,87 @@ class SmokeTest {
         assertThat(api.idempotencyKeys).hasSize(2).doesNotHaveDuplicates();
     }
 
-    @Test
-    void reportsAStaleStateFile() {
-        assertThat(smoke(1).stateProblem()).contains("state file is stale");
+    /** A clock that moves only when the smoke test pauses, so warm-up retries run instantly. */
+    private final StepClock clock = new StepClock(T0);
 
+    private @Nullable String stateProblem() {
+        return smoke(1).stateProblem(clock, clock::advance);
+    }
+
+    private void courierExists() {
         api.couriers.put(201L, new CourierView(CourierStatus.OFFLINE, SHOP));
+    }
 
-        assertThat(smoke(1).stateProblem()).isNull();
+    @Test
+    void checksTheCourierAndMerchantIdsStoredInTheStateFile() {
+        courierExists();
+
+        assertThat(stateProblem()).isNull();
+        assertThat(api.calls).containsExactly("courier 201", "placed 1");
+    }
+
+    @Test
+    void waitsWhileOrderServiceCopiesTheSeededMerchant() {
+        // Right after a seed, order-service's merchant copy (M5-3) can still lack the merchant: CI run 42557588764.
+        courierExists();
+        api.failOn = "placed 1";
+        api.failure = new ApiException(404, "MERCHANT_NOT_FOUND");
+        api.failTimes = 3;
+
+        assertThat(stateProblem()).isNull();
+        assertThat(api.callsStartingWith("placed 1")).hasSize(4);
+    }
+
+    @Test
+    void waitsWhileTheServicesDoNotAnswerYet() {
+        courierExists();
+        api.failOn = "courier 201";
+        api.failure = new IllegalStateException("Connection refused");
+        api.failTimes = 2;
+
+        assertThat(stateProblem()).isNull();
+    }
+
+    @Test
+    void reportsAStaleStateFileOnlyWhenTheIdsStayMissingAfterTheWarmUp() {
+        assertThat(stateProblem()).contains("state file is stale (courier 201 or merchant 1 not found)");
+        assertThat(clock.instant()).isAfterOrEqualTo(T0.plus(Smoke.WARM_UP));
+    }
+
+    @Test
+    void reportsServicesThatNeverAnswer() {
+        api.failOn = "courier";
+        api.failure = new IllegalStateException("Connection refused");
+        api.failTimes = Integer.MAX_VALUE;
+
+        assertThat(stateProblem()).startsWith("services not reachable");
+    }
+
+    private static final class StepClock extends Clock {
+        private Instant now;
+
+        StepClock(Instant now) {
+            this.now = now;
+        }
+
+        void advance(Duration by) {
+            now = now.plus(by);
+        }
+
+        @Override
+        public Instant instant() {
+            return now;
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            throw new UnsupportedOperationException();
+        }
     }
 
     @Test

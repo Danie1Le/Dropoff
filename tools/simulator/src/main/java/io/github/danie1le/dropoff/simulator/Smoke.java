@@ -33,6 +33,9 @@ final class Smoke {
 
     static final Duration RETRY = Duration.ofSeconds(2);
 
+    /** How long the start-up state check retries before it calls the state file stale or the services unreachable. */
+    static final Duration WARM_UP = Duration.ofSeconds(60);
+
     /** What order-service answers while its merchant copies still lack the merchant or the item (M5-3). */
     private static final Set<String> NOT_IN_COPIES_YET = Set.of("MERCHANT_UNKNOWN", "MENU_ITEM_UNKNOWN");
 
@@ -136,14 +139,42 @@ final class Smoke {
     /** One order and its Idempotency-Key, kept across retries of a transport failure. */
     private record PendingOrder(long customerId, long merchantId, List<OrderLine> lines, String key) {}
 
+    /** Sleeps between warm-up probes; tests pass one that only moves their clock. */
+    @FunctionalInterface
+    interface Pause {
+        void sleep(Duration duration) throws InterruptedException;
+    }
+
     /**
-     * Compares the state file with the running services.
+     * Compares the state file with the running services, probing every {@link #RETRY} for up to {@link #WARM_UP}.
+     *
+     * <p>A 404 right after a seed does not mean the state file is stale: order-service's merchant copy (M5-3) can
+     * lag the seed by a moment, and a service can still be starting. So any failed probe is retried, and only one
+     * that still fails once the warm-up is over is reported.
      *
      * @return what is wrong (a stale state file after {@code docker compose down -v}, or a service that does not
-     *     answer), or null if the first seeded courier and merchant exist
+     *     answer), or null once the first courier and merchant in the state file exist
      */
     @Nullable
-    String stateProblem() {
+    String stateProblem(Clock clock, Pause pause) {
+        Instant end = clock.instant().plus(WARM_UP);
+        while (true) {
+            String problem = probeState();
+            if (problem == null || !clock.instant().isBefore(end)) {
+                return problem;
+            }
+            log.info("State check: {}; retrying", problem);
+            try {
+                pause.sleep(RETRY);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return problem;
+            }
+        }
+    }
+
+    /** One probe of the first courier and merchant in the state file: what is wrong, or null if both exist. */
+    private @Nullable String probeState() {
         long courierId = state.couriers().get(0).id();
         long merchantId = state.merchants().get(0).id();
         try {
@@ -184,7 +215,7 @@ final class Smoke {
      * @return whether every order was DELIVERED in time
      */
     boolean run(Clock clock, Duration timeout) {
-        String problem = stateProblem();
+        String problem = stateProblem(clock, duration -> Thread.sleep(duration.toMillis()));
         if (problem != null) {
             log.error("Smoke test cannot start: {}", problem);
             return false;

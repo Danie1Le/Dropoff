@@ -25,12 +25,14 @@ final class FakeApi implements DropoffApi {
 
     record PlacedOrder(long customerId, long merchantId, List<OrderLine> lines) {}
 
-    /** The next mutating call whose description starts with this prefix throws {@link #failure}. */
+    /** The next {@link #failTimes} calls whose description starts with this prefix throw {@link #failure}. */
     @Nullable
     String failOn;
 
     @Nullable
     RuntimeException failure;
+
+    int failTimes = 1;
 
     private long nextId = 1;
 
@@ -38,8 +40,10 @@ final class FakeApi implements DropoffApi {
         calls.add(call);
         if (failOn != null && call.startsWith(failOn) && failure != null) {
             RuntimeException toThrow = failure;
-            failOn = null;
-            failure = null;
+            if (--failTimes <= 0) {
+                failOn = null;
+                failure = null;
+            }
             throw toThrow;
         }
     }
