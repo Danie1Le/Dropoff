@@ -147,6 +147,7 @@ docker compose --profile demo run --rm simulator smoke       # full-flow check: 
 ```
 
 Options include `--orders-per-minute`, `--speed-kmh`, `--duration`, `--orders`, `--timeout` and one URL per service.
+Couriers drive at 30 km/h by default, so the first deliveries take a few minutes; the demo logs show `delivered=` climbing.
 The host simulator keeps its ids in `.simulator/state.json`; delete that file after `docker compose down -v`.
 
 ## Order lifecycle and event flow
