@@ -499,7 +499,7 @@ Goal: measured load and one or two measured wins.
 **M7-5 Write-up.**
 - Scope:
   - `docs/perf/README.md` complete: setup, baseline, each change with EXPLAIN, the after numbers and the % change.
-  - A summary table in the README.
+  - A summary table at the top of `docs/perf/README.md`; the main README links to it (M8-2).
 - Tests: none; this is a docs PR (links checked by review).
 - Decisions: #35.
 
@@ -518,6 +518,7 @@ Goal: a repo a reviewer can understand at a glance.
   - A Mermaid architecture diagram.
   - A quick start: ports 8081/8082/8083, Swagger URLs, Grafana on 3000, the `demo` profile.
   - Known gaps: no auth, no payments.
+  - Link the performance summary table at the top of `docs/perf/README.md` (M7-5 hand-off).
 - Tests: none; this is a docs PR (the quick start is followed once from a clean clone).
 - Decisions: #37.
 

@@ -21,7 +21,7 @@ same harness, `LOAD_PROFILE=full`. Every number is copied from a section below. 
 | Four targeted order_db statements, DB time per run | 21,762 ms | 18,600 ms | -15% | [`place-orders`](#place-orders) |
 | `POST /orders` p50 | 7.08 ms | 6.69 ms | -5.5% | [`place-orders`](#place-orders) |
 | `POST /orders` p95 | 13.42 ms | 17.60 ms | +31%, most likely the host, not proven | [`place-orders`](#place-orders) |
-| `POST /orders` p99 | 66.24 ms | 1,260.54 ms | most likely the host, not proven | [`place-orders`](#place-orders) |
+| `POST /orders` p99 | 66.24 ms | 1,260.54 ms | +1,803% (most likely the host, not proven) | [`place-orders`](#place-orders) |
 | `browse` | p95 1.80 ms | not measured again | none | merchant-service was not touched |
 
 What the table does and does not say:
