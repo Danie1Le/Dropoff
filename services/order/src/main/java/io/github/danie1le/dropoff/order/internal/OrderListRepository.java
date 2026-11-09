@@ -1,10 +1,12 @@
 package io.github.danie1le.dropoff.order.internal;
 
+import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.support.PageableExecutionUtils;
 
 /**
  * Merchant and customer order lists (M2-6). Hand-written SQL (ADR-0002). The SQL owns the sort, so callers pass an
@@ -30,10 +32,27 @@ interface OrderListRepository extends Repository<Order, Long> {
     Page<Order> findForMerchantInStatus(
             @Param("merchantId") long merchantId, @Param("status") OrderStatus status, Pageable page);
 
-    /** A customer's orders, newest first. */
+    /**
+     * A customer's orders, newest first (M7-3). A deferred join: the inner query walks
+     * {@code orders_customer_id_created_at_id_idx} as an index-only scan to skip the offset and pick 20 ids, and only
+     * those 20 rows are read from the table. A plain {@code OFFSET} read and sorted every skipped row first. The count
+     * runs only when the page doesn't already give the total ({@link PageableExecutionUtils}).
+     */
+    default Page<Order> findForCustomer(long customerId, Pageable page) {
+        List<Order> content = findPageForCustomer(customerId, page.getOffset(), page.getPageSize());
+        return PageableExecutionUtils.getPage(content, page, () -> countForCustomer(customerId));
+    }
+
+    /** One page of {@link #findForCustomer}; callers use that. */
     @Query(
-            value = "SELECT * FROM orders WHERE customer_id = :customerId ORDER BY created_at DESC, id DESC",
-            countQuery = "SELECT count(*) FROM orders WHERE customer_id = :customerId",
+            value = "SELECT o.* FROM orders o JOIN (SELECT id FROM orders WHERE customer_id = :customerId"
+                    + " ORDER BY created_at DESC, id DESC OFFSET :offset LIMIT :limit) page ON page.id = o.id"
+                    + " ORDER BY o.created_at DESC, o.id DESC",
             nativeQuery = true)
-    Page<Order> findForCustomer(@Param("customerId") long customerId, Pageable page);
+    List<Order> findPageForCustomer(
+            @Param("customerId") long customerId, @Param("offset") long offset, @Param("limit") int limit);
+
+    /** The total for {@link #findForCustomer}; callers use that. */
+    @Query(value = "SELECT count(*) FROM orders WHERE customer_id = :customerId", nativeQuery = true)
+    long countForCustomer(@Param("customerId") long customerId);
 }

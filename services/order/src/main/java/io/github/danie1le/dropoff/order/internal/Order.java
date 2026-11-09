@@ -8,7 +8,6 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
@@ -65,8 +64,9 @@ class Order {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
-    @JoinColumn(name = "order_id", nullable = false)
+    // OrderLine owns order_id (mappedBy), so each line's INSERT carries it. Owned from this side, Hibernate inserted
+    // the lines and then set order_id with one UPDATE per line (M7-3, docs/perf/README.md).
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("id")
     // Lists load the lines of a whole page in one query instead of one per order.
     @BatchSize(size = 100)
@@ -92,6 +92,7 @@ class Order {
         this.deliveryLat = deliveryAddress.lat();
         this.deliveryLng = deliveryAddress.lng();
         this.lines = new ArrayList<>(lines);
+        lines.forEach(line -> line.belongTo(this));
         this.totalCents = lines.stream().mapToLong(OrderLine::subtotalCents).reduce(0, Math::addExact);
         this.idempotencyKey = idempotencyKey;
         this.requestHash = requestHash;
