@@ -154,6 +154,8 @@ Three changes in one PR, all in order-service and all aimed at the targets above
 the existing tests pass unchanged, and two new `OrderListRepositoryIT` cases pin the history order (ties broken by the
 newest id) and the totals on every page.
 
+Deviation from #122 ("each optimization its own PR", one thing at a time): this PR has three changes. Re-measuring is about an hour per scenario on this host, and the line change and the status change both sit on the same `POST /orders` path. Splitting would have meant re-measuring `place-orders` for each. So the k6 `place-orders` p50 gain cannot be split between the two changes. The per-statement `pg_stat_statements` numbers below attribute each statement separately; use them as the evidence for each change.
+
 | Change | Target it hits |
 |---|---|
 | `OrderLine` owns `order_id` (`@ManyToOne`, `mappedBy` on `Order.lines`) | the `update order_lines set order_id` after every line insert |
@@ -239,7 +241,7 @@ with `plan_cache_mode = force_generic_plan`).
 
 Page 0 skips the join. A first try used the deferred join for every page and made page 0 slower: its 20 primary-key
 probes cost 84 buffers and 0.15 ms, against 23 buffers and 0.06 ms for a plain `LIMIT` on the backward index scan.
-With nothing to skip, the join only adds work. `OrderListRepository.findForCustomer` now runs the plain query for page
+With nothing to skip, the join only adds work. `OrderListRepositoryCustomImpl.findForCustomer` now runs the plain query for page
 0 and the join for every later page. The numbers above are from that version.
 
 Keyset paging (`WHERE (created_at, id) < ($1, $2)`) would make a deep page as cheap as page 0. It would also replace
@@ -259,17 +261,14 @@ table rows for them.
 After, runs 1, 2 and 3: p50 6.69, 6.72, 6.67 ms; p95 17.60, 19.42, 14.68 ms; p99 2,074.09, 1,260.54, 889.28 ms. k6
 dropped 206, 52 and 71 iterations.
 
-The p95 and p99 rise is the host, not the change. The extra back-to-back pair on the same host state:
+The p95 and p99 rise is most likely the host, not the change, but this PR did not prove it. All 3 after-run p99 values (2,074.09, 1,260.54, 889.28 ms) exceed the baseline's worst (527 ms), and k6 dropped 206 / 52 / 71 iterations, against 29 / 64 / 0 in the baseline. One extra back-to-back pair on the same host state (n=1) points at the host:
 
 | Run | p50 | p95 | p99 |
 |---|---|---|---|
 | `main` (`ddca65c`), 1 run | 7.18 ms | 14.58 ms | 268.38 ms |
 | this branch, 1 run | 6.57 ms | 12.38 ms | 49.48 ms |
 
-A p99 of 49 ms on this branch against 268 ms on `main` in the same conditions, and 40 to 527 ms in the baseline's own
-three runs, show that the `place-orders` tail is set by pauses on a host short of memory (GC, Docker, paging), not by
-the SQL. p50 is the stable number: 6.57 to 6.72 ms on this branch in all four runs, against 7.06 to 7.33 ms in the
-baseline and 7.18 ms on `main`, about 0.4 ms (−5%) faster. Part of that is the DB time saved per order below (about
+In that pair this branch had a p99 of 49 ms against 268 ms on `main`. That is one pair, so the tail cause is most likely host pauses on a host short of memory (about 2 GB free, against 4.8 GB at the baseline: GC, Docker, paging), not the SQL. Two more back-to-back pairs would settle it; they were not run. p50 is the stable comparison: 6.57 to 6.72 ms on this branch in all four runs, against 7.06 to 7.33 ms in the baseline and 7.18 ms on `main`, about 0.4 ms (-5%) faster. Part of that is the DB time saved per order below (about
 0.19 ms for the line updates), and part is the two round trips those updates no longer make.
 
 `pg_stat_statements` for the targeted statements in order_db (calls / total / mean). "Control" is the `main` run of the

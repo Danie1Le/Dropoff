@@ -64,8 +64,7 @@ class Order {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    // OrderLine owns order_id (mappedBy), so each line's INSERT carries it. Owned from this side, Hibernate inserted
-    // the lines and then set order_id with one UPDATE per line (M7-3, docs/perf/README.md).
+    // OrderLine owns order_id, so each line's INSERT carries it (docs/perf/README.md, M7-3).
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("id")
     // Lists load the lines of a whole page in one query instead of one per order.

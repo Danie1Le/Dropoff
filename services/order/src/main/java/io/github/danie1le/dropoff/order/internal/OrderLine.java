@@ -21,10 +21,10 @@ class OrderLine {
     private @Nullable Long id;
 
     /** Set by the {@link Order} it is added to. Only Hibernate reads it, to write {@code order_id}. */
-    @SuppressWarnings("UnusedVariable")
+    @SuppressWarnings({"UnusedVariable", "NullAway.Init"})
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "order_id", nullable = false)
-    private @Nullable Order order;
+    private Order order;
 
     @Column(name = "menu_item_id", nullable = false)
     private long menuItemId;

@@ -131,10 +131,8 @@ class OrderCommandService {
             return order;
         }
         Instant now = DbClock.now(clock);
-        // Conditional update: an UPDATE waits for a racing command's row lock and then re-checks the WHERE against the
-        // row that command left (READ COMMITTED), so only the first command moves the order. RETURNING old.status
-        // (Postgres 18) gives the status it really left. One index probe; the old self-join with a FOR UPDATE
-        // sub-select did the same in two (M7-3, docs/perf/README.md).
+        // An UPDATE waits for a racing command's row lock and re-checks the WHERE, so only the first command moves
+        // the order. RETURNING old.status (Postgres 18) gives the status it left (docs/perf/README.md, M7-3).
         Optional<String> from = jdbc.sql("UPDATE orders SET status = :to, updated_at = :now"
                         + " WHERE id = :id AND status IN (:from) RETURNING old.status")
                 .param("to", command.target().name())
