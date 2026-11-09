@@ -33,17 +33,28 @@ interface OrderListRepository extends Repository<Order, Long> {
             @Param("merchantId") long merchantId, @Param("status") OrderStatus status, Pageable page);
 
     /**
-     * A customer's orders, newest first (M7-3). A deferred join: the inner query walks
-     * {@code orders_customer_id_created_at_id_idx} as an index-only scan to skip the offset and pick 20 ids, and only
-     * those 20 rows are read from the table. A plain {@code OFFSET} read and sorted every skipped row first. The count
-     * runs only when the page doesn't already give the total ({@link PageableExecutionUtils}).
+     * A customer's orders, newest first (M7-3). Both queries walk {@code orders_customer_id_created_at_id_idx}
+     * backwards, so neither sorts. The first page reads its rows straight from that scan. A later page is a deferred
+     * join: an index-only scan skips the offset and picks the page's ids, and only those rows are read from the table.
+     * A plain {@code OFFSET} reads every skipped row from the table first; the join's 20 primary-key probes cost more
+     * than that only when nothing is skipped. The count runs only when the page doesn't already give the total
+     * ({@link PageableExecutionUtils}).
      */
     default Page<Order> findForCustomer(long customerId, Pageable page) {
-        List<Order> content = findPageForCustomer(customerId, page.getOffset(), page.getPageSize());
+        List<Order> content = page.getOffset() == 0
+                ? findFirstPageForCustomer(customerId, page.getPageSize())
+                : findPageForCustomer(customerId, page.getOffset(), page.getPageSize());
         return PageableExecutionUtils.getPage(content, page, () -> countForCustomer(customerId));
     }
 
-    /** One page of {@link #findForCustomer}; callers use that. */
+    /** The first page of {@link #findForCustomer}; callers use that. */
+    @Query(
+            value = "SELECT * FROM orders WHERE customer_id = :customerId ORDER BY created_at DESC, id DESC"
+                    + " LIMIT :limit",
+            nativeQuery = true)
+    List<Order> findFirstPageForCustomer(@Param("customerId") long customerId, @Param("limit") int limit);
+
+    /** A later page of {@link #findForCustomer}; callers use that. */
     @Query(
             value = "SELECT o.* FROM orders o JOIN (SELECT id FROM orders WHERE customer_id = :customerId"
                     + " ORDER BY created_at DESC, id DESC OFFSET :offset LIMIT :limit) page ON page.id = o.id"
