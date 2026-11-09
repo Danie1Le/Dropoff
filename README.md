@@ -247,12 +247,6 @@ UI only.
 - **No map UI.** Tracking is STOMP messages that `simulator watch` prints.
 - **Local only.** One Kafka broker, one Postgres, no hosted deploy.
 
-## How AI was used
-
-Claude wrote the code in this repo, and the author reviewed every pull request and answered a quiz on each one. Output
-was checked with unit and integration tests, an automated code review on every PR, and the author's own review. The
-detailed notes, with the mistakes that were caught, are in [`docs/ai-usage.md`](docs/ai-usage.md).
-
 ## License
 
 MIT, see [LICENSE](LICENSE).
