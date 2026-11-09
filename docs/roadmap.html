@@ -602,7 +602,7 @@ const MILESTONES = [
     { t: 'One shared service Dockerfile: layered jar on Alpine with a jlink Temurin 21 runtime (the full eclipse-temurin:21-jre-alpine is too big, #36 amended), non-root, < 300 MB and booted in CI; simulator Dockerfile; Compose profiles services and demo', done: true },
     { t: 'dropoff_dlt_messages_total{topic} from each dead-letter recoverer', done: true },
     { t: 'CI runs ops/smoke/full-flow.sh against Compose', done: true },
-    { t: 'CI publishes after build and test pass to ghcr.io/danie1le/dropoff-<service> (dropoff-app before M5): sha-* and main on main, version and latest on v* tags; PRs build only; linux/amd64; public images', done: false },
+    { t: 'CI publishes after build and test pass to ghcr.io/danie1le/dropoff-<service> (dropoff-app before M5): sha-* and main on main, version and latest on v* tags; PRs build only; linux/amd64; public images', done: true },
   ]},
   { id: 'M7', name: 'Performance', gh: 8, needs: [33, 34, 35], goal: 'Measured load and one or two measured wins.', items: [
     { t: 'k6 2.3.0 scripts in ops/k6 (Compose profile load, 256 MB cap): place-orders (5→50 orders/s over 10 min), browse (100 req/s), order-history; p95 < 300 ms, errors < 1%; short 1 min runs by default, LOAD_PROFILE=full for the ticket #35 shape', done: true },
