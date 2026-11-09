@@ -34,6 +34,13 @@ final class FakeApi implements DropoffApi {
 
     int failTimes = 1;
 
+    /** The next {@code times} calls whose description starts with the prefix throw the exception. */
+    void failNext(String prefix, RuntimeException exception, int times) {
+        failOn = prefix;
+        failure = exception;
+        failTimes = times;
+    }
+
     private long nextId = 1;
 
     private void record(String call) {

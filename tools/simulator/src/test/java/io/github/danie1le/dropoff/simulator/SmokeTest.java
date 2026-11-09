@@ -37,8 +37,7 @@ class SmokeTest {
     @Test
     void retriesAnOrderRejectedUntilTheMerchantCopiesCatchUp() {
         Smoke smoke = smoke(1);
-        api.failOn = "placeOrder";
-        api.failure = new ApiException(422, "MENU_ITEM_UNKNOWN");
+        api.failNext("placeOrder", new ApiException(422, "MENU_ITEM_UNKNOWN"), 1);
 
         smoke.tick(T0);
         smoke.tick(T0.plusSeconds(1));
@@ -54,8 +53,7 @@ class SmokeTest {
     @Test
     void retriesATransportFailureWithTheSameKeyAndBody() {
         Smoke smoke = smoke(1);
-        api.failOn = "placeOrder";
-        api.failure = new IllegalStateException("timeout");
+        api.failNext("placeOrder", new IllegalStateException("timeout"), 1);
 
         smoke.tick(T0);
         smoke.tick(T0.plus(Smoke.RETRY));
@@ -67,8 +65,7 @@ class SmokeTest {
     @Test
     void usesANewKeyAfterTheServerRejectedTheOrder() {
         Smoke smoke = smoke(1);
-        api.failOn = "placeOrder";
-        api.failure = new ApiException(422, "MENU_ITEM_UNKNOWN");
+        api.failNext("placeOrder", new ApiException(422, "MENU_ITEM_UNKNOWN"), 1);
 
         smoke.tick(T0);
         smoke.tick(T0.plus(Smoke.RETRY));
@@ -96,12 +93,9 @@ class SmokeTest {
     }
 
     @Test
-    void waitsWhileOrderServiceCopiesTheSeededMerchant() {
-        // Right after a seed, order-service's merchant copy (M5-3) can still lack the merchant: CI run 42557588764.
+    void waitsWhileAReusedStateFileMeetsServicesThatAreStillBooting() {
         courierExists();
-        api.failOn = "placed 1";
-        api.failure = new ApiException(404, "MERCHANT_NOT_FOUND");
-        api.failTimes = 3;
+        api.failNext("placed 1", new ApiException(404, "MERCHANT_UNKNOWN"), 3);
 
         assertThat(stateProblem()).isNull();
         assertThat(api.callsStartingWith("placed 1")).hasSize(4);
@@ -110,9 +104,7 @@ class SmokeTest {
     @Test
     void waitsWhileTheServicesDoNotAnswerYet() {
         courierExists();
-        api.failOn = "courier 201";
-        api.failure = new IllegalStateException("Connection refused");
-        api.failTimes = 2;
+        api.failNext("courier 201", new IllegalStateException("Connection refused"), 2);
 
         assertThat(stateProblem()).isNull();
     }
@@ -124,10 +116,18 @@ class SmokeTest {
     }
 
     @Test
+    void failsAtOnceOnAServerError() {
+        courierExists();
+        api.failNext("placed 1", new ApiException(503, "UNAVAILABLE"), Integer.MAX_VALUE);
+
+        assertThat(stateProblem()).startsWith("services not ready");
+        assertThat(api.callsStartingWith("placed 1")).hasSize(1);
+        assertThat(clock.instant()).isEqualTo(T0);
+    }
+
+    @Test
     void reportsServicesThatNeverAnswer() {
-        api.failOn = "courier";
-        api.failure = new IllegalStateException("Connection refused");
-        api.failTimes = Integer.MAX_VALUE;
+        api.failNext("courier", new IllegalStateException("Connection refused"), Integer.MAX_VALUE);
 
         assertThat(stateProblem()).startsWith("services not reachable");
     }

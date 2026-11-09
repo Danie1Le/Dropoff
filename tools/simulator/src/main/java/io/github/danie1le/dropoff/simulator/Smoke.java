@@ -23,6 +23,11 @@ import org.slf4j.LoggerFactory;
  * seed an order can still be rejected with {@code MERCHANT_UNKNOWN} or {@code MENU_ITEM_UNKNOWN}. The smoke test
  * retries such an order every 2 s until the copies catch up. Couriers always accept, so no order waits out an ignored
  * offer: the test checks the whole flow, not the bots' moods.
+ *
+ * <p>A state file written by an earlier run is checked against the services before the first order, since {@code
+ * docker compose down -v} leaves such a file stale. Services still booting get a {@link #WARM_UP} of 20 s, so a stale
+ * file is reported only after that delay (a 404 or a connection error is retried every 2 s; any other error fails at
+ * once). A file this run just seeded is not checked: it cannot be stale.
  */
 final class Smoke {
 
@@ -33,8 +38,11 @@ final class Smoke {
 
     static final Duration RETRY = Duration.ofSeconds(2);
 
-    /** How long the start-up state check retries before it calls the state file stale or the services unreachable. */
-    static final Duration WARM_UP = Duration.ofSeconds(60);
+    /**
+     * How long the check of a reused state file retries before it calls the file stale or the services unreachable.
+     * It delays only that failure; a fresh seed skips the check.
+     */
+    static final Duration WARM_UP = Duration.ofSeconds(20);
 
     /** What order-service answers while its merchant copies still lack the merchant or the item (M5-3). */
     private static final Set<String> NOT_IN_COPIES_YET = Set.of("MERCHANT_UNKNOWN", "MENU_ITEM_UNKNOWN");
@@ -146,11 +154,10 @@ final class Smoke {
     }
 
     /**
-     * Compares the state file with the running services, probing every {@link #RETRY} for up to {@link #WARM_UP}.
+     * Compares a reused state file with the running services, probing every {@link #RETRY} for up to {@link #WARM_UP}.
      *
-     * <p>A 404 right after a seed does not mean the state file is stale: order-service's merchant copy (M5-3) can
-     * lag the seed by a moment, and a service can still be starting. So any failed probe is retried, and only one
-     * that still fails once the warm-up is over is reported.
+     * <p>A service can still be starting, so a 404 or a connection error is retried. Any other error (a 5xx, for
+     * example) is reported at once. A genuinely stale file therefore fails only after the warm-up.
      *
      * @return what is wrong (a stale state file after {@code docker compose down -v}, or a service that does not
      *     answer), or null once the first courier and merchant in the state file exist
@@ -159,36 +166,42 @@ final class Smoke {
     String stateProblem(Clock clock, Pause pause) {
         Instant end = clock.instant().plus(WARM_UP);
         while (true) {
-            String problem = probeState();
-            if (problem == null || !clock.instant().isBefore(end)) {
-                return problem;
+            Probe probe = probeState();
+            if (probe.problem() == null
+                    || !probe.retryable()
+                    || !clock.instant().isBefore(end)) {
+                return probe.problem();
             }
-            log.info("State check: {}; retrying", problem);
+            log.info("State check: {}; retrying", probe.problem());
             try {
                 pause.sleep(RETRY);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                return problem;
+                return probe.problem();
             }
         }
     }
 
-    /** One probe of the first courier and merchant in the state file: what is wrong, or null if both exist. */
-    private @Nullable String probeState() {
+    private record Probe(@Nullable String problem, boolean retryable) {}
+
+    /** One probe of the first courier and merchant in the state file: what is wrong, or no problem if both exist. */
+    private Probe probeState() {
         long courierId = state.couriers().get(0).id();
         long merchantId = state.merchants().get(0).id();
         try {
             api.courier(courierId);
             api.placedOrders(merchantId);
-            return null;
+            return new Probe(null, false);
         } catch (ApiException e) {
             if (e.status() == 404) {
-                return "state file is stale (courier " + courierId + " or merchant " + merchantId
-                        + " not found): delete it or reseed";
+                return new Probe(
+                        "state file is stale (courier " + courierId + " or merchant " + merchantId
+                                + " not found): delete it or reseed",
+                        true);
             }
-            return "services not ready: " + e.getMessage();
+            return new Probe("services not ready: " + e.getMessage(), false);
         } catch (RuntimeException e) {
-            return "services not reachable: " + e.getMessage();
+            return new Probe("services not reachable: " + e.getMessage(), true);
         }
     }
 
@@ -212,13 +225,16 @@ final class Smoke {
     /**
      * Ticks every 250 ms until every order is final or the timeout passes.
      *
+     * @param reusedState whether the state file came from an earlier run; only then is it checked against the services
      * @return whether every order was DELIVERED in time
      */
-    boolean run(Clock clock, Duration timeout) {
-        String problem = stateProblem(clock, duration -> Thread.sleep(duration.toMillis()));
-        if (problem != null) {
-            log.error("Smoke test cannot start: {}", problem);
-            return false;
+    boolean run(Clock clock, Duration timeout, boolean reusedState) {
+        if (reusedState) {
+            String problem = stateProblem(clock, duration -> Thread.sleep(duration.toMillis()));
+            if (problem != null) {
+                log.error("Smoke test cannot start: {}", problem);
+                return false;
+            }
         }
         Instant start = clock.instant();
         Instant end = start.plus(timeout);
