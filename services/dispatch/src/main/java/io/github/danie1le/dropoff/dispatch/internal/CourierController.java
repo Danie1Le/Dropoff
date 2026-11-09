@@ -5,6 +5,7 @@ import io.github.danie1le.dropoff.dispatch.internal.CourierRequests.CourierRespo
 import io.github.danie1le.dropoff.dispatch.internal.CourierRequests.CreateCourier;
 import io.github.danie1le.dropoff.dispatch.internal.CourierRequests.UpdateLocation;
 import io.github.danie1le.dropoff.web.ProblemResponse;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.headers.Header;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
@@ -36,6 +37,7 @@ class CourierController {
             responseCode = "201",
             description = "Created.",
             headers = @Header(name = HttpHeaders.LOCATION, description = "URL of the new courier."))
+    @Operation(summary = "Register a courier", description = "Creates a courier with no location yet.")
     @PostMapping
     ResponseEntity<CourierResponse> create(@Valid @RequestBody CreateCourier request) {
         Courier courier = service.create(request.name());
@@ -47,6 +49,7 @@ class CourierController {
     }
 
     @ProblemResponse(status = 404, codes = "COURIER_NOT_FOUND")
+    @Operation(summary = "Get a courier")
     @GetMapping("/{id}")
     CourierResponse get(@PathVariable long id) {
         return CourierResponse.of(service.get(id));
@@ -56,12 +59,19 @@ class CourierController {
     @ProblemResponse(
             status = 409,
             codes = {"COURIER_LOCATION_UNKNOWN", "COURIER_BUSY", "COURIER_HAS_ACTIVE_DELIVERY"})
+    @Operation(
+            summary = "Go available or offline",
+            description =
+                    "Only AVAILABLE and OFFLINE can be requested; BUSY is set by the system when the courier accepts an offer.")
     @PatchMapping("/{id}/status")
     CourierResponse changeStatus(@PathVariable long id, @Valid @RequestBody ChangeStatus request) {
         return CourierResponse.of(service.changeStatus(id, request.requested()));
     }
 
     @ProblemResponse(status = 404, codes = "COURIER_NOT_FOUND")
+    @Operation(
+            summary = "Report the courier location",
+            description = "Replaces the courier position. Couriers send this every few seconds while working.")
     @PutMapping("/{id}/location")
     CourierResponse moveTo(@PathVariable long id, @Valid @RequestBody UpdateLocation request) {
         return CourierResponse.of(service.moveTo(id, request.position()));

@@ -4,6 +4,7 @@ import io.github.danie1le.dropoff.order.internal.CustomerRequests.CreateCustomer
 import io.github.danie1le.dropoff.order.internal.CustomerRequests.CustomerResponse;
 import io.github.danie1le.dropoff.order.internal.CustomerRequests.UpdateCustomer;
 import io.github.danie1le.dropoff.web.ProblemResponse;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.headers.Header;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
@@ -34,6 +35,7 @@ class CustomerController {
             responseCode = "201",
             description = "Created.",
             headers = @Header(name = HttpHeaders.LOCATION, description = "URL of the new customer."))
+    @Operation(summary = "Create a customer")
     @PostMapping
     ResponseEntity<CustomerResponse> create(@Valid @RequestBody CreateCustomer request) {
         Customer customer = service.create(request);
@@ -45,12 +47,17 @@ class CustomerController {
     }
 
     @ProblemResponse(status = 404, codes = "CUSTOMER_NOT_FOUND")
+    @Operation(summary = "Get a customer")
     @GetMapping("/{id}")
     CustomerResponse get(@PathVariable long id) {
         return CustomerResponse.of(service.get(id));
     }
 
     @ProblemResponse(status = 404, codes = "CUSTOMER_NOT_FOUND")
+    @Operation(
+            summary = "Update a customer",
+            description =
+                    "Partial update: absent or null fields stay as they are. Address, lat and lng are sent together.")
     @PatchMapping("/{id}")
     CustomerResponse update(@PathVariable long id, @Valid @RequestBody UpdateCustomer request) {
         return CustomerResponse.of(service.update(id, request));

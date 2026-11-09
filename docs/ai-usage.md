@@ -1,7 +1,7 @@
 # How AI was used
 
 Claude Code wrote the code, tests, docs and most issue text in this repo. The owner chose what to build, reviewed every
-PR before merge, and answered a quiz at the end of each one (the questions are in `docs/milestones/M*.md`). This page
+PR before merge, and answered a quiz at the end of each one (the questions are in `docs/milestones/M2.md` to `M8.md`; M0 and M1 have no guide). This page
 says how that worked, how the output was checked, which mistakes the checks caught, and where the checks stop.
 
 Every link below points at a pull request thread you can read.
@@ -18,7 +18,7 @@ Every link below points at a pull request thread you can read.
 
 ## The loop
 
-One item from `docs/PLAN.md` becomes one small PR. Three roles handle it, each a fresh agent with no memory of the
+One item from `docs/PLAN.md` becomes one small PR. The full process is in PLAN's "How every PR works"; this is the short version. Three roles handle it, each a fresh agent with no memory of the
 others:
 
 1. **Builder.** Reads the ticket and the decisions it cites, writes the failing tests first, then the code. It makes
@@ -91,11 +91,11 @@ red before the fix ([reply](https://github.com/Danie1Le/Dropoff/pull/98#discussi
 ### Histogram range (M6-1, PR [#116](https://github.com/Danie1Le/Dropoff/pull/116))
 
 The dispatch-time timer used Micrometer's default histogram range of 1 ms to 30 s. Real waits run for minutes, so the
-p95 shown in Grafana would have been stuck at 30 s and the 15-minute alert would never have looked right. The reviewer
+p95 shown in Grafana would have been capped at 30 s, far below the waits near the 15-minute alert threshold in #13. The reviewer
 [spotted the default](https://github.com/Danie1Le/Dropoff/pull/116#discussion_r4507749222). The range is now 1 s to
 30 min ([reply](https://github.com/Danie1Le/Dropoff/pull/116#discussion_r4507765466)). The same review also found that
 a gauge kept its last value when its database query kept failing
-([comment](https://github.com/Danie1Le/Dropoff/pull/116#discussion_r4507749225)), which would hide an outage.
+([comment](https://github.com/Danie1Le/Dropoff/pull/116#discussion_r4507749225)), which would hide an outage and keep the 15-minute alert from firing. A failed load now reads as NaN (test `aFailedFirstLoadReadsAsNaN`).
 
 ### Dedupe atomicity (M5-1, PR [#106](https://github.com/Danie1Le/Dropoff/pull/106))
 
@@ -121,7 +121,7 @@ the primary key already guarantees. It now checks the log output.
   [#37](https://github.com/Danie1Le/Dropoff/issues/37)): the owner delegated those, and approved them through the final
   plan review, not one by one.
 - **Departures from the plan went to the owner.** When the service images came out over the 300 MB limit set in #36
-  (305-315 MB on the stock Java runtime), the builder measured it, proposed a `jlink`-trimmed runtime on plain Alpine, and
+  (305-315 MB on the stock Java runtime, as recorded in the [#36 amendment](https://github.com/Danie1Le/Dropoff/issues/36#issuecomment-6727514165)), the builder measured it, proposed a `jlink`-trimmed runtime on plain Alpine, and
   wrote in the PR body "Please review this change from the planned base image"
   ([PR #118](https://github.com/Danie1Le/Dropoff/pull/118)). It was merged by the owner, and #36 and the plan were
   amended to record it.
