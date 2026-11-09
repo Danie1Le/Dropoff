@@ -1,8 +1,45 @@
 # Performance
 
-M7 measures the three services under load, picks one or two fixes from the numbers, and measures again (ticket #35,
-`docs/PLAN.md` section M7, `docs/milestones/M7.md`). This file holds the setup and the baseline (M7-2). M7-3/4 add each
-change with its `EXPLAIN`, and M7-5 adds the after table and the summary.
+M7 measures the three services under load, picks fixes from the numbers, and measures again (ticket #35,
+`docs/PLAN.md` section M7, `docs/milestones/M7.md`). This file holds the setup, the baseline (M7-2), the changes with
+their `EXPLAIN` and the after numbers (M7-3), and the summary below (M7-5). The repo README (M8-2) will link here.
+
+## Summary
+
+Baseline at `0f784d5` (median of 3 runs), after at `b0300b6` (`feat/m7-3-optimizations`, merged as #126), same host,
+same harness, `LOAD_PROFILE=full`. Every number is copied from a section below. Change is (after - before) / before.
+
+| What | Before | After | Change | Evidence |
+|---|---|---|---|---|
+| History deep page, query mean | 1.09 ms | 0.25 ms | -77% | [`order-history`](#order-history) |
+| History, both page queries, DB time per run | 8,674 ms | 2,316 ms | -73% | [`order-history`](#order-history) |
+| History deep page, buffers (`EXPLAIN`, customer 1000042, offset 1980) | 2,123 | 99 | -95% | [`order-history`](#order-history) |
+| `GET /customers/{id}/orders`, deep page, p50 / p95 / p99 | 3.69 / 4.69 / 5.71 ms | 3.31 / 4.21 / 5.21 ms | -10.3% / -10.2% / -8.8% | [`order-history`](#order-history) |
+| `GET /customers/{id}/orders`, page 0, p50 / p95 / p99 | 2.74 / 3.45 / 4.65 ms | 2.78 / 3.58 / 4.69 ms | +1.5% / +3.8% / +0.9% (noise) | [`order-history`](#order-history) |
+| `update order_lines set order_id` per run | 33,158 calls, 3,034 ms | gone | -100% | [`place-orders`](#place-orders) |
+| Status `UPDATE` per run | 8,766 ms (0.19 ms a call) | 8,283 ms (0.18 ms a call) | -5.5% | [`place-orders`](#place-orders) |
+| Four targeted order_db statements, DB time per run | 21,762 ms | 18,600 ms | -15% | [`place-orders`](#place-orders) |
+| `POST /orders` p50 | 7.08 ms | 6.69 ms | -5.5% | [`place-orders`](#place-orders) |
+| `POST /orders` p95 | 13.42 ms | 17.60 ms | +31%, most likely the host, not proven | [`place-orders`](#place-orders) |
+| `POST /orders` p99 | 66.24 ms | 1,260.54 ms | +1,803% (most likely the host, not proven) | [`place-orders`](#place-orders) |
+| `browse` | p95 1.80 ms | not measured again | none | merchant-service was not touched |
+
+What the table does and does not say:
+
+- The wins are in the database, and they are measured per statement. End-to-end latency was already far under the 300 ms
+  threshold in every run, so the endpoint percentiles move by tenths of a millisecond. That is why the DB-time rows
+  carry the evidence and the percentile rows are context.
+- `POST /orders` p95 and p99 got worse in the median after run. This is not claimed as a regression and not claimed as
+  noise. All three after runs had a p99 above the baseline's worst (527 ms), but one back-to-back pair on the same host
+  state (n=1) had this branch at 49.48 ms against 268.38 ms on `main`. The most likely cause is host pauses on a host
+  with about 2 GB free (the baseline had 4.8 GB). Two more pairs would settle it and were not run. p50 is the stable
+  comparison: 6.57 to 6.72 ms on this branch in all four runs, against 7.06 to 7.33 ms in the baseline.
+- Dispatch p95 (2.13 s baseline, 2.72 s after) is a courier-capacity number, not a dispatch result. With 30 couriers,
+  about 27 of roughly 16,500 orders were dispatched per run and about 15,800 stayed READY. It is reported in
+  [Dispatch p95](#dispatch-p95) and is not part of the comparison above.
+- Three changes shipped in one PR (#126), against #122's one-change-per-PR rule, so the `place-orders` p50 gain cannot
+  be split between the line change and the status change. The per-statement numbers attribute each.
+- M7-4 was skipped: after M7-3 no remaining target was worth a second PR (see [What's left](#whats-left)).
 
 ## Setup
 
@@ -320,7 +357,9 @@ about 28 orders dispatched per run and 30 couriers. It isn't a result of this PR
 - `order-history`: the `count(*)` per page, now the top statement, costs 0.16 ms. Removing it changes the API.
 - `place-orders`: the status `UPDATE` and the `order_events` insert are one each per status change. Fewer of them
   would mean fewer transitions or no audit trail, which are behaviour changes. A second optimization PR (M7-4) has no
-  target worth it in these numbers.
+  target worth it in these numbers, so M7-4 was skipped.
+- Open question: whether the `POST /orders` p95 and p99 rise is the host. Two more back-to-back `main` versus branch
+  pairs on a host with free memory would answer it.
 
 ## Reproducing
 
