@@ -104,4 +104,43 @@ class OrderListRepositoryIT {
         assertThat(page0.getTotalPages()).isEqualTo(2);
         assertThat(ids(customerPage1)).containsExactly(first);
     }
+
+    @Test
+    void customerPagesBreakTiesByNewestIdAndKeepTheTotalOnEveryPage() {
+        long c = customer();
+        long m = merchant();
+        long a = order(c, m, "CANCELLED", "2026-01-01T10:00:00Z");
+        long b = order(c, m, "CANCELLED", "2026-01-01T10:00:00Z");
+        long d = order(c, m, "CANCELLED", "2026-01-01T10:00:00Z");
+        long newest = order(c, m, "PLACED", "2026-01-01T11:00:00Z");
+
+        Page<Order> page0 = orders.findForCustomer(c, PageRequest.of(0, 2));
+        Page<Order> page1 = orders.findForCustomer(c, PageRequest.of(1, 2));
+        Page<Order> pastTheEnd = orders.findForCustomer(c, PageRequest.of(5, 2));
+
+        assertThat(ids(page0)).containsExactly(newest, d);
+        assertThat(ids(page1)).containsExactly(b, a);
+        assertThat(page1.getTotalElements()).isEqualTo(4);
+        assertThat(page1.getTotalPages()).isEqualTo(2);
+        assertThat(ids(pastTheEnd)).isEmpty();
+        assertThat(pastTheEnd.getTotalElements()).isEqualTo(4);
+    }
+
+    @Test
+    void customerPagesLoadEachOrdersLines() {
+        long c = customer();
+        long m = merchant();
+        long item = OrderFixtures.item(jdbc, m, 350, true);
+        long older = order(c, m, "CANCELLED", "2026-01-01T10:00:00Z");
+        long newer = order(c, m, "CANCELLED", "2026-01-01T11:00:00Z");
+        OrderFixtures.line(jdbc, older, item, 350);
+        OrderFixtures.line(jdbc, newer, item, 425);
+
+        Page<Order> page1 = orders.findForCustomer(c, PageRequest.of(1, 1));
+
+        assertThat(ids(page1)).containsExactly(older);
+        assertThat(page1.getContent().getFirst().lines())
+                .singleElement()
+                .satisfies(line -> assertThat(line.priceCents()).isEqualTo(350));
+    }
 }

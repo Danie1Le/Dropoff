@@ -12,7 +12,7 @@ import org.springframework.data.repository.query.Param;
  * one query per shape, with no {@code IS NULL OR} filter, so each can use its index in a generic plan too:
  * {@code orders_merchant_id_created_at_idx} without a status, {@code orders_merchant_id_status_idx} with one.
  */
-interface OrderListRepository extends Repository<Order, Long> {
+interface OrderListRepository extends Repository<Order, Long>, OrderListRepositoryCustom {
 
     /** All of a merchant's orders, oldest first. */
     @Query(
@@ -29,11 +29,4 @@ interface OrderListRepository extends Repository<Order, Long> {
             nativeQuery = true)
     Page<Order> findForMerchantInStatus(
             @Param("merchantId") long merchantId, @Param("status") OrderStatus status, Pageable page);
-
-    /** A customer's orders, newest first. */
-    @Query(
-            value = "SELECT * FROM orders WHERE customer_id = :customerId ORDER BY created_at DESC, id DESC",
-            countQuery = "SELECT count(*) FROM orders WHERE customer_id = :customerId",
-            nativeQuery = true)
-    Page<Order> findForCustomer(@Param("customerId") long customerId, Pageable page);
 }
