@@ -5,9 +5,19 @@ three Spring Boot services that talk through REST and Kafka events. It runs loca
 
 ## Demo
 
-The demo GIF (one order from placement to delivery, with the Grafana dashboard beside it) is recorded by hand and is
-not in the repo yet. It will live in `docs/media/`. To see the same thing yourself, follow the
+![Demo: simulator watch beside the Grafana dashboard](docs/media/demo.gif)
+
+The GIF (24 s) shows `simulator watch <orderId>` printing an order's live messages beside the Grafana dashboard taking
+orders. It is a timed sequence of headless screenshots stitched with ffmpeg, not a screen recording; rebuild it with
+`ops/media/capture.ps1` while the demo stack runs. To see the same thing yourself, follow the
 [quick start](#quick-start) and [Running the simulator](#running-the-simulator).
+
+| Swagger UI (order-service) | k6 `place-orders.js` summary |
+|---|---|
+| ![Swagger UI](docs/media/swagger-order.png) | ![k6 summary](docs/media/k6-summary.png) |
+
+The k6 run is a one-minute `short` profile on a laptop that also runs the whole demo stack, so its p95 crosses the 300 ms
+threshold. The numbers that matter are in [docs/perf/README.md](docs/perf/README.md).
 
 ## Features
 
