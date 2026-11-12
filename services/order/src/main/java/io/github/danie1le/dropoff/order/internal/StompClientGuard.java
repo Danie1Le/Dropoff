@@ -1,5 +1,8 @@
 package io.github.danie1le.dropoff.order.internal;
 
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
 import org.springframework.messaging.Message;
@@ -14,10 +17,20 @@ import org.springframework.messaging.support.MessageHeaderAccessor;
  * Checks frames from STOMP clients (M4-1). Clients only listen: a {@code SEND} is rejected, because the simple broker
  * would otherwise relay it to every subscriber, letting anyone fake a status on any order's topic. A {@code SUBSCRIBE}
  * must name one order's topic, so a wildcard such as {@code /topic/orders/**} cannot watch every order at once.
+ *
+ * <p>Each session may hold at most {@link #MAX_SUBSCRIPTIONS_PER_SESSION} subscriptions, so one socket cannot grow the
+ * broker's in-memory registry without bound. {@code UNSUBSCRIBE} frees a slot and {@code DISCONNECT} drops the
+ * session. Spring also sends a {@code DISCONNECT} through this channel when a socket closes without one, so a dropped
+ * connection is cleared too.
  */
 class StompClientGuard implements ChannelInterceptor {
 
+    static final int MAX_SUBSCRIPTIONS_PER_SESSION = 50;
+
     private static final Pattern ORDER_TOPIC = Pattern.compile("/topic/orders/\\d+");
+
+    /** Subscription ids per STOMP session id. */
+    private final Map<String, Set<String>> subscriptions = new ConcurrentHashMap<>();
 
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
@@ -29,13 +42,60 @@ class StompClientGuard implements ChannelInterceptor {
         if (command == StompCommand.SEND) {
             throw new MessageDeliveryException(message, "Clients may not SEND; subscribe to /topic/orders/{id}.");
         }
-        if (command == StompCommand.SUBSCRIBE && !isOrderTopic(stomp.getDestination())) {
-            throw new MessageDeliveryException(message, "Only /topic/orders/{id} can be subscribed to.");
+        if (command == StompCommand.SUBSCRIBE) {
+            if (!isOrderTopic(stomp.getDestination())) {
+                throw new MessageDeliveryException(message, "Only /topic/orders/{id} can be subscribed to.");
+            }
+            if (!track(stomp.getSessionId(), stomp.getSubscriptionId())) {
+                throw new MessageDeliveryException(
+                        message, "At most " + MAX_SUBSCRIPTIONS_PER_SESSION + " subscriptions per session.");
+            }
+        } else if (command == StompCommand.UNSUBSCRIBE) {
+            untrack(stomp.getSessionId(), stomp.getSubscriptionId());
+        } else if (command == StompCommand.DISCONNECT) {
+            String sessionId = stomp.getSessionId();
+            if (sessionId != null) {
+                subscriptions.remove(sessionId);
+            }
         }
         return message;
     }
 
+    /** Number of sessions holding at least one subscription; for tests. */
+    int trackedSessions() {
+        return subscriptions.size();
+    }
+
     private static boolean isOrderTopic(@Nullable String destination) {
         return destination != null && ORDER_TOPIC.matcher(destination).matches();
+    }
+
+    /** Records the subscription, or returns {@code false} if the session is already at the cap. */
+    private boolean track(@Nullable String sessionId, @Nullable String subscriptionId) {
+        if (sessionId == null || subscriptionId == null) {
+            // The broker ignores a SUBSCRIBE without these, so there is nothing to count.
+            return true;
+        }
+        boolean[] accepted = {true};
+        subscriptions.compute(sessionId, (id, ids) -> {
+            Set<String> held = ids != null ? ids : ConcurrentHashMap.newKeySet();
+            if (!held.contains(subscriptionId) && held.size() >= MAX_SUBSCRIPTIONS_PER_SESSION) {
+                accepted[0] = false;
+            } else {
+                held.add(subscriptionId);
+            }
+            return held;
+        });
+        return accepted[0];
+    }
+
+    private void untrack(@Nullable String sessionId, @Nullable String subscriptionId) {
+        if (sessionId == null || subscriptionId == null) {
+            return;
+        }
+        subscriptions.computeIfPresent(sessionId, (id, held) -> {
+            held.remove(subscriptionId);
+            return held.isEmpty() ? null : held;
+        });
     }
 }
