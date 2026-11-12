@@ -15,6 +15,12 @@ jspecify = "1.0.1"
 # Architecture tests outside the app (M5-2): the same ArchUnit Spring Modulith brings into the app
 archunit = "1.4.2"
 
+# Security floors for kafka-clients' compression libraries, above what the Spring Boot BOM brings in
+# snappy-java: GHSA-gwq9-9ffj-mvrv, GHSA-q233-g92q-qxp6, GHSA-xqrx-qh46-34m7 (fixed in 1.1.10.9)
+snappy-java = "1.1.10.12"
+# lz4-java: GHSA-mcr4-qmvw-px4g, GHSA-343h-94h5-c4wr, GHSA-gm45-99xc-r7wv (fixed in 1.11.4)
+lz4-java = "1.14.0"
+
 [libraries]
 # BOMs that manage the application dependency versions
 spring-boot-bom = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "spring-boot" }
@@ -60,6 +66,10 @@ assertj-core = { module = "org.assertj:assertj-core" }
 spring-data-commons = { module = "org.springframework.data:spring-data-commons" }
 jakarta-validation-api = { module = "jakarta.validation:jakarta.validation-api" }
 archunit = { module = "com.tngtech.archunit:archunit", version.ref = "archunit" }
+
+# Transitive via kafka-clients, pinned by constraint in libs/service-common for the advisories above
+snappy-java = { module = "org.xerial.snappy:snappy-java", version.ref = "snappy-java" }
+lz4-java = { module = "at.yawk.lz4:lz4-java", version.ref = "lz4-java" }
 
 # Plugins used by build-logic, declared as libraries so the convention plugin can apply them
 spotless-gradle = { module = "com.diffplug.spotless:spotless-plugin-gradle", version.ref = "spotless" }
