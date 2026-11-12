@@ -24,6 +24,7 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+import tools.jackson.core.exc.StreamConstraintsException;
 
 /**
  * Turns every error into an RFC 9457 Problem Details body with a stable {@code code} field (ticket #8). Domain
@@ -108,6 +109,15 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @Override
     protected ResponseEntity<Object> handleHttpMessageNotReadable(
             HttpMessageNotReadableException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        if (exceedsReadLimits(ex)) {
+            HttpStatus tooLarge = HttpStatus.CONTENT_TOO_LARGE;
+            return ResponseEntity.status(tooLarge)
+                    .headers(headers)
+                    .body(problem(
+                            tooLarge,
+                            RequestSizeLimitFilter.CONTENT_TOO_LARGE,
+                            "The request body exceeds the allowed size or nesting depth."));
+        }
         return badRequest("MALFORMED_REQUEST", "The request body could not be read.", headers, null);
     }
 
@@ -138,6 +148,16 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
             }
         }
         return response;
+    }
+
+    /** Jackson hit a read limit from {@link JsonLimitsConfig} (or its default nesting depth) while parsing the body. */
+    private static boolean exceedsReadLimits(Throwable ex) {
+        for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
+            if (cause instanceof StreamConstraintsException) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static ResponseEntity<Object> validationFailed(List<FieldViolation> violations, HttpHeaders headers) {
