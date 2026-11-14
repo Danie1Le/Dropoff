@@ -12,6 +12,7 @@ import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
+import org.springframework.stereotype.Component;
 
 /**
  * Checks frames from STOMP clients (M4-1). Clients only listen: a {@code SEND} is rejected, because the simple broker
@@ -23,6 +24,7 @@ import org.springframework.messaging.support.MessageHeaderAccessor;
  * session. Spring also sends a {@code DISCONNECT} through this channel when a socket closes without one, so a dropped
  * connection is cleared too.
  */
+@Component
 class StompClientGuard implements ChannelInterceptor {
 
     static final int MAX_SUBSCRIPTIONS_PER_SESSION = 50;
@@ -39,29 +41,32 @@ class StompClientGuard implements ChannelInterceptor {
             return message;
         }
         StompCommand command = stomp.getCommand();
-        if (command == StompCommand.SEND) {
-            throw new MessageDeliveryException(message, "Clients may not SEND; subscribe to /topic/orders/{id}.");
+        if (command == null) {
+            return message;
         }
-        if (command == StompCommand.SUBSCRIBE) {
-            if (!isOrderTopic(stomp.getDestination())) {
-                throw new MessageDeliveryException(message, "Only /topic/orders/{id} can be subscribed to.");
+        switch (command) {
+            case SEND ->
+                throw new MessageDeliveryException(message, "Clients may not SEND; subscribe to /topic/orders/{id}.");
+            case SUBSCRIBE -> {
+                if (!isOrderTopic(stomp.getDestination())) {
+                    throw new MessageDeliveryException(message, "Only /topic/orders/{id} can be subscribed to.");
+                }
+                if (!track(stomp.getSessionId(), stomp.getSubscriptionId())) {
+                    throw new MessageDeliveryException(
+                            message, "At most " + MAX_SUBSCRIPTIONS_PER_SESSION + " subscriptions per session.");
+                }
             }
-            if (!track(stomp.getSessionId(), stomp.getSubscriptionId())) {
-                throw new MessageDeliveryException(
-                        message, "At most " + MAX_SUBSCRIPTIONS_PER_SESSION + " subscriptions per session.");
-            }
-        } else if (command == StompCommand.UNSUBSCRIBE) {
-            untrack(stomp.getSessionId(), stomp.getSubscriptionId());
-        } else if (command == StompCommand.DISCONNECT) {
-            String sessionId = stomp.getSessionId();
-            if (sessionId != null) {
-                subscriptions.remove(sessionId);
-            }
+            case UNSUBSCRIBE -> untrack(stomp.getSessionId(), stomp.getSubscriptionId());
+            case DISCONNECT -> forget(stomp.getSessionId());
+            default -> {}
         }
         return message;
     }
 
-    /** Number of sessions holding at least one subscription; for tests. */
+    /**
+     * Number of sessions holding at least one subscription. Package-private for tests, which use it to check that
+     * closed sessions are removed from the map.
+     */
     int trackedSessions() {
         return subscriptions.size();
     }
@@ -76,17 +81,16 @@ class StompClientGuard implements ChannelInterceptor {
             // The broker ignores a SUBSCRIBE without these, so there is nothing to count.
             return true;
         }
-        boolean[] accepted = {true};
-        subscriptions.compute(sessionId, (id, ids) -> {
-            Set<String> held = ids != null ? ids : ConcurrentHashMap.newKeySet();
-            if (!held.contains(subscriptionId) && held.size() >= MAX_SUBSCRIPTIONS_PER_SESSION) {
-                accepted[0] = false;
-            } else {
-                held.add(subscriptionId);
+        // The check and the add happen together inside compute, so the cap holds even if two frames race.
+        Set<String> held = subscriptions.compute(sessionId, (id, ids) -> {
+            Set<String> set = ids != null ? ids : ConcurrentHashMap.newKeySet();
+            if (set.size() < MAX_SUBSCRIPTIONS_PER_SESSION) {
+                set.add(subscriptionId);
             }
-            return held;
+            return set;
         });
-        return accepted[0];
+        // Already present (a repeated id) or just added; absent only when the session was full.
+        return held.contains(subscriptionId);
     }
 
     private void untrack(@Nullable String sessionId, @Nullable String subscriptionId) {
@@ -97,5 +101,11 @@ class StompClientGuard implements ChannelInterceptor {
             held.remove(subscriptionId);
             return held.isEmpty() ? null : held;
         });
+    }
+
+    private void forget(@Nullable String sessionId) {
+        if (sessionId != null) {
+            subscriptions.remove(sessionId);
+        }
     }
 }

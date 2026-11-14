@@ -18,7 +18,13 @@ import org.springframework.web.socket.config.annotation.WebSocketTransportRegist
 class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     /** Clients only send small control frames such as {@code SUBSCRIBE}, so 8 KiB is plenty. */
-    private static final int MESSAGE_SIZE_LIMIT_BYTES = 8 * 1024;
+    static final int MESSAGE_SIZE_LIMIT_BYTES = 8 * 1024;
+
+    private final StompClientGuard guard;
+
+    WebSocketConfig(StompClientGuard guard) {
+        this.guard = guard;
+    }
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
@@ -39,6 +45,6 @@ class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {
-        registration.interceptors(new StompClientGuard());
+        registration.interceptors(guard);
     }
 }

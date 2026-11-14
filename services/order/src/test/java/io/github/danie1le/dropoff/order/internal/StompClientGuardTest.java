@@ -75,10 +75,36 @@ class StompClientGuardTest {
     }
 
     @Test
+    void aRejectedSubscriptionIsNotRecorded() {
+        fillToCap("s1");
+        assertThatThrownBy(() -> guard.preSend(subscribe("s1", "over"), channel))
+                .isInstanceOf(MessageDeliveryException.class);
+
+        guard.preSend(sessionFrame(StompCommand.UNSUBSCRIBE, "s1", "sub-0"), channel);
+
+        // Had "over" been recorded, the session would still be full and "next" would be rejected.
+        Message<byte[]> next = subscribe("s1", "next");
+        assertThat(guard.preSend(next, channel)).isSameAs(next);
+        // Full again, and "over" is a new id rather than a repeat, so it is still rejected.
+        assertThatThrownBy(() -> guard.preSend(subscribe("s1", "over"), channel))
+                .isInstanceOf(MessageDeliveryException.class);
+    }
+
+    @Test
+    void aSubscriptionWithoutIdsPassesUncounted() {
+        Message<byte[]> noSession = subscribe(null, "sub-0");
+        Message<byte[]> noSubscription = subscribe("s1", null);
+
+        assertThat(guard.preSend(noSession, channel)).isSameAs(noSession);
+        assertThat(guard.preSend(noSubscription, channel)).isSameAs(noSubscription);
+        assertThat(guard.trackedSessions()).isZero();
+    }
+
+    @Test
     void unsubscribeFreesASlot() {
         fillToCap("s1");
 
-        guard.preSend(session(StompCommand.UNSUBSCRIBE, "s1", "sub-0"), channel);
+        guard.preSend(sessionFrame(StompCommand.UNSUBSCRIBE, "s1", "sub-0"), channel);
 
         Message<byte[]> next = subscribe("s1", "next");
         assertThat(guard.preSend(next, channel)).isSameAs(next);
@@ -88,7 +114,7 @@ class StompClientGuardTest {
     void disconnectClearsTheSession() {
         fillToCap("s1");
 
-        guard.preSend(session(StompCommand.DISCONNECT, "s1", null), channel);
+        guard.preSend(sessionFrame(StompCommand.DISCONNECT, "s1", null), channel);
 
         assertThat(guard.trackedSessions()).isZero();
         Message<byte[]> again = subscribe("s1", "sub-0");
@@ -109,15 +135,21 @@ class StompClientGuardTest {
         }
     }
 
-    private static Message<byte[]> subscribe(String sessionId, String subscriptionId) {
+    private static Message<byte[]> subscribe(@Nullable String sessionId, @Nullable String subscriptionId) {
         StompHeaderAccessor stomp = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
         stomp.setDestination("/topic/orders/42");
-        stomp.setSessionId(sessionId);
-        stomp.setSubscriptionId(subscriptionId);
+        if (sessionId != null) {
+            stomp.setSessionId(sessionId);
+        }
+        if (subscriptionId != null) {
+            stomp.setSubscriptionId(subscriptionId);
+        }
         return MessageBuilder.createMessage(new byte[0], stomp.getMessageHeaders());
     }
 
-    private static Message<byte[]> session(StompCommand command, String sessionId, @Nullable String subscriptionId) {
+    /** A frame of the given command carrying a session id, and a subscription id when one is given. */
+    private static Message<byte[]> sessionFrame(
+            StompCommand command, String sessionId, @Nullable String subscriptionId) {
         StompHeaderAccessor stomp = StompHeaderAccessor.create(command);
         stomp.setSessionId(sessionId);
         if (subscriptionId != null) {
