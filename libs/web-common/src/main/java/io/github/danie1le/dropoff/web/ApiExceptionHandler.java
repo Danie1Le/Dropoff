@@ -24,6 +24,7 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+import tools.jackson.core.exc.StreamConstraintsException;
 
 /**
  * Turns every error into an RFC 9457 Problem Details body with a stable {@code code} field (ticket #8). Domain
@@ -34,11 +35,20 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
+    // The built-in codes: set here and by RequestSizeLimitFilter, listed in Swagger by ProblemDetailsOpenApi.
+    static final String VALIDATION_FAILED = "VALIDATION_FAILED";
+    static final String MALFORMED_REQUEST = "MALFORMED_REQUEST";
+    static final String CONTENT_TOO_LARGE = "CONTENT_TOO_LARGE";
+    static final String INTERNAL_ERROR = "INTERNAL_ERROR";
+
     private static final String CODE = "code";
     private static final String ERRORS = "errors";
     private static final String TYPE_MISMATCH = "typeMismatch";
-    private static final String INTERNAL_ERROR = "INTERNAL_ERROR";
     private static final String INTERNAL_DETAIL = "An unexpected error occurred.";
+    private static final String CONTENT_TOO_LARGE_DETAIL =
+            "The request body is larger than " + RequestSizeLimitFilter.MAX_BODY_BYTES + " bytes.";
+    /** How Jackson's message for a {@code maxDocumentLength} violation starts; its other limits say something else. */
+    private static final String DOCUMENT_LENGTH_MESSAGE = "Document length";
 
     /** One invalid input: which field or parameter, and why. */
     record FieldViolation(String field, String message) {}
@@ -108,7 +118,12 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @Override
     protected ResponseEntity<Object> handleHttpMessageNotReadable(
             HttpMessageNotReadableException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
-        return badRequest("MALFORMED_REQUEST", "The request body could not be read.", headers, null);
+        if (exceedsDocumentLength(ex)) {
+            return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE)
+                    .headers(headers)
+                    .body(contentTooLarge());
+        }
+        return badRequest(MALFORMED_REQUEST, "The request body could not be read.", headers, null);
     }
 
     /**
@@ -140,8 +155,32 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return response;
     }
 
+    /**
+     * The 413 body for a request body over {@link RequestSizeLimitFilter#MAX_BODY_BYTES}. Both this handler and the
+     * filter use it, so the two 413 paths return the same problem.
+     */
+    static ProblemDetail contentTooLarge() {
+        return problem(HttpStatus.CONTENT_TOO_LARGE, CONTENT_TOO_LARGE, CONTENT_TOO_LARGE_DETAIL);
+    }
+
+    /**
+     * Jackson hit the {@code maxDocumentLength} cap from {@link JsonLimitsConfig} while parsing the body. Its other
+     * read limits (nesting depth, number, name or string length) mean a malformed body, not a large one, so they stay
+     * a 400. {@code StreamConstraintsException} has no field saying which limit failed, so the message tells them
+     * apart.
+     */
+    private static boolean exceedsDocumentLength(Throwable ex) {
+        for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
+            if (cause instanceof StreamConstraintsException limit
+                    && String.valueOf(limit.getOriginalMessage()).startsWith(DOCUMENT_LENGTH_MESSAGE)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static ResponseEntity<Object> validationFailed(List<FieldViolation> violations, HttpHeaders headers) {
-        return badRequest("VALIDATION_FAILED", "The request has invalid fields.", headers, violations);
+        return badRequest(VALIDATION_FAILED, "The request has invalid fields.", headers, violations);
     }
 
     private static ResponseEntity<Object> badRequest(
