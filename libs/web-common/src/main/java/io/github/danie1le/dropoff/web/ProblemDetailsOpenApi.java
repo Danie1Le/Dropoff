@@ -25,8 +25,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 
 /**
  * Documents the RFC 9457 Problem Details errors from {@link ApiExceptionHandler} in Swagger (M1-4, ticket #8). Adds a
- * {@code Problem} schema, then gives every operation its error responses: 400 and 500 always, plus the statuses and
- * codes listed by {@link ProblemResponse} on the controller method.
+ * {@code Problem} schema, then gives every operation its error responses: 400 and 500 always, 413 when it reads a
+ * body, plus the statuses and codes listed by {@link ProblemResponse} on the controller method.
  */
 @Configuration(proxyBeanMethods = false)
 class ProblemDetailsOpenApi {
@@ -56,12 +56,13 @@ class ProblemDetailsOpenApi {
                         .addAll(Arrays.asList(response.codes()));
             }
             Set<String> badRequest = codes.computeIfAbsent(400, status -> new LinkedHashSet<>());
-            badRequest.add("VALIDATION_FAILED");
+            badRequest.add(ApiExceptionHandler.VALIDATION_FAILED);
             if (Arrays.stream(handlerMethod.getMethodParameters())
                     .anyMatch(parameter -> parameter.hasParameterAnnotation(RequestBody.class))) {
-                badRequest.add("MALFORMED_REQUEST");
+                badRequest.add(ApiExceptionHandler.MALFORMED_REQUEST);
+                codes.computeIfAbsent(413, status -> new LinkedHashSet<>()).add(ApiExceptionHandler.CONTENT_TOO_LARGE);
             }
-            codes.computeIfAbsent(500, status -> new LinkedHashSet<>()).add("INTERNAL_ERROR");
+            codes.computeIfAbsent(500, status -> new LinkedHashSet<>()).add(ApiExceptionHandler.INTERNAL_ERROR);
 
             ApiResponses responses = operation.getResponses();
             if (responses == null) {
