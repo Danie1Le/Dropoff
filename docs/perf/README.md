@@ -2,7 +2,7 @@
 
 M7 measures the three services under load, picks fixes from the numbers, and measures again (ticket #35,
 `docs/PLAN.md` section M7, `docs/milestones/M7.md`). This file holds the setup, the baseline (M7-2), the changes with
-their `EXPLAIN` and the after numbers (M7-3), and the summary below (M7-5). The repo README (M8-2) will link here.
+their `EXPLAIN` and the after numbers (M7-3), and the summary below (M7-5).
 
 ## Summary
 
@@ -24,13 +24,13 @@ same harness, `LOAD_PROFILE=full`. Every number is copied from a section below. 
 | `POST /orders` p99 | 66.24 ms | 1,260.54 ms | +1,803% (most likely the host, not proven) | [`place-orders`](#place-orders) |
 | `browse` | p95 1.80 ms | not measured again | none | merchant-service was not touched |
 
-What the table does and does not say:
+Reading the table:
 
 - The wins are in the database, and they are measured per statement. End-to-end latency was already far under the 300 ms
-  threshold in every run, so the endpoint percentiles move by tenths of a millisecond. That is why the DB-time rows
-  carry the evidence and the percentile rows are context.
-- `POST /orders` p95 and p99 got worse in the median after run. This is not claimed as a regression and not claimed as
-  noise. All three after runs had a p99 above the baseline's worst (527 ms), but one back-to-back pair on the same host
+  threshold in every run, so the endpoint percentiles move by tenths of a millisecond. The DB-time rows are the
+  evidence; the percentile rows are context.
+- `POST /orders` p95 and p99 got worse in the median after run. The cause is unproven: the rise is neither claimed as a
+  regression nor dismissed as noise. All three after runs had a p99 above the baseline's worst (527 ms), but one back-to-back pair on the same host
   state (n=1) had this branch at 49.48 ms against 268.38 ms on `main`. The most likely cause is host pauses on a host
   with about 2 GB free (the baseline had 4.8 GB). Two more pairs would settle it and were not run. p50 is the stable
   comparison: 6.57 to 6.72 ms on this branch in all four runs, against 7.06 to 7.33 ms in the baseline.
@@ -38,7 +38,7 @@ What the table does and does not say:
   about 27 of roughly 16,500 orders were dispatched per run and about 15,800 stayed READY. It is reported in
   [Dispatch p95](#dispatch-p95) and is not part of the comparison above.
 - Three changes shipped in one PR (#126), against #122's one-change-per-PR rule, so the `place-orders` p50 gain cannot
-  be split between the line change and the status change. The per-statement numbers attribute each.
+  be split between the line change and the status change. The per-statement numbers show each one's effect.
 - M7-4 was skipped: after M7-3 no remaining target was worth a second PR (see [What's left](#whats-left)).
 
 ## Setup
@@ -57,8 +57,8 @@ What the table does and does not say:
 | Couriers | 30, the simulator's default (see [Dispatch p95](#dispatch-p95)) |
 
 The stack ran with the `demo` profile, which is the `services` profile (merchant, order, dispatch) plus the simulator.
-The simulator is needed: its merchant bots accept and prepare the orders `place-orders` sends, and its courier bots take
-the dispatch offers. Without it, orders stop at PLACED and dispatch has nothing to measure. Its customer bots also place
+The simulator is required: its merchant bots accept and prepare the orders `place-orders` sends, and its courier bots
+take the dispatch offers. Without it, orders stop at PLACED and dispatch has nothing to measure. Its customer bots also place
 about 6 orders a minute in the background, which is noise next to the load.
 
 Nothing else ran on the machine during the runs. No container was OOM-killed or restarted (checked with
@@ -124,11 +124,11 @@ the baseline.
 This p95 doesn't measure dispatch. The timer records an order only when a courier accepts it. With 30 couriers, all 30
 were BUSY at the end of every run, about 27 orders were dispatched in 10 minutes, and about 15,800 stayed READY at the end (the order_db count above;
 the Prometheus peak is lower, 13,669; the two are different sources, read at different times, and not reconciled here).
-The ones that got a courier were the lucky few that turned READY just as a courier came free, so their p95 is a couple
-of seconds. The rest never got one: about 27 of roughly 16,500 placed orders (under 0.2%) were accepted by a courier.
+The few orders that got a courier turned READY just as a courier came free, so their p95 is a couple of seconds. The
+rest never got one: about 27 of roughly 16,500 placed orders (under 0.2%) were accepted by a courier.
 
-More couriers would not fix this. A delivery takes several minutes at the simulator's 30 km/h, and the load brings
-about 27 orders a second. Keeping up would take thousands of couriers. The simulator runs one bot per courier in a
+Adding couriers would not fix this. A delivery takes several minutes at the simulator's 30 km/h, and the load
+brings about 27 orders a second. Keeping up would take thousands of couriers. The simulator runs one bot per courier in a
 256 MB container and seeds a fixed 30 (`Seeder.COURIERS`), so this baseline keeps 30. Treat dispatch p95 as a
 courier-capacity number. M7-3/4 compare it only between runs with the same courier count.
 
@@ -191,7 +191,7 @@ Three changes in one PR, all in order-service and all aimed at the targets above
 the existing tests pass unchanged, and two new `OrderListRepositoryIT` cases pin the history order (ties broken by the
 newest id) and the totals on every page.
 
-Deviation from #122 ("each optimization its own PR", one thing at a time): this PR has three changes. Re-measuring is about an hour per scenario on this host, and the line change and the status change both sit on the same `POST /orders` path. Splitting would have meant re-measuring `place-orders` for each. So the k6 `place-orders` p50 gain cannot be split between the two changes. The per-statement `pg_stat_statements` numbers below attribute each statement separately; use them as the evidence for each change.
+This PR departs from #122 ("each optimization its own PR", one thing at a time) and makes three changes. Re-measuring takes about an hour per scenario on this host, and the line change and the status change both sit on the same `POST /orders` path, so splitting them would have meant re-measuring `place-orders` for each. The k6 `place-orders` p50 gain therefore cannot be split between the two changes. The per-statement `pg_stat_statements` numbers below show each statement separately; use them as the evidence for each change.
 
 | Change | Target it hits |
 |---|---|
@@ -298,14 +298,14 @@ table rows for them.
 After, runs 1, 2 and 3: p50 6.69, 6.72, 6.67 ms; p95 17.60, 19.42, 14.68 ms; p99 2,074.09, 1,260.54, 889.28 ms. k6
 dropped 206, 52 and 71 iterations.
 
-The p95 and p99 rise is most likely the host, not the change, but this PR did not prove it. All 3 after-run p99 values (2,074.09, 1,260.54, 889.28 ms) exceed the baseline's worst (527 ms), and k6 dropped 206 / 52 / 71 iterations, against 29 / 64 / 0 in the baseline. One extra back-to-back pair on the same host state (n=1) points at the host:
+The p95 and p99 rise is most likely the host, not the change, but this was not proven. All 3 after-run p99 values (2,074.09, 1,260.54, 889.28 ms) exceed the baseline's worst (527 ms), and k6 dropped 206 / 52 / 71 iterations, against 29 / 64 / 0 in the baseline. One extra back-to-back pair on the same host state (n=1) points at the host:
 
 | Run | p50 | p95 | p99 |
 |---|---|---|---|
 | `main` (`ddca65c`), 1 run | 7.18 ms | 14.58 ms | 268.38 ms |
 | this branch, 1 run | 6.57 ms | 12.38 ms | 49.48 ms |
 
-In that pair this branch had a p99 of 49 ms against 268 ms on `main`. That is one pair, so the tail cause is most likely host pauses on a host short of memory (about 2 GB free, against 4.8 GB at the baseline: GC, Docker, paging), not the SQL. Two more back-to-back pairs would settle it; they were not run. p50 is the stable comparison: 6.57 to 6.72 ms on this branch in all four runs, against 7.06 to 7.33 ms in the baseline and 7.18 ms on `main`, about 0.4 ms (-5%) faster. Part of that is the DB time saved per order below (about
+In that pair this branch had a p99 of 49 ms against 268 ms on `main`. It is only one pair, but it fits host pauses on a machine short of memory (about 2 GB free, against 4.8 GB at the baseline: GC, Docker, paging) better than it fits the SQL. Two more back-to-back pairs would settle it; they were not run. p50 is the stable comparison: 6.57 to 6.72 ms on this branch in all four runs, against 7.06 to 7.33 ms in the baseline and 7.18 ms on `main`, about 0.4 ms (-5%) faster. Part of that is the DB time saved per order below (about
 0.19 ms for the line updates), and part is the two round trips those updates no longer make.
 
 `pg_stat_statements` for the targeted statements in order_db (calls / total / mean). "Control" is the `main` run of the
@@ -319,11 +319,11 @@ pair above. The baseline's top 5 didn't list the line insert.
 | `INSERT INTO order_events (...)` | 62,179 / 6,906 ms / 0.11 ms | 62,012 / 7,048 ms / 0.11 ms | 61,836 / 7,197 ms / 0.12 ms |
 | `insert into orders (...)` | 16,531 / 3,056 ms / 0.18 ms | 16,493 / 3,122 ms / 0.19 ms | 16,488 / 3,120 ms / 0.19 ms |
 
-- **`order_lines`:** the control shows that Hibernate already wrote `order_id` in the line `INSERT` and then set it
+- `order_lines`: the control shows that Hibernate already wrote `order_id` in the line `INSERT` and then set it
   again with an `UPDATE`, once per line. That came from the unidirectional `@OneToMany @JoinColumn`. With the line
   owning the column, the `UPDATE` is gone and the insert costs the same: 3,097 ms of DB time per run saved, about
   0.19 ms per order, with no other cost.
-- **Status `UPDATE`:** the old statement joined `orders` to a `FOR UPDATE` sub-select of itself to read the old status,
+- Status `UPDATE`: the old statement joined `orders` to a `FOR UPDATE` sub-select of itself to read the old status,
   so it probed the primary key twice and added a `LockRows` node. An `UPDATE` with the source statuses in its `WHERE`
   already waits for a racing command's row lock and re-checks the `WHERE` on the new row version (READ COMMITTED). So
   `RETURNING old.status` (new in Postgres 18) gives the same answer, with one probe:
@@ -344,7 +344,7 @@ pair above. The baseline's top 5 didn't list the line insert.
 
   The gain is small, 0.19 ms to 0.18 ms a call and 8,766 ms to 8,283 ms a run (−5.5%). Most of an `UPDATE`'s cost is
   writing the new row version and its index entries. `status` is in three indexes, so the update can't be HOT.
-- **`order_events`:** unchanged. It is one audit row per status change (ticket #10), so it can't be skipped, and its
+- `order_events`: unchanged. It is one audit row per status change (ticket #10), so it can't be skipped, and its
   0.11 ms includes the foreign-key check on `orders`.
 
 The four statements other than the line insert took 21,762 ms of DB time per run in the baseline, 22,147 ms in the

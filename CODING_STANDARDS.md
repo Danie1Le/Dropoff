@@ -1,6 +1,6 @@
 # Coding standards
 
-How code in Dropoff is written and reviewed. Decided in [Coding standards for code review](https://github.com/Danie1Le/Dropoff/issues/7) unless a rule cites another source. Each rule has a one-line "why". Rules marked **(tool)** are enforced by the build, so code review skips them. Everything else, including rules marked **(review)**, is checked in code review.
+How code in Dropoff is written and reviewed. Decided in [Coding standards for code review](https://github.com/Danie1Le/Dropoff/issues/7) unless a rule cites another source. Each rule has a one-line reason. Rules marked **(tool)** are enforced by the build, so code review skips them. Everything else, including rules marked **(review)**, is checked in code review.
 
 ## Format
 
@@ -76,10 +76,10 @@ How code in Dropoff is written and reviewed. Decided in [Coding standards for co
 The PR workflow details below (one plan step per PR, posting and answering review findings, green CI) come from `docs/PLAN.md`, "How every PR works".
 
 - Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:` …).
-  _Why:_ history reads as a changelog, and authorship stays with the human.
+  _Why:_ history reads as a changelog.
 - Small PRs, one plan step each (see `docs/PLAN.md`).
   _Why:_ small diffs get real review and are easy to revert.
 - Before a PR is handed over for review, run the `code-review` skill, post its findings as PR comments, fix or answer each one, resolve them all, then mark the PR ready.
-  _Why:_ mechanical findings are fixed before a human spends time on the PR.
+  _Why:_ mechanical findings are fixed before a reviewer spends time on the PR.
 - CI must be green before merging.
   _Why:_ `main` always builds.

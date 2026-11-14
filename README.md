@@ -7,11 +7,10 @@ three Spring Boot services that talk through REST and Kafka events. It runs loca
 
 ![Demo: simulator watch beside the Grafana dashboard](docs/media/demo.gif)
 
-The GIF shows `simulator watch <orderId>` printing an order's live messages beside the Grafana dashboard taking
-orders. It is about 6x sped up: each 2 s frame is a headless screenshot taken about 12 s of real time after the last. It is
-a timed sequence stitched with ffmpeg, not a screen recording; rebuild it with `ops/media/capture.ps1` while the demo stack
-runs. To see the same thing yourself, follow the [quick start](#quick-start) and
-[Running the simulator](#running-the-simulator).
+The GIF shows `simulator watch <orderId>` printing an order's live messages next to the Grafana dashboard as orders
+come in. It plays about 6x faster than real time: each frame shows for 2 s and is a headless screenshot taken about 12 s
+after the one before, joined with ffmpeg. Rebuild it with `ops/media/capture.ps1` while the demo stack runs. To watch it
+live, follow the [quick start](#quick-start) and [Running the simulator](#running-the-simulator).
 
 ![Grafana overview dashboard with the demo bots running](docs/media/grafana-overview.png)
 
@@ -19,24 +18,24 @@ runs. To see the same thing yourself, follow the [quick start](#quick-start) and
 |---|---|
 | ![Swagger UI](docs/media/swagger-order.png) | ![k6 summary](docs/media/k6-summary.png) |
 
-This k6 summary was captured on a laptop under memory pressure (~2 GB free) and shows the p95 threshold failing; the clean
-median-of-3 baseline, where every threshold passes, is in [docs/perf/README.md](docs/perf/README.md). Re-run
-`ops/media/capture.ps1 -K6Only` on an idle machine to refresh it.
+The k6 summary was captured on a laptop with about 2 GB of free memory, so its p95 threshold fails. The clean baseline,
+the median of 3 runs with every threshold passing, is in [docs/perf/README.md](docs/perf/README.md). To refresh the
+screenshot, run `ops/media/capture.ps1 -K6Only` on an idle machine.
 
 ## Features
 
 - **Merchants and menus:** create merchants and menu items, and toggle item availability.
-- **Orders:** idempotent order placement with a price snapshot on each line, and a status lifecycle driven by path-scoped
-  commands (`/merchants/{id}/orders/...`).
-- **Dispatch:** the nearest available courier for a ready order, found with Redis geo queries; offers that can be
-  declined or time out, and reassignment.
+- **Orders:** placing an order is idempotent, each line keeps a snapshot of its price, and orders move through their
+  statuses with path-scoped commands (`/merchants/{id}/orders/...`).
+- **Dispatch:** each ready order is offered to the nearest available courier, found with Redis geo queries. If the
+  courier declines or the offer times out, the order goes to the next courier.
 - **Events:** services talk through Kafka (`order-events`, `courier-events`, `courier-locations`, `merchants`,
   `menu-items`), with a transactional outbox, idempotent consumers, retries and dead-letter topics.
 - **Live tracking:** STOMP over WebSocket (`ws://localhost:8082/ws`) pushes order status and courier location.
-- **OpenAPI:** every endpoint documented in Swagger UI, one per service.
+- **OpenAPI:** every endpoint is documented in Swagger UI, one per service.
 - **Monitoring:** Micrometer metrics, Prometheus, and a provisioned Grafana dashboard with alert rules.
-- **Load tests and a measured optimization:** k6 scripts and a before/after write-up.
-- **A simulator** with customer, merchant and courier bots, plus a full-flow smoke test that CI runs.
+- **Load tests:** k6 scripts, plus a before-and-after write-up of the optimizations they led to.
+- **Simulator:** customer, merchant and courier bots, plus a full-flow smoke test that CI runs.
 
 ## Architecture
 
@@ -161,7 +160,7 @@ docker compose --profile demo run --rm simulator smoke       # full-flow check: 
 ```
 
 Options include `--orders-per-minute`, `--speed-kmh`, `--duration`, `--orders`, `--timeout` and one URL per service.
-Couriers drive at 30 km/h by default, so the first deliveries take a few minutes; the demo logs show `delivered=` climbing.
+Couriers drive at 30 km/h by default, so the first deliveries take a few minutes. Watch `delivered=` climb in the demo logs.
 The host simulator keeps its ids in `.simulator/state.json`; delete that file after `docker compose down -v`.
 
 ## Order lifecycle and event flow
@@ -207,20 +206,19 @@ scope and milestones in [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md) and [docs/PLA
 - `./gradlew build` runs formatting (Spotless), static checks (Error Prone, NullAway), the unit tests and the integration
   tests. Each service also has a Spring Modulith test that verifies its module boundaries.
 - `ops/smoke/full-flow.sh` places 5 orders through the real services and exits 0 once all are delivered.
-  `ops/smoke/full-flow.sh --compose` runs it inside Compose, as CI does. A state file left by an earlier run is checked
-  first; if it is stale (after `docker compose down -v`), the check retries for 20 s before it fails. A fresh seed is
-  not checked, so that delay applies only to reused files.
+  `ops/smoke/full-flow.sh --compose` runs it inside Compose, as CI does. If it reuses a state file from an earlier run
+  and that file is stale (after `docker compose down -v`), it retries for 20 s before it fails.
 
 Run one Gradle build at a time on a small machine, and `./gradlew --stop` when done.
 
 ## Performance
 
-The k6 harness is in `ops/k6/`. The full write-up has the setup, the baseline, each change with its `EXPLAIN` output, and
-the after numbers. The summary table is at the top of
-[docs/perf/README.md](docs/perf/README.md#summary). The headline: deep order-history pages went from 2,123 to 99
-buffers per query (-95%) and the query's mean time fell 77%, from a wider index and a deferred join.
-End-to-end latency was already far under the 300 ms threshold, so the wins show in database time, not in the endpoint
-percentiles. Run a script with:
+The k6 scripts are in `ops/k6/`. The [performance write-up](docs/perf/README.md#summary) covers the setup, the
+baseline, each change with its `EXPLAIN` output, and the numbers after, with a summary table at the top.
+
+The biggest change was a wider index and a deferred join on deep order-history pages: they now read 99 buffers per
+query instead of 2,123 (-95%), and the query's mean time fell 77%. End-to-end latency was already well under the 300 ms
+threshold, so the gains show up in database time rather than in the endpoint percentiles. Run a script with:
 
 ```bash
 docker compose --profile demo --profile load run --rm k6 run browse.js
@@ -230,15 +228,15 @@ docker compose --profile demo --profile load run --rm k6 run browse.js
 
 Prometheus scrapes `/actuator/prometheus` on all three services every 15 s. Grafana at http://localhost:3000 opens on a
 provisioned dashboard (orders per minute, latency, errors, dispatch time, offer outcomes, waiting orders, couriers by
-status, consumer lag and dead letters), and its alert rules show in the
-UI only.
+status, consumer lag and dead letters). Its alert rules show only in the Grafana UI.
 
 ![Grafana overview](docs/media/grafana-overview.png)
 
 ## Known gaps
 
-- **No authentication or authorization.** Every endpoint is open, and the services trust their callers. Grafana also allows anonymous Viewer access on port 3000.
-- **No payments.** Prices are recorded on each order, and nothing is charged.
+- **No authentication or authorization.** Every endpoint is open, and the services trust their callers. Grafana also
+  allows anonymous Viewer access on port 3000.
+- **No payments.** Each order records its prices, but nothing is charged.
 - **Run one order-service instance.** Its STOMP broker lives in memory, and `courier-locations` is read by a single
   consumer group, so a second instance would miss messages. Scaling out needs a consumer group per instance and a
   shared broker relay.
