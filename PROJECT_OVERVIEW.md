@@ -28,22 +28,22 @@ Entry-level backend and software engineering roles at delivery and marketplace c
 
 ### Core (MVP)
 
-- Merchants and menus: create merchants, menus, and items, and toggle item availability.
-- Orders: customers place orders, and each order moves through a status lifecycle: `PLACED → ACCEPTED → PREPARING → READY → PICKED_UP → DELIVERED` (or `CANCELLED`).
-- Couriers: register couriers, set their status (Offline, Available, Busy), and update their location.
-- Dispatch: pick the nearest available courier for a ready order using Redis geo queries.
-- REST APIs: documented with OpenAPI/Swagger.
-- Validation and error handling: consistent error responses and input validation.
+- **Merchants and menus:** create merchants, menus, and items, and toggle item availability.
+- **Orders:** customers place orders, and each order moves through a status lifecycle: `PLACED → ACCEPTED → PREPARING → READY → PICKED_UP → DELIVERED` (or `CANCELLED`).
+- **Couriers:** register couriers, set their status (Offline, Available, Busy), and update their location.
+- **Dispatch:** pick the nearest available courier for a ready order using Redis geo queries.
+- **REST APIs:** documented with OpenAPI/Swagger.
+- **Validation and error handling:** consistent error responses and input validation.
 
 ### Stand-out features
 
-- Event-driven flow: services publish and consume Kafka events such as `OrderPlaced`, `OrderReady`, `CourierAssigned`, and `OrderDelivered`.
-- Live tracking: WebSocket updates for order status and courier location.
-- Idempotency: retry-safe order creation using idempotency keys.
-- Failure handling: reassign an order if its offer is declined or goes unanswered, or its courier goes offline before pickup, and retry consumers with a dead-letter topic.
-- Load testing: k6 scripts that simulate high order volume, with results in the README.
-- Performance writeup: before-and-after measurements of an optimization such as an index, a cache, or batching.
-- Monitoring: Prometheus metrics and a Grafana dashboard for request latency, orders per minute, and dispatch time.
+- **Event-driven flow:** services publish and consume Kafka events such as `OrderPlaced`, `OrderReady`, `CourierAssigned`, and `OrderDelivered`.
+- **Live tracking:** WebSocket updates for order status and courier location.
+- **Idempotency:** retry-safe order creation using idempotency keys.
+- **Failure handling:** reassign an order if its offer is declined or goes unanswered, or its courier goes offline before pickup, and retry consumers with a dead-letter topic.
+- **Load testing:** k6 scripts that simulate high order volume, with results in the README.
+- **Performance writeup:** before-and-after measurements of an optimization such as an index, a cache, or batching.
+- **Monitoring:** Prometheus metrics and a Grafana dashboard for request latency, orders per minute, and dispatch time.
 
 ### Stretch goals
 

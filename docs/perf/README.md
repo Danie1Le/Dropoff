@@ -29,9 +29,9 @@ Reading the table:
 - The wins are in the database, and they are measured per statement. End-to-end latency was already far under the 300 ms
   threshold in every run, so the endpoint percentiles move by tenths of a millisecond. The DB-time rows are the
   evidence; the percentile rows are context.
-- `POST /orders` p95 and p99 got worse in the median after run. The cause is unproven: the rise is neither claimed as a
-  regression nor dismissed as noise. All three after runs had a p99 above the baseline's worst (527 ms), but one back-to-back pair on the same host
-  state (n=1) had this branch at 49.48 ms against 268.38 ms on `main`. The most likely cause is host pauses on a host
+- `POST /orders` p95 and p99 got worse in the median after run. Whether the rise is a regression or noise is unproven.
+  All three after runs had a p99 above the baseline's worst (527 ms), but one back-to-back pair on the same host state
+  (n=1) had this branch at 49.48 ms against 268.38 ms on `main`. The most likely cause is host pauses on a host
   with about 2 GB free (the baseline had 4.8 GB). Two more pairs would settle it and were not run. p50 is the stable
   comparison: 6.57 to 6.72 ms on this branch in all four runs, against 7.06 to 7.33 ms in the baseline.
 - Dispatch p95 (2.13 s baseline, 2.72 s after) is a courier-capacity number, not a dispatch result. With 30 couriers,
@@ -58,8 +58,8 @@ Reading the table:
 
 The stack ran with the `demo` profile, which is the `services` profile (merchant, order, dispatch) plus the simulator.
 The simulator is required: its merchant bots accept and prepare the orders `place-orders` sends, and its courier bots
-take the dispatch offers. Without it, orders stop at PLACED and dispatch has nothing to measure. Its customer bots also place
-about 6 orders a minute in the background, which is noise next to the load.
+take the dispatch offers. Without it, orders stop at PLACED and dispatch has nothing to measure. Its customer bots also
+place about 6 orders a minute in the background, which is noise next to the load.
 
 Nothing else ran on the machine during the runs. No container was OOM-killed or restarted (checked with
 `docker inspect` after every run). The busiest containers at the end of a `place-orders` run used: order 407 to 427 MB
@@ -305,7 +305,7 @@ The p95 and p99 rise is most likely the host, not the change, but this was not p
 | `main` (`ddca65c`), 1 run | 7.18 ms | 14.58 ms | 268.38 ms |
 | this branch, 1 run | 6.57 ms | 12.38 ms | 49.48 ms |
 
-In that pair this branch had a p99 of 49 ms against 268 ms on `main`. It is only one pair, but it fits host pauses on a machine short of memory (about 2 GB free, against 4.8 GB at the baseline: GC, Docker, paging) better than it fits the SQL. Two more back-to-back pairs would settle it; they were not run. p50 is the stable comparison: 6.57 to 6.72 ms on this branch in all four runs, against 7.06 to 7.33 ms in the baseline and 7.18 ms on `main`, about 0.4 ms (-5%) faster. Part of that is the DB time saved per order below (about
+In that pair this branch had a p99 of 49 ms against 268 ms on `main`. It is only one pair, but the tail cause is most likely host pauses on a machine short of memory (about 2 GB free, against 4.8 GB at the baseline: GC, Docker, paging), not the SQL. Two more back-to-back pairs would settle it; they were not run. p50 is the stable comparison: 6.57 to 6.72 ms on this branch in all four runs, against 7.06 to 7.33 ms in the baseline and 7.18 ms on `main`, about 0.4 ms (-5%) faster. Part of that is the DB time saved per order below (about
 0.19 ms for the line updates), and part is the two round trips those updates no longer make.
 
 `pg_stat_statements` for the targeted statements in order_db (calls / total / mean). "Control" is the `main` run of the
@@ -319,11 +319,11 @@ pair above. The baseline's top 5 didn't list the line insert.
 | `INSERT INTO order_events (...)` | 62,179 / 6,906 ms / 0.11 ms | 62,012 / 7,048 ms / 0.11 ms | 61,836 / 7,197 ms / 0.12 ms |
 | `insert into orders (...)` | 16,531 / 3,056 ms / 0.18 ms | 16,493 / 3,122 ms / 0.19 ms | 16,488 / 3,120 ms / 0.19 ms |
 
-- `order_lines`: the control shows that Hibernate already wrote `order_id` in the line `INSERT` and then set it
+- **`order_lines`:** the control shows that Hibernate already wrote `order_id` in the line `INSERT` and then set it
   again with an `UPDATE`, once per line. That came from the unidirectional `@OneToMany @JoinColumn`. With the line
   owning the column, the `UPDATE` is gone and the insert costs the same: 3,097 ms of DB time per run saved, about
   0.19 ms per order, with no other cost.
-- Status `UPDATE`: the old statement joined `orders` to a `FOR UPDATE` sub-select of itself to read the old status,
+- **Status `UPDATE`:** the old statement joined `orders` to a `FOR UPDATE` sub-select of itself to read the old status,
   so it probed the primary key twice and added a `LockRows` node. An `UPDATE` with the source statuses in its `WHERE`
   already waits for a racing command's row lock and re-checks the `WHERE` on the new row version (READ COMMITTED). So
   `RETURNING old.status` (new in Postgres 18) gives the same answer, with one probe:
@@ -344,7 +344,7 @@ pair above. The baseline's top 5 didn't list the line insert.
 
   The gain is small, 0.19 ms to 0.18 ms a call and 8,766 ms to 8,283 ms a run (−5.5%). Most of an `UPDATE`'s cost is
   writing the new row version and its index entries. `status` is in three indexes, so the update can't be HOT.
-- `order_events`: unchanged. It is one audit row per status change (ticket #10), so it can't be skipped, and its
+- **`order_events`:** unchanged. It is one audit row per status change (ticket #10), so it can't be skipped, and its
   0.11 ms includes the foreign-key check on `orders`.
 
 The four statements other than the line insert took 21,762 ms of DB time per run in the baseline, 22,147 ms in the

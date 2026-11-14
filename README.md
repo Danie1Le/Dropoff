@@ -9,8 +9,9 @@ three Spring Boot services that talk through REST and Kafka events. It runs loca
 
 The GIF shows `simulator watch <orderId>` printing an order's live messages next to the Grafana dashboard as orders
 come in. It plays about 6x faster than real time: each frame shows for 2 s and is a headless screenshot taken about 12 s
-after the one before, joined with ffmpeg. Rebuild it with `ops/media/capture.ps1` while the demo stack runs. To watch it
-live, follow the [quick start](#quick-start) and [Running the simulator](#running-the-simulator).
+after the one before. The frames are joined with ffmpeg, so it is a timed sequence of screenshots, not a screen
+recording. Rebuild it with `ops/media/capture.ps1` while the demo stack runs. To watch it live, follow the
+[quick start](#quick-start) and [Running the simulator](#running-the-simulator).
 
 ![Grafana overview dashboard with the demo bots running](docs/media/grafana-overview.png)
 
@@ -18,23 +19,23 @@ live, follow the [quick start](#quick-start) and [Running the simulator](#runnin
 |---|---|
 | ![Swagger UI](docs/media/swagger-order.png) | ![k6 summary](docs/media/k6-summary.png) |
 
-The k6 summary was captured on a laptop with about 2 GB of free memory, so its p95 threshold fails. The clean baseline,
-the median of 3 runs with every threshold passing, is in [docs/perf/README.md](docs/perf/README.md). To refresh the
-screenshot, run `ops/media/capture.ps1 -K6Only` on an idle machine.
+The k6 summary was captured on a laptop with about 2 GB of free memory, and its p95 threshold fails. The clean
+baseline, the median of 3 runs with every threshold passing, is in [docs/perf/README.md](docs/perf/README.md). To
+refresh the screenshot, run `ops/media/capture.ps1 -K6Only` on an idle machine.
 
 ## Features
 
 - **Merchants and menus:** create merchants and menu items, and toggle item availability.
 - **Orders:** placing an order is idempotent, each line keeps a snapshot of its price, and orders move through their
   statuses with path-scoped commands (`/merchants/{id}/orders/...`).
-- **Dispatch:** each ready order is offered to the nearest available courier, found with Redis geo queries. If the
-  courier declines or the offer times out, the order goes to the next courier.
+- **Dispatch:** each ready order is offered to the nearest available courier, found with Redis geo queries. An offer
+  can be declined or time out, and reassignment then dispatches the order again.
 - **Events:** services talk through Kafka (`order-events`, `courier-events`, `courier-locations`, `merchants`,
   `menu-items`), with a transactional outbox, idempotent consumers, retries and dead-letter topics.
 - **Live tracking:** STOMP over WebSocket (`ws://localhost:8082/ws`) pushes order status and courier location.
 - **OpenAPI:** every endpoint is documented in Swagger UI, one per service.
 - **Monitoring:** Micrometer metrics, Prometheus, and a provisioned Grafana dashboard with alert rules.
-- **Load tests:** k6 scripts, plus a before-and-after write-up of the optimizations they led to.
+- **Load tests:** k6 scripts and a measured before-and-after write-up of an optimization.
 - **Simulator:** customer, merchant and courier bots, plus a full-flow smoke test that CI runs.
 
 ## Architecture
@@ -216,9 +217,9 @@ Run one Gradle build at a time on a small machine, and `./gradlew --stop` when d
 The k6 scripts are in `ops/k6/`. The [performance write-up](docs/perf/README.md#summary) covers the setup, the
 baseline, each change with its `EXPLAIN` output, and the numbers after, with a summary table at the top.
 
-The biggest change was a wider index and a deferred join on deep order-history pages: they now read 99 buffers per
-query instead of 2,123 (-95%), and the query's mean time fell 77%. End-to-end latency was already well under the 300 ms
-threshold, so the gains show up in database time rather than in the endpoint percentiles. Run a script with:
+With a wider index and a deferred join, deep order-history pages now read 99 buffers per query instead of 2,123
+(-95%), and the query's mean time fell 77%. End-to-end latency was already well under the 300 ms threshold, so the
+gains show up in database time rather than in the endpoint percentiles. Run a script with:
 
 ```bash
 docker compose --profile demo --profile load run --rm k6 run browse.js
