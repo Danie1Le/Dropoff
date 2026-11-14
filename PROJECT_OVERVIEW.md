@@ -1,12 +1,12 @@
-# Dropoff — Project Overview
+# Dropoff: project overview
 
 > A real-time order and courier dispatch backend built with Java, Spring Boot, PostgreSQL, Redis, and Kafka.
 
 ## Summary
 
-Dropoff is a backend for a three-sided delivery marketplace: **customers** place orders, **merchants** prepare them, and **couriers** deliver them. It starts as a modular monolith (one Spring Boot app) and splits into a small set of services that communicate through REST APIs and events, with real-time dispatch and live order tracking.
+Dropoff is a backend for a three-sided delivery marketplace: customers place orders, merchants prepare them, and couriers deliver them. It starts as a modular monolith (one Spring Boot app) and splits into a small set of services that communicate through REST APIs and events, with real-time dispatch and live order tracking.
 
-The goal is a portfolio project that demonstrates production-style backend engineering:
+The goal is a portfolio project that shows production-style backend engineering:
 
 - clean, tested code
 - SQL data modeling
@@ -83,37 +83,37 @@ Entry-level backend and software engineering roles at delivery and marketplace c
 
 | Service | Responsibility | Storage |
 |---|---|---|
-| **merchant-service** | Merchants, menus, items, availability | PostgreSQL |
-| **order-service** | Order creation, status lifecycle, idempotency, WebSocket updates | PostgreSQL |
-| **dispatch-service** | Courier status and location, dispatch to the nearest available courier, reassignment | Redis (geo) and PostgreSQL |
+| merchant-service | Merchants, menus, items, availability | PostgreSQL |
+| order-service | Order creation, status lifecycle, idempotency, WebSocket updates | PostgreSQL |
+| dispatch-service | Courier status and location, dispatch to the nearest available courier, reassignment | Redis (geo) and PostgreSQL |
 
 > Decision: start as a single Spring Boot app with clear packages per domain, then split it into services once the core works (see `docs/adr/0001-modular-monolith-first.md`).
 
 ---
 
-## Tech Stack
+## Tech stack
 
 | Layer | Technology |
 |---|---|
-| Language | **Java 21** (optional: Kotlin for one service) |
-| Framework | **Spring Boot 4** (Web MVC, Data JPA, Validation, Actuator, WebSocket/STOMP) + **Spring Modulith** (module boundary checks) |
+| Language | Java 21 (optional: Kotlin for one service) |
+| Framework | Spring Boot 4 (Web MVC, Data JPA, Validation, Actuator, WebSocket/STOMP) + Spring Modulith (module boundary checks) |
 | Build | Gradle (Kotlin DSL) |
-| Database | **PostgreSQL**, with Flyway for migrations |
-| Cache / Geo | **Redis** (`GEOADD` / `GEOSEARCH`) |
-| Messaging | **Kafka** in KRaft mode (Spring in-app events until the service split) |
-| API Docs | springdoc-openapi (Swagger UI) |
+| Database | PostgreSQL, with Flyway for migrations |
+| Cache / Geo | Redis (`GEOADD` / `GEOSEARCH`) |
+| Messaging | Kafka in KRaft mode (Spring in-app events until the service split) |
+| API docs | springdoc-openapi (Swagger UI) |
 | Testing | JUnit 5, Mockito, Testcontainers 2 |
-| Load Testing | k6 |
+| Load testing | k6 |
 | Containers | Docker and Docker Compose |
-| CI/CD | **GitHub Actions** (test, build, publish images to GHCR) |
+| CI/CD | GitHub Actions (test, build, publish images to GHCR) |
 | Monitoring | Micrometer, Prometheus, and Grafana |
 | Tools | IntelliJ IDEA Community, Postman/Bruno, Git |
 
-**Cost: $0.** Everything is open source and runs locally.
+Cost: $0. Everything is open source and runs locally.
 
 ---
 
-## Data Model (rough)
+## Data model (rough)
 
 ```
 merchants(id, name, address, lat, lng, is_open)
@@ -137,7 +137,7 @@ menu_item_copies(menu_item_id, merchant_id, name, price_cents, available)  -- or
 
 ---
 
-## API Sketch
+## API sketch
 
 ```
 POST   /merchants                       create merchant
@@ -180,7 +180,7 @@ WS     /ws  (STOMP)  SUBSCRIBE /topic/orders/{id}   live order + courier updates
 - [ ] Reassignment when an offer is declined or goes unanswered, or the courier goes offline before pickup
 - [ ] Integration tests with Testcontainers
 
-### Events and Real-time
+### Events and real-time
 - [ ] Add Kafka to Docker Compose
 - [ ] Publish and consume order and courier events
 - [ ] Retries and a dead-letter topic
