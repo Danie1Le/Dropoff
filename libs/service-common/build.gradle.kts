@@ -17,11 +17,11 @@ plugins {
 dependencies {
     api(platform(libs.spring.boot.bom))
     api(platform(libs.spring.modulith.bom))
-    // kafka-clients pulls in snappy-java and lz4-java at versions with known advisories (see libs.versions.toml).
+    // kafka-clients pulls in snappy-java and lz4-java at versions with known advisories (IDs in the reasons below).
     // Declared on api so every service's runtime classpath gets the patched versions too.
     constraints {
-        api(libs.snappy.java) { because("GHSA-gwq9-9ffj-mvrv, GHSA-q233-g92q-qxp6, GHSA-xqrx-qh46-34m7") }
-        api(libs.lz4.java) { because("GHSA-mcr4-qmvw-px4g, GHSA-343h-94h5-c4wr, GHSA-gm45-99xc-r7wv") }
+        api(libs.snappy.java) { because("GHSA-gwq9-9ffj-mvrv, GHSA-q233-g92q-qxp6, GHSA-xqrx-qh46-34m7 (fixed in 1.1.10.9)") }
+        api(libs.lz4.java) { because("GHSA-mcr4-qmvw-px4g, GHSA-343h-94h5-c4wr, GHSA-gm45-99xc-r7wv (fixed in 1.11.4), GHSA-48mj-8f7c-7qfm (fixed in 1.12.1)") }
     }
     implementation(project(":contracts"))
     implementation(libs.spring.boot.starter.kafka)

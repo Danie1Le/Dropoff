@@ -15,10 +15,11 @@ jspecify = "1.0.1"
 # Architecture tests outside the app (M5-2): the same ArchUnit Spring Modulith brings into the app
 archunit = "1.4.2"
 
-# Security floors for kafka-clients' compression libraries, above what the Spring Boot BOM brings in
-# snappy-java: GHSA-gwq9-9ffj-mvrv, GHSA-q233-g92q-qxp6, GHSA-xqrx-qh46-34m7 (fixed in 1.1.10.9)
+# Security floors for kafka-clients' compression libraries, above the versions kafka-clients brings in
+# (snappy-java 1.1.10.7, lz4-java 1.11.2). Advisory IDs: see the because() reasons in libs/service-common/build.gradle.kts
+# snappy-java: 1.1.10.9 is the first fixed version; 1.1.10.12 is the latest 1.1.10.x patch
 snappy-java = "1.1.10.12"
-# lz4-java: GHSA-mcr4-qmvw-px4g, GHSA-343h-94h5-c4wr, GHSA-gm45-99xc-r7wv (fixed in 1.11.4)
+# lz4-java: 1.11.4 fixes the first three advisories; 1.14.0 is also past the later 1.12.1 fix
 lz4-java = "1.14.0"
 
 [libraries]
